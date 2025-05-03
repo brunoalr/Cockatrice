@@ -386,10 +386,14 @@ jobs:
           arch: win64_${{matrix.qt_arch}}
           tools: ${{matrix.qt_tools}}
           modules: ${{matrix.qt_modules}}
+      - name: Restore vcpkg cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/vcpkg_cache
+          key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-x64-windows-
 
-      # TODO: re-enable when https://github.com/lukka/run-vcpkg/issues/243 is fixed
-      - if: false
-        name: Run vcpkg (disabled)
+      - name: Run vcpkg (disabled)
         uses: lukka/run-vcpkg@v11
         with:
           runVcpkgInstall: true
@@ -397,13 +401,6 @@ jobs:
         env:
           VCPKG_DEFAULT_TRIPLET: 'x64-windows'
           VCPKG_DISABLE_METRICS: 1
-
-      - name: Restore vcpkg cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ github.workspace }}/vcpkg_cache
-          key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json') }}
-          restore-keys: vcpkg-x64-windows-
 
       - name: Build Cockatrice
         id: build
