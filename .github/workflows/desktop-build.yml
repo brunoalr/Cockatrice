@@ -134,6 +134,7 @@ jobs:
       # Cache size over the entire repo is 10Gi:
       # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CCACHE_SIZE: 200M
+      CMAKE_GENERATOR: 'Ninja'
 
     steps:
       - name: Checkout
@@ -161,6 +162,8 @@ jobs:
       - name: Build debug and test
         if: matrix.test != 'skip'
         shell: bash
+        env:
+          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
         run: |
           source .ci/docker.sh
           RUN --server --debug --test --ccache "$CCACHE_SIZE" --parallel 4
@@ -173,6 +176,7 @@ jobs:
           BUILD_DIR: build
           SUFFIX: '-${{matrix.distro}}${{matrix.version}}'
           type: '${{matrix.package}}'
+          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
         run: |
           source .ci/docker.sh
           RUN --server --release --package "$type" --dir "$BUILD_DIR" \
@@ -240,6 +244,7 @@ jobs:
     env:
       DEVELOPER_DIR:
         /Applications/Xcode_${{matrix.xcode}}.app/Contents/Developer
+      CMAKE_GENERATOR: 'Ninja'
 
     steps:
       - name: Checkout
@@ -267,6 +272,7 @@ jobs:
           MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
+          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
         # macOS runner have 3 cores usually - only the macos-13 image has 4:
         # https://docs.github.com/en/actions/using-github-hosted-runners/using-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-public-repositories
         # https://github.com/actions/runner-images?tab=readme-ov-file#available-images
