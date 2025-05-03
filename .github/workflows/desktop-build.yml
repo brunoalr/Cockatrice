@@ -393,7 +393,7 @@ jobs:
           key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json') }}
           restore-keys: vcpkg-x64-windows-
 
-      - name: Run vcpkg (disabled)
+      - name: Run vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           runVcpkgInstall: true
