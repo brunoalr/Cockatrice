@@ -364,6 +364,7 @@ jobs:
     runs-on: windows-2022
     env:
       CMAKE_GENERATOR: 'Visual Studio 17 2022'
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg_cache,readwrite
 
     steps:
       - name: Add msbuild to PATH
@@ -386,6 +387,7 @@ jobs:
           arch: win64_${{matrix.qt_arch}}
           tools: ${{matrix.qt_tools}}
           modules: ${{matrix.qt_modules}}
+
       - name: Restore vcpkg cache
         uses: actions/cache/restore@v4
         with:
@@ -402,6 +404,12 @@ jobs:
           VCPKG_DEFAULT_TRIPLET: 'x64-windows'
           VCPKG_DISABLE_METRICS: 1
 
+      - name: Save vcpkg cache
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/vcpkg_cache
+          key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json') }}
+
       - name: Build Cockatrice
         id: build
         shell: bash
@@ -413,12 +421,6 @@ jobs:
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
         run: .ci/compile.sh --server --release --test --package
-
-      - name: Save vcpkg cache
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ github.workspace }}/vcpkg_cache
-          key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json') }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
