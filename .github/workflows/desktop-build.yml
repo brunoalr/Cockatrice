@@ -363,7 +363,7 @@ jobs:
     needs: configure
     runs-on: windows-2022
     env:
-      CMAKE_GENERATOR: 'Visual Studio 17 2022'
+      CMAKE_GENERATOR: 'Ninja'
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg_cache,readwrite
 
     steps:
@@ -410,7 +410,6 @@ jobs:
         env:
           PACKAGE_SUFFIX: '-Win${{matrix.target}}'
           CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
-          CMAKE_GENERATOR_PLATFORM: 'x64'
           QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\win64_${{matrix.qt_arch}}'
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
