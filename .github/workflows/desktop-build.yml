@@ -392,7 +392,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/vcpkg_cache
-          key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json') }}
+          key: vcpkg-x64-windows-${{matrix.target}}-${{ hashFiles('vcpkg.json') }}
           restore-keys: vcpkg-x64-windows-
 
       - name: Run vcpkg
@@ -408,7 +408,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/vcpkg_cache
-          key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json') }}
+          key: vcpkg-x64-windows-${{matrix.target}}-${{ hashFiles('vcpkg.json') }}
 
       - name: Build Cockatrice
         id: build
