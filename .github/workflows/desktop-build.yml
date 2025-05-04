@@ -404,12 +404,6 @@ jobs:
           VCPKG_DEFAULT_TRIPLET: 'x64-windows'
           VCPKG_DISABLE_METRICS: 1
 
-      - name: Save vcpkg cache
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ github.workspace }}/vcpkg_cache
-          key: vcpkg-x64-windows-${{matrix.target}}-${{ hashFiles('vcpkg.json') }}
-
       - name: Build Cockatrice
         id: build
         shell: bash
@@ -421,6 +415,12 @@ jobs:
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
         run: .ci/compile.sh --server --release --test --package
+
+      - name: Save vcpkg cache
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/vcpkg_cache
+          key: vcpkg-x64-windows-${{matrix.target}}-${{ hashFiles('vcpkg.json') }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
