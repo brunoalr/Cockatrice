@@ -393,7 +393,7 @@ jobs:
         with:
           path: ${{ github.workspace }}/vcpkg_cache
           key: vcpkg-x64-windows-${{matrix.target}}-${{ hashFiles('vcpkg.json') }}
-          restore-keys: vcpkg-x64-windows-
+          restore-keys: vcpkg-x64-windows-${{matrix.target}}-
 
       - name: Run vcpkg
         uses: lukka/run-vcpkg@v11
