@@ -362,11 +362,12 @@ jobs:
     needs: configure
     runs-on: windows-2022
     env:
-      PREFER_NINJA: 1
+      CMAKE_GENERATOR: 'Ninja'
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg_cache,readwrite
 
     steps:
-      - name: Add msbuild to PATH
+      - if: false
+        name: Add msbuild to PATH
         id: add-msbuild
         uses: microsoft/setup-msbuild@v2
         with:
@@ -408,7 +409,7 @@ jobs:
         shell: bash
         env:
           PACKAGE_SUFFIX: '-Win${{matrix.target}}'
-          PREFER_NINJA: '${{env.PREFER_NINJA}}'
+          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
           QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\win64_${{matrix.qt_arch}}'
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
