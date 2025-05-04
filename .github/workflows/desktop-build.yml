@@ -134,7 +134,6 @@ jobs:
       # Cache size over the entire repo is 10Gi:
       # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CCACHE_SIZE: 200M
-      CMAKE_GENERATOR: 'Ninja'
 
     steps:
       - name: Checkout
@@ -162,8 +161,6 @@ jobs:
       - name: Build debug and test
         if: matrix.test != 'skip'
         shell: bash
-        env:
-          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
         run: |
           source .ci/docker.sh
           RUN --server --debug --test --ccache "$CCACHE_SIZE"
@@ -176,7 +173,6 @@ jobs:
           BUILD_DIR: build
           SUFFIX: '-${{matrix.distro}}${{matrix.version}}'
           type: '${{matrix.package}}'
-          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
         run: |
           source .ci/docker.sh
           RUN --server --release --package "$type" --dir "$BUILD_DIR" \
@@ -240,7 +236,6 @@ jobs:
     env:
       DEVELOPER_DIR:
         /Applications/Xcode_${{matrix.xcode}}.app/Contents/Developer
-      CMAKE_GENERATOR: 'Ninja'
 
     steps:
       - name: Checkout
@@ -268,7 +263,6 @@ jobs:
           MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
-          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
         run: |
           if [[ -n "$MACOS_CERTIFICATE_NAME" ]]
           then
@@ -362,7 +356,6 @@ jobs:
     needs: configure
     runs-on: windows-2022
     env:
-      CMAKE_GENERATOR: 'Ninja'
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg_cache,readwrite
 
     steps:
@@ -409,7 +402,6 @@ jobs:
         shell: bash
         env:
           PACKAGE_SUFFIX: '-Win${{matrix.target}}'
-          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
           QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\win64_${{matrix.qt_arch}}'
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/

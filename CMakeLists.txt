@@ -25,6 +25,8 @@ option(WITH_DBCONVERTER "build dbconverter" ON)
 # Compile tests
 option(TEST "build tests" OFF)
 
+set(CMAKE_GENERATOR "Ninja" CACHE STRING "CMake generator")
+
 # Default to "Release" build type
 # User-provided value for CMAKE_BUILD_TYPE must be checked before the PROJECT() call
 if(DEFINED CMAKE_BUILD_TYPE)
