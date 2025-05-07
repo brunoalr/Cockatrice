@@ -91,7 +91,7 @@ void DeckEditorDeckDockWidget::createDeckDock()
     bannerCardLabel = new QLabel();
     bannerCardLabel->setObjectName("bannerCardLabel");
     bannerCardLabel->setText(tr("Banner Card"));
-    bannerCardLabel->setHidden(SettingsCache::instance().getDeckEditorBannerCardComboBoxVisible());
+    bannerCardLabel->setHidden(!SettingsCache::instance().getDeckEditorBannerCardComboBoxVisible());
     bannerCardComboBox = new QComboBox(this);
     connect(deckModel, &DeckListModel::dataChanged, this, [this]() {
         // Delay the update to avoid race conditions
@@ -294,6 +294,10 @@ void DeckEditorDeckDockWidget::updateBannerCardComboBox()
     int restoredIndex = bannerCardComboBox->findText(currentText);
     if (restoredIndex != -1) {
         bannerCardComboBox->setCurrentIndex(restoredIndex);
+        if (deckModel->getDeckList()->getBannerCard().second !=
+            bannerCardComboBox->itemData(bannerCardComboBox->currentIndex()).toMap()["uuid"].toString()) {
+            setBannerCard(restoredIndex);
+        }
     } else {
         // Add a placeholder "-" and set it as the current selection
         int bannerIndex = bannerCardComboBox->findText(deckModel->getDeckList()->getBannerCard().first);
@@ -563,6 +567,7 @@ void DeckEditorDeckDockWidget::retranslateUi()
     setWindowTitle(tr("Deck"));
 
     nameLabel->setText(tr("Deck &name:"));
+    quickSettingsWidget->setToolTip(tr("Banner Card/Tags Visibility Settings"));
     showBannerCardCheckBox->setText(tr("Show banner card selection menu"));
     showTagsWidgetCheckBox->setText(tr("Show tags selection menu"));
     commentsLabel->setText(tr("&Comments:"));
