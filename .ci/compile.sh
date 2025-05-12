@@ -64,6 +64,11 @@ while [[ $# != 0 ]]; do
       shift
       if [[ $# != 0 && ${1:0:1} != - ]]; then
         CCACHE_SIZE="$1"
+        if [[ $RUNNER_OS == Windows ]]; then
+          CCACHE_BIN=sccache
+        else
+          CCACHE_BIN=ccache
+        fi
         shift
       fi
       ;;
@@ -117,7 +122,7 @@ if [[ $USE_CCACHE ]]; then
   flags+=("-DUSE_CCACHE=1")
   if [[ $CCACHE_SIZE ]]; then
     # note, this setting persists after running the script
-    ccache --max-size "$CCACHE_SIZE"
+    ${CCACHE_BIN} --max-size "$CCACHE_SIZE"
   fi
 fi
 if [[ $PACKAGE_TYPE ]]; then
@@ -140,7 +145,7 @@ fi
 function ccachestatsverbose() {
   # note, verbose only works on newer ccache, discard the error
   local got
-  if got="$(ccache --show-stats --verbose 2>/dev/null)"; then
+  if got="$(${CCACHE_BIN} --show-stats --verbose 2>/dev/null)"; then
     echo "$got"
   else
     ccache --show-stats
