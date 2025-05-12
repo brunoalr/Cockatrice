@@ -248,6 +248,7 @@ jobs:
           restore-keys: |
             ccache-${{ runner.os }}-${{ matrix.target }}-${{ matrix.type }}-master
           create-symlink: true
+          append-timestamp: true
 
       - name: Install dependencies using Homebrew
         shell: bash
