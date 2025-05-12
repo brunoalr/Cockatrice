@@ -370,7 +370,7 @@ jobs:
     runs-on: windows-2022
     env:
       CMAKE_GENERATOR: 'Visual Studio 17 2022'
-
+      CCACHE_SIZE: 500M
     steps:
       - name: Add msbuild to PATH
         id: add-msbuild
@@ -411,7 +411,7 @@ jobs:
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
-        run: .ci/compile.sh --server --release --test --package
+        run: .ci/compile.sh --cache "$CCACHE_SIZE" --server --release --test --package
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
