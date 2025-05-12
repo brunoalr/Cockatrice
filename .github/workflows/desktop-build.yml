@@ -383,6 +383,15 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Restore ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          verbose: 1
+          key: ccache-${{ runner.os }}-${{ matrix.target }}-${{ github.ref_name }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.target }}-master
+          append-timestamp: true
+
       - name: Install Qt ${{matrix.qt_version}}
         uses: jurplel/install-qt-action@v4
         with:
@@ -398,11 +407,6 @@ jobs:
         uses: TAServers/vcpkg-cache@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Restore ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          verbose: 1
 
       - name: Build Cockatrice
         id: build

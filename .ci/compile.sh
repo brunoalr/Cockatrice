@@ -163,7 +163,7 @@ echo "::group::Build project"
 if [[ $RUNNER_OS == Windows ]]; then
   # Enable MTT, see https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
   # and https://devblogs.microsoft.com/cppblog/cpp-build-throughput-investigation-and-tune-up/#multitooltask-mtt
-  VERBOSE=1 cmake --build . "${buildflags[@]}" -- -p:UseMultiToolTask=true -p:EnableClServerMode=true -p:v:diag
+  VERBOSE=1 cmake --build . "${buildflags[@]}" -- \/v:diag -p:UseMultiToolTask=true -p:EnableClServerMode=true
 else
   VERBOSE=1 cmake --build . "${buildflags[@]}"
 fi
