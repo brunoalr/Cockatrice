@@ -240,6 +240,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Restore ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          verbose: 1
+          key: ccache-${{ runner.os }}-${{ matrix.target }}-${{ matrix.type }}-${{ github.ref }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.target }}-${{ matrix.type }}-master
+          create-symlink: true
+          append-timestamp: true
+
       - name: Install dependencies using Homebrew
         shell: bash
         # CMake cannot find the MySQL connector
@@ -248,15 +258,7 @@ jobs:
           HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
         run: |
           brew update
-          brew install protobuf qt ccache --force-bottle
-
-      - name: Restore ccache
-        uses: actions/cache@v4
-        with:
-          path: /Users/runner/Library/Caches/ccache
-          key: ccache-${{ runner.os }}-${{ matrix.target }}-${{ matrix.type }}-${{ github.head_ref }}
-          restore-keys: |
-            ccache-${{ runner.os }}-${{ matrix.target }}-${{ matrix.type }}-master
+          brew install protobuf qt --force-bottle
 
       - name: Build & Sign on Xcode ${{matrix.xcode}}
         shell: bash
