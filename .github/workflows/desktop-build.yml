@@ -399,6 +399,12 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Restore ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          variant: sccache
+          verbose: 1
+
       - name: Build Cockatrice
         id: build
         shell: bash
