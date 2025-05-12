@@ -383,6 +383,15 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Restore ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          variant: sccache
+          verbose: 1
+          key: ccache-${{ runner.os }}-${{ matrix.target }}-${{ github.ref }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.target }}-master
+
       - name: Install Qt ${{matrix.qt_version}}
         uses: jurplel/install-qt-action@v4
         with:
@@ -399,12 +408,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Restore ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          variant: sccache
-          verbose: 1
-
       - name: Build Cockatrice
         id: build
         shell: bash
@@ -415,6 +418,8 @@ jobs:
           QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\win64_${{matrix.qt_arch}}'
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
         run: .ci/compile.sh --ccache "$CCACHE_SIZE" --server --release --test --package
