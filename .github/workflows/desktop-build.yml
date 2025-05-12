@@ -244,7 +244,7 @@ jobs:
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           verbose: 1
-          key: ccache-${{ runner.os }}-${{ matrix.target }}-${{ matrix.type }}-${{ github.ref }}
+          key: ccache-${{ runner.os }}-${{ matrix.target }}-${{ matrix.type }}-${{ github.ref_name }}
           restore-keys: |
             ccache-${{ runner.os }}-${{ matrix.target }}-${{ matrix.type }}-master
           create-symlink: true
