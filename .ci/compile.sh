@@ -120,7 +120,7 @@ if [[ $MAKE_TEST ]]; then
 fi
 if [[ $USE_CCACHE ]]; then
   flags+=("-DUSE_CCACHE=1")
-  if [[ $CCACHE_SIZE ]]; then
+  if [[ $CCACHE_SIZE ]] && [[ $RUNNER_OS != Windows ]]; then
     # note, this setting persists after running the script
     ${CCACHE_BIN} --max-size "$CCACHE_SIZE"
   fi
@@ -148,7 +148,7 @@ function ccachestatsverbose() {
   if got="$(${CCACHE_BIN} --show-stats --verbose 2>/dev/null)"; then
     echo "$got"
   else
-    ccache --show-stats
+    ${CCACHE_BIN} --show-stats
   fi
 }
 
