@@ -134,12 +134,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "18.1.8"
-
       - name: Generate cache timestamp
         id: cache_timestamp
         shell: bash
@@ -245,11 +239,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "18.1.8"
 
       - name: Install dependencies using Homebrew
         shell: bash
