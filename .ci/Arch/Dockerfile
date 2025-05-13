@@ -3,6 +3,7 @@ from archlinux:latest
 RUN pacman --sync --refresh --sysupgrade --needed --noconfirm \
         base-devel \
         ccache \
+        clang \
         cmake \
         git \
         gtest \
