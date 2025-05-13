@@ -2,6 +2,7 @@
 #
 # provides the oracle binary
 
+cmake_policy(SET CMP0177 NEW)
 project(Oracle VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
 
 # paths

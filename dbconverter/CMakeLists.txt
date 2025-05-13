@@ -1,5 +1,7 @@
 # CMakeLists for dbconverter directory
 
+cmake_policy(SET CMP0177 NEW)
+
 project(Dbconverter VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
 
 set(dbconverter_SOURCES
