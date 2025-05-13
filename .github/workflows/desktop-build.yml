@@ -111,11 +111,6 @@ jobs:
             package: RPM
 
           - distro: Ubuntu
-            version: 20.04
-            package: DEB
-            test: skip    # Ubuntu 20.04 has a broken Qt for debug builds
-
-          - distro: Ubuntu
             version: 22.04
             package: DEB
             test: skip    # Running tests on all distros is superfluous
@@ -133,7 +128,7 @@ jobs:
       CACHE: /tmp/${{matrix.distro}}${{matrix.version}}-cache    # ${{runner.temp}} does not work?
       # Cache size over the entire repo is 10Gi:
       # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
-      CCACHE_SIZE: 200M
+      CCACHE_SIZE: 500M
 
     steps:
       - name: Checkout
@@ -381,37 +376,25 @@ jobs:
           tools: ${{matrix.qt_tools}}
           modules: ${{matrix.qt_modules}}
 
-      - name: Restore vcpkg cache
-        uses: actions/cache/restore@v4
+      - name: Setup vcpkg cache
+        id: vcpkg-cache
+        uses: TAServers/vcpkg-cache@v3
         with:
-          path: ${{ github.workspace }}/vcpkg_cache
-          key: vcpkg-x64-windows-${{matrix.target}}-${{ hashFiles('vcpkg.json') }}
-          restore-keys: vcpkg-x64-windows-${{matrix.target}}-
-
-      - name: Run vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          runVcpkgInstall: true
-          doNotCache: false
-        env:
-          VCPKG_DEFAULT_TRIPLET: 'x64-windows'
-          VCPKG_DISABLE_METRICS: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Cockatrice
         id: build
         shell: bash
         env:
           PACKAGE_SUFFIX: '-Win${{matrix.target}}'
+          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
+          CMAKE_GENERATOR_PLATFORM: 'x64'
           QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\win64_${{matrix.qt_arch}}'
+          VCPKG_DISABLE_METRICS: 1
+          VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
         run: .ci/compile.sh --server --release --test --package
-
-      - name: Save vcpkg cache
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ github.workspace }}/vcpkg_cache
-          key: vcpkg-x64-windows-${{matrix.target}}-${{ hashFiles('vcpkg.json') }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
