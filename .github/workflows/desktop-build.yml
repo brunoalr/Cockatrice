@@ -138,7 +138,7 @@ jobs:
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "20.1.0"
+          version: "17.0.6"
 
       - name: Generate cache timestamp
         id: cache_timestamp
@@ -249,7 +249,7 @@ jobs:
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "20.1.0"
+          version: "17.0.6"
 
       - name: Install dependencies using Homebrew
         shell: bash
@@ -380,7 +380,7 @@ jobs:
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "20.1.0"
+          version: "17.0.6"
 
       - name: Install Qt ${{matrix.qt_version}}
         uses: jurplel/install-qt-action@v4
