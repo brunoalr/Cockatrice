@@ -97,9 +97,12 @@ cd "$BUILD_DIR"
 
 # Add cmake flags
 flags=("-DCMAKE_BUILD_TYPE=$BUILDTYPE")
-flags+=("-DCMAKE_CXX_COMPILER=clang++")
-flags+=("-DCMAKE_C_COMPILER=clang")
-flags+=("-DPROTOBUF_CONSTINIT=''")
+
+if [[ $RUNNER_OS == Windows ]]; then
+  flags+=("-DCMAKE_CXX_COMPILER=clang++")
+  flags+=("-DCMAKE_C_COMPILER=clang")
+  flags+=("-DPROTOBUF_CONSTINIT=''")
+fi
 if [[ $MAKE_SERVER ]]; then
   flags+=("-DWITH_SERVER=1")
 fi

@@ -357,14 +357,16 @@ jobs:
     runs-on: windows-2022
     env:
       CMAKE_GENERATOR: 'Ninja'
+      CXX: 'clang++'
+      CC: 'clang'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-      # - name: Setup MSVC
-      #   uses: ilammy/msvc-dev-cmd@v1
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
