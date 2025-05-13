@@ -2,7 +2,6 @@ FROM fedora:41
 
 RUN dnf install -y \
         ccache \
-        clang \
         cmake \
         gcc-c++ \
         git \
