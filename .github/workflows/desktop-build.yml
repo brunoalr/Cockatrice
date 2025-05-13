@@ -372,6 +372,7 @@ jobs:
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: "20.1.0"
+          cached: true
 
       - name: Install Qt ${{matrix.qt_version}}
         uses: jurplel/install-qt-action@v4
