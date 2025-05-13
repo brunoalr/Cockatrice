@@ -136,7 +136,7 @@ if(UNIX)
     endif()
   endif()
 elseif(WIN32)
-  set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/rundir/${CMAKE_BUILD_TYPE})
+  set(CMAKE_INSTALL_PREFIX ${PROJECT_BINARY_DIR}/rundir/${CMAKE_BUILD_TYPE})
 endif()
 
 # Define proper compilation flags
