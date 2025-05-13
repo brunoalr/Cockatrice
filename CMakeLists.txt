@@ -25,6 +25,8 @@ option(WITH_DBCONVERTER "build dbconverter" ON)
 # Compile tests
 option(TEST "build tests" OFF)
 
+set(CPACK_VERBOSE TRUE)
+
 # Default to "Release" build type
 # User-provided value for CMAKE_BUILD_TYPE must be checked before the PROJECT() call
 if(DEFINED CMAKE_BUILD_TYPE)
@@ -87,6 +89,7 @@ set(CMAKE_CXX_STANDARD
     CACHE STRING "C++ ISO Standard"
 )
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Set conventional loops
 set(CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS true)
@@ -135,7 +138,7 @@ if(UNIX)
     endif()
   endif()
 elseif(WIN32)
-  set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/rundir/${CMAKE_BUILD_TYPE})
+  set(CMAKE_INSTALL_PREFIX ${PROJECT_BINARY_DIR}/rundir/${CMAKE_BUILD_TYPE})
 endif()
 
 # Define proper compilation flags
