@@ -170,7 +170,7 @@ if [[ $MAKE_PACKAGE ]]; then
     echo "waiting for XProtectBehaviorService kill"; while pgrep "XProtect"; do sleep 3; done;
   fi
   if [[ $RUNNER_OS == Windows ]]; then
-  C:\Windows\system32\cmd.exe /C "cd /D D:\a\Cockatrice\Cockatrice\build && "C:\Program Files\CMake\bin\cpack.exe" --config ./CPackConfig.cmake"
+  C:\\Windows\\system32\\cmd.exe /C "cd /D D:\a\Cockatrice\Cockatrice\build && "C:\Program Files\CMake\bin\cpack.exe" --config ./CPackConfig.cmake"
   else
     cmake --build . --verbose --target package --config "$BUILDTYPE"
   fi
