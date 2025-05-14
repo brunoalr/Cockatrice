@@ -169,8 +169,7 @@ if [[ $MAKE_PACKAGE ]]; then
     echo "killing XProtectBehaviorService"; sudo pkill -9 XProtect >/dev/null || true;
     echo "waiting for XProtectBehaviorService kill"; while pgrep "XProtect"; do sleep 3; done;
   fi
-  # cmake --build . --verbose --target package --config "$BUILDTYPE"
-  cd "$BUILD_DIR" && cpack --config ./CPackConfig.cmake
+  cmake --build . --verbose --target package --config "$BUILDTYPE"
   echo "::endgroup::"
 
   if [[ $PACKAGE_SUFFIX ]]; then
