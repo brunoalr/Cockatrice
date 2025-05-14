@@ -2,7 +2,6 @@
 #
 # provides the cockatrice binary
 
-cmake_policy(SET CMP0177 NEW)
 project(Cockatrice VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
 
 set(cockatrice_SOURCES

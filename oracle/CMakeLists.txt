@@ -2,7 +2,6 @@
 #
 # provides the oracle binary
 
-cmake_policy(SET CMP0177 NEW)
 project(Oracle VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
 
 # paths
@@ -214,7 +213,7 @@ if(WIN32)
   list(APPEND libSearchDirs ${QT_LIBRARY_DIR})
 
   install(
-    DIRECTORY "${PROJECT_BINARY_DIR}/${PROJECT_NAME}/${CMAKE_BUILD_TYPE}/"
+    DIRECTORY "${CMAKE_BINARY_DIR}/${PROJECT_NAME}/${CMAKE_BUILD_TYPE}/"
     DESTINATION ./
     FILES_MATCHING
     PATTERN "*.dll"
