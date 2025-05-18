@@ -235,6 +235,7 @@ jobs:
     runs-on: ${{matrix.os}}
     continue-on-error: ${{matrix.allow-failure == 'yes'}}
     env:
+      CACHE: /tmp/${{matrix.os}}-${{matrix.type}}-cache    # ${{runner.temp}} does not work?
       DEVELOPER_DIR:
         /Applications/Xcode_${{matrix.xcode}}.app/Contents/Developer
       CMAKE_GENERATOR: 'Ninja'
@@ -252,6 +253,16 @@ jobs:
         run: |
           brew update
           brew install protobuf qt --force-bottle
+
+      - name: Restore compiler cache (ccache)
+        id: ccache_restore
+        uses: actions/cache/restore@v4
+        env:
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+        with:
+          path: ${{env.CACHE}}
+          key: ccache-${{matrix.os}}-${{matrix.type}}-${{env.BRANCH_NAME}}
+          restore-keys: ccache-${{matrix.os}}-${{matrix.type}}-
 
       - name: Build & Sign on Xcode ${{matrix.xcode}}
         shell: bash
@@ -322,6 +333,13 @@ jobs:
             echo "Attach staple"
             xcrun stapler staple ${{steps.build.outputs.path}}
           fi
+
+      - name: Save compiler cache (ccache)
+        if: github.ref == 'refs/heads/master'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{env.CACHE}}
+          key: ${{ steps.ccache_restore.outputs.cache-primary-key }}
 
       - name: Upload artifact
         if: matrix.make_package
