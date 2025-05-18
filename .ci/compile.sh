@@ -135,6 +135,10 @@ if [[ $USE_CCACHE ]]; then
 fi
 
 echo "::group::Configure cmake"
+
+echo "Creating asset directory for vcpkg: D:\\a\\Cockatrice\\Cockatrice\\vcpkg-asset"
+mkdir -p D:\\a\\Cockatrice\\Cockatrice\\vcpkg-asset
+
 cmake --version
 cmake .. "${flags[@]}"
 echo "::endgroup::"
@@ -175,7 +179,7 @@ if [[ $MAKE_PACKAGE ]]; then
     echo "killing XProtectBehaviorService"; sudo pkill -9 XProtect >/dev/null || true;
     echo "waiting for XProtectBehaviorService kill"; while pgrep "XProtect"; do sleep 3; done;
   fi
-  cmake --build . --target package --config "$BUILDTYPE"
+  cmake --build . --verbose --target package --config "$BUILDTYPE"
   echo "::endgroup::"
 
   if [[ $PACKAGE_SUFFIX ]]; then

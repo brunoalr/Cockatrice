@@ -235,6 +235,7 @@ jobs:
     runs-on: ${{matrix.os}}
     continue-on-error: ${{matrix.allow-failure == 'yes'}}
     env:
+      CACHE: /tmp/${{matrix.os}}-${{matrix.type}}-cache    # ${{runner.temp}} does not work?
       DEVELOPER_DIR:
         /Applications/Xcode_${{matrix.xcode}}.app/Contents/Developer
       CMAKE_GENERATOR: 'Ninja'
@@ -252,6 +253,15 @@ jobs:
         run: |
           brew update
           brew install protobuf qt --force-bottle
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@63069e3931dedbf3b63792097479563182fe70d1 # 1.2.18
+        with:
+          verbose: 1
+          key: ${{matrix.os}}-${{matrix.type}}-${{github.ref_name}}
+          restore-keys: |
+            ${{matrix.os}}-${{matrix.type}}-master
+          append-timestamp: true
 
       - name: Build & Sign on Xcode ${{matrix.xcode}}
         shell: bash
@@ -277,7 +287,7 @@ jobs:
             security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_CI_KEYCHAIN_PWD" build.keychain
           fi
-          .ci/compile.sh --server
+          .ci/compile.sh --server --ccache
 
       - name: Sign app bundle
         if: matrix.make_package
@@ -358,20 +368,20 @@ jobs:
     name: Windows ${{matrix.target}}
     needs: configure
     runs-on: windows-2022
-    env:
-      CMAKE_GENERATOR: 'Visual Studio 17 2022'
+    # env:
+    #   CMAKE_GENERATOR: 'Ninja'
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
       - name: Add msbuild to PATH
         id: add-msbuild
         uses: microsoft/setup-msbuild@v2
         with:
           msbuild-architecture: x64
-
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Qt ${{matrix.qt_version}}
         uses: jurplel/install-qt-action@v4
@@ -389,6 +399,21 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup vcpkg-asset cache
+        id: vcpkg-asset-cache
+        uses: actions/cache@v4
+        with:
+          key: vcpkg-asset-windows-${{ matrix.target }}-${{ github.ref_name }}
+          path: D:\a\Cockatrice\Cockatrice\vcpkg-asset
+          restore-keys: |
+            vcpkg-asset-windows-${{ matrix.target }}-master
+
+      - name: Upload vcpkg asset folder
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # 4.6.2
+        with:
+          name: vcpkg-asset-windows-${{ matrix.target }}-before-build
+          path: D:\a\Cockatrice\Cockatrice\
+
       - name: Build Cockatrice
         id: build
         shell: bash
@@ -398,9 +423,14 @@ jobs:
           QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\win64_${{matrix.qt_arch}}'
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
-        # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
-        # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
+          X_VCPKG_ASSET_SOURCES: 'clear;x-azurl,file://D:\a\Cockatrice\Cockatrice\vcpkg-asset,,readwrite'
         run: .ci/compile.sh --server --release --test --package
+
+      - name: Upload vcpkg asset folder
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # 4.6.2
+        with:
+          name: vcpkg-asset-windows-${{ matrix.target }}
+          path: D:\a\Cockatrice\Cockatrice\
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
