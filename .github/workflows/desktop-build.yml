@@ -397,6 +397,15 @@ jobs:
           tools: ${{matrix.qt_tools}}
           modules: ${{matrix.qt_modules}}
 
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@63069e3931dedbf3b63792097479563182fe70d1 # 1.2.18
+        with:
+          verbose: 1
+          key: windows-${{matrix.target}}-${{github.ref_name}}
+          restore-keys: |
+            windows-${{matrix.target}}-master
+          append-timestamp: true
+
       - name: Setup vcpkg cache
         id: vcpkg-cache
         uses: TAServers/vcpkg-cache@v3
@@ -408,6 +417,8 @@ jobs:
         shell: bash
         env:
           PACKAGE_SUFFIX: '-Win${{matrix.target}}'
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
           CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
           QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\win64_${{matrix.qt_arch}}'
           VCPKG_DISABLE_METRICS: 1
