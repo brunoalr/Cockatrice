@@ -88,38 +88,79 @@ jobs:
       matrix:
         # These names correspond to the files in ".ci/$distro$version"
         include:
-          - distro: Arch
+          - os: Linux
+            distro: Arch
             package: skip    # We are packaged in Arch already
+            cmake-generator: Ninja
             allow-failure: yes
 
-          - distro: Debian
+          - os: Linux
+            distro: Debian
             version: 11
             package: DEB
+            cmake-generator: Ninja
             test: skip    # Running tests on all distros is superfluous
 
-          - distro: Debian
+          - os: Linux
+            distro: Debian
             version: 12
             package: DEB
+            cmake-generator: Ninja
 
-          - distro: Fedora
+          - os: Linux
+            distro: Fedora
             version: 41
             package: RPM
+            cmake-generator: Ninja
             test: skip    # Running tests on all distros is superfluous
 
-          - distro: Fedora
+          - os: Linux
+            distro: Fedora
             version: 42
             package: RPM
+            cmake-generator: Ninja
 
-          - distro: Ubuntu
+          - os: Linux
+            distro: Ubuntu
             version: 22.04
             package: DEB
+            cmake-generator: Ninja
             test: skip    # Running tests on all distros is superfluous
 
-          - distro: Ubuntu
+          - os: Linux
+            distro: Ubuntu
             version: 24.04
             package: DEB
+            cmake-generator: Ninja
 
-    name: ${{matrix.distro}} ${{matrix.version}}
+          - version: 13
+            soc: Intel
+            os: macos-13
+            xcode: "14.3.1"
+            type: Release
+            make_package: 1
+
+          - version: 14
+            soc: Apple
+            os: macos-14
+            xcode: "15.4"
+            type: Release
+            make_package: 1
+
+          - version: 15
+            soc: Apple
+            os: macos-15
+            xcode: "16.2"
+            type: Release
+            make_package: 1
+
+          - version: 15
+            soc: Apple
+            os: macos-15
+            xcode: "16.2"
+            type: Debug
+
+    name: ${{matrix.os}}${{matrix.distro && format(' {0}', matrix.distro)}} ${{matrix.version}}${{matrix.type && format(' ({0})', matrix.type)}}
     needs: configure
     runs-on: ubuntu-latest
     continue-on-error: ${{matrix.allow-failure == 'yes'}}
@@ -129,15 +170,24 @@ jobs:
       # Cache size over the entire repo is 10Gi:
       # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CCACHE_SIZE: 500M
-      CMAKE_GENERATOR: 'Ninja'
+      CMAKE_GENERATOR: ${{matrix.cmake-generator}}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build ${{matrix.distro}} ${{matrix.version}} Docker image
+        if: matrix.os == 'Linux'
         shell: bash
         run: source .ci/docker.sh --build
+
+      - name: Configure ccache key
+        if: ${{ !contains(matrix.os, 'windows') }}
+        run: |
+            KEY=ccache-${{ matrix.os }}
+            KEY="$KEY${{ matrix.distro && format('-{0}{1}', matrix.distro, matrix.version) }}"
+            KEY="$KEY${{ matrix.type && format('-{0}', matrix.type) }}"
+            echo "CCACHE_KEY_BASE=$KEY" >> "$GITHUB_ENV"
 
       - name: Restore compiler cache (ccache)
         id: ccache_restore
@@ -146,11 +196,11 @@ jobs:
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         with:
           path: ${{env.CACHE}}
-          key: ccache-${{matrix.distro}}${{matrix.version}}-${{env.BRANCH_NAME}}
-          restore-keys: ccache-${{matrix.distro}}${{matrix.version}}-
+          key: ${{env.CCACHE_KEY_BASE}}-${{env.BRANCH_NAME}}
+          restore-keys: ${{env.CCACHE_KEY_BASE}}-
 
-      - name: Build debug and test
-        if: matrix.test != 'skip'
+      - name: Build debug and test (Linux)
+        if: matrix.test != 'skip' && matrix.os == 'Linux'
         shell: bash
         env:
           CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
@@ -158,9 +208,9 @@ jobs:
           source .ci/docker.sh
           RUN --server --debug --test --ccache "$CCACHE_SIZE"
 
-      - name: Build release package
+      - name: Build release package (Linux)
         id: build
-        if: matrix.package != 'skip'
+        if: matrix.package != 'skip' && matrix.os == 'Linux'
         shell: bash
         env:
           BUILD_DIR: build
@@ -181,7 +231,7 @@ jobs:
           key: ${{ steps.ccache_restore.outputs.cache-primary-key }}
 
       - name: Upload artifact
-        if: matrix.package != 'skip'
+        if: matrix.package != 'skip' && matrix.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: ${{matrix.distro}}${{matrix.version}}-package
