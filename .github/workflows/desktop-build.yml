@@ -86,38 +86,45 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        distro: [Arch, Debian, Fedora, Ubuntu]
+        os: [Linux]
         cmake-generator: [Ninja]
         # These names correspond to the files in ".ci/$distro$version"
         include:
-          - distro: Arch
+          - os: Linux
+            distro: Arch
             package: skip    # We are packaged in Arch already
             allow-failure: yes
 
-          - distro: Debian
+          - os: Linux
+            distro: Debian
             version: 11
             package: DEB
             test: skip    # Running tests on all distros is superfluous
 
-          - distro: Debian
+          - os: Linux
+            distro: Debian
             version: 12
             package: DEB
 
-          - distro: Fedora
+          - os: Linux
+            distro: Fedora
             version: 41
             package: RPM
             test: skip    # Running tests on all distros is superfluous
 
-          - distro: Fedora
+          - os: Linux
+            distro: Fedora
             version: 42
             package: RPM
 
-          - distro: Ubuntu
+          - os: Linux
+            distro: Ubuntu
             version: 22.04
             package: DEB
             test: skip    # Running tests on all distros is superfluous
 
-          - distro: Ubuntu
+          - os: Linux
+            distro: Ubuntu
             version: 24.04
             package: DEB
 
