@@ -86,6 +86,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        os: [Arch, Debian, Fedora, Ubuntu]
+        cmake-generator: [Ninja]
         # These names correspond to the files in ".ci/$os$version"
         include:
           - os: Arch
@@ -129,7 +131,7 @@ jobs:
       # Cache size over the entire repo is 10Gi:
       # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CCACHE_SIZE: 500M
-      CMAKE_GENERATOR: 'Ninja'
+      CMAKE_GENERATOR: ${{matrix.cmake-generator}}
 
     steps:
       - name: Checkout
