@@ -158,8 +158,8 @@ jobs:
         if: ${{ !contains(matrix.os, 'windows') }}
         run: |
             KEY=ccache-${{ matrix.os }}
-            KEY="$KEY${{ matrix.distro && '-${{matrix.distro}}'}}"
-            KEY="$KEY${{ matrix.version && '-${{matrix.version}}'}}"
+            KEY="$KEY${{ matrix.distro && join('-',matrix.distro)}}"
+            KEY="$KEY${{ matrix.version && join('-',matrix.version)}}"
             echo "CCACHE_KEY_BASE=$KEY" >> "$GITHUB_ENV"
 
       - name: Restore compiler cache (ccache)
