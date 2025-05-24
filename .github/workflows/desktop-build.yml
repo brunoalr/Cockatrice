@@ -169,8 +169,8 @@ jobs:
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         with:
           path: ${{env.CACHE}}
-          key: ${CCACHE_KEY_BASE}-${{env.BRANCH_NAME}}
-          restore-keys: ${CCACHE_KEY_BASE}-
+          key: ${{github.env.CCACHE_KEY_BASE}}-${{env.BRANCH_NAME}}
+          restore-keys: ${{github.env.CCACHE_KEY_BASE}}-
 
       - name: Build debug and test
         if: matrix.test != 'skip'
