@@ -86,7 +86,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [Linux]
         cmake-generator: [Ninja]
         # These names correspond to the files in ".ci/$distro$version"
         include:
