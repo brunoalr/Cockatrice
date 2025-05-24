@@ -86,48 +86,48 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [Arch, Debian, Fedora, Ubuntu]
+        distro: [Arch, Debian, Fedora, Ubuntu]
         cmake-generator: [Ninja]
-        # These names correspond to the files in ".ci/$os$version"
+        # These names correspond to the files in ".ci/$distro$version"
         include:
-          - os: Arch
+          - distro: Arch
             package: skip    # We are packaged in Arch already
             allow-failure: yes
 
-          - os: Debian
+          - distro: Debian
             version: 11
             package: DEB
             test: skip    # Running tests on all distros is superfluous
 
-          - os: Debian
+          - distro: Debian
             version: 12
             package: DEB
 
-          - os: Fedora
+          - distro: Fedora
             version: 41
             package: RPM
             test: skip    # Running tests on all distros is superfluous
 
-          - os: Fedora
+          - distro: Fedora
             version: 42
             package: RPM
 
-          - os: Ubuntu
+          - distro: Ubuntu
             version: 22.04
             package: DEB
             test: skip    # Running tests on all distros is superfluous
 
-          - os: Ubuntu
+          - distro: Ubuntu
             version: 24.04
             package: DEB
 
-    name: ${{matrix.os}} ${{matrix.version}}
+    name: ${{matrix.distro}} ${{matrix.version}}
     needs: configure
     runs-on: ubuntu-latest
     continue-on-error: ${{matrix.allow-failure == 'yes'}}
     env:
-      NAME: ${{matrix.os}}${{matrix.version}}
-      CACHE: /tmp/${{matrix.os}}${{matrix.version}}-cache    # ${{runner.temp}} does not work?
+      NAME: ${{matrix.distro}}${{matrix.version}}
+      CACHE: /tmp/${{matrix.distro}}${{matrix.version}}-cache    # ${{runner.temp}} does not work?
       # Cache size over the entire repo is 10Gi:
       # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CCACHE_SIZE: 500M
@@ -137,7 +137,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build ${{matrix.os}} ${{matrix.version}} Docker image
+      - name: Build ${{matrix.distro}} ${{matrix.version}} Docker image
         shell: bash
         run: source .ci/docker.sh --build
 
@@ -148,8 +148,8 @@ jobs:
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         with:
           path: ${{env.CACHE}}
-          key: ccache-${{matrix.os}}${{matrix.version}}-${{env.BRANCH_NAME}}
-          restore-keys: ccache-${{matrix.os}}${{matrix.version}}-
+          key: ccache-${{matrix.distro}}${{matrix.version}}-${{env.BRANCH_NAME}}
+          restore-keys: ccache-${{matrix.distro}}${{matrix.version}}-
 
       - name: Build debug and test
         if: matrix.test != 'skip'
@@ -166,7 +166,7 @@ jobs:
         shell: bash
         env:
           BUILD_DIR: build
-          SUFFIX: '-${{matrix.os}}${{matrix.version}}'
+          SUFFIX: '-${{matrix.distro}}${{matrix.version}}'
           type: '${{matrix.package}}'
           CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
         run: |
@@ -186,7 +186,7 @@ jobs:
         if: matrix.package != 'skip'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{matrix.os}}${{matrix.version}}-package
+          name: ${{matrix.distro}}${{matrix.version}}-package
           path: ${{steps.build.outputs.path}}
           if-no-files-found: error
 
