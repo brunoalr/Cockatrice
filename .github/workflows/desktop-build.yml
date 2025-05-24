@@ -135,11 +135,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build ${{matrix.distro}} ${{matrix.version}} Docker image
-        shell: bash
-        run: source .ci/docker.sh --build
-
-      - name: Restore compiler cache (ccache)
+      - name: Restore caches (docker and ccache)
         id: ccache_restore
         uses: actions/cache/restore@v4
         env:
@@ -148,6 +144,10 @@ jobs:
           path: ${{env.CACHE}}
           key: ccache-${{matrix.distro}}${{matrix.version}}-${{env.BRANCH_NAME}}
           restore-keys: ccache-${{matrix.distro}}${{matrix.version}}-
+
+      - name: Build ${{matrix.distro}} ${{matrix.version}} Docker image
+        shell: bash
+        run: source .ci/docker.sh --get --save
 
       - name: Build debug and test
         if: matrix.test != 'skip'
@@ -173,7 +173,7 @@ jobs:
                   --ccache "$CCACHE_SIZE"
           .ci/name_build.sh
 
-      - name: Save compiler cache (ccache)
+      - name: Save caches (docker and ccache)
         if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v4
         with:
