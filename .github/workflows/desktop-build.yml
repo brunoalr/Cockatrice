@@ -86,46 +86,46 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # These names correspond to the files in ".ci/$distro$version"
+        # These names correspond to the files in ".ci/$os$version"
         include:
-          - distro: Arch
+          - os: Arch
             package: skip    # We are packaged in Arch already
             allow-failure: yes
 
-          - distro: Debian
+          - os: Debian
             version: 11
             package: DEB
             test: skip    # Running tests on all distros is superfluous
 
-          - distro: Debian
+          - os: Debian
             version: 12
             package: DEB
 
-          - distro: Fedora
+          - os: Fedora
             version: 41
             package: RPM
             test: skip    # Running tests on all distros is superfluous
 
-          - distro: Fedora
+          - os: Fedora
             version: 42
             package: RPM
 
-          - distro: Ubuntu
+          - os: Ubuntu
             version: 22.04
             package: DEB
             test: skip    # Running tests on all distros is superfluous
 
-          - distro: Ubuntu
+          - os: Ubuntu
             version: 24.04
             package: DEB
 
-    name: ${{matrix.distro}} ${{matrix.version}}
+    name: ${{matrix.os}} ${{matrix.version}}
     needs: configure
     runs-on: ubuntu-latest
     continue-on-error: ${{matrix.allow-failure == 'yes'}}
     env:
-      NAME: ${{matrix.distro}}${{matrix.version}}
-      CACHE: /tmp/${{matrix.distro}}${{matrix.version}}-cache    # ${{runner.temp}} does not work?
+      NAME: ${{matrix.os}}${{matrix.version}}
+      CACHE: /tmp/${{matrix.os}}${{matrix.version}}-cache    # ${{runner.temp}} does not work?
       # Cache size over the entire repo is 10Gi:
       # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CCACHE_SIZE: 500M
@@ -135,7 +135,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build ${{matrix.distro}} ${{matrix.version}} Docker image
+      - name: Build ${{matrix.os}} ${{matrix.version}} Docker image
         shell: bash
         run: source .ci/docker.sh --build
 
@@ -146,8 +146,8 @@ jobs:
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         with:
           path: ${{env.CACHE}}
-          key: ccache-${{matrix.distro}}${{matrix.version}}-${{env.BRANCH_NAME}}
-          restore-keys: ccache-${{matrix.distro}}${{matrix.version}}-
+          key: ccache-${{matrix.os}}${{matrix.version}}-${{env.BRANCH_NAME}}
+          restore-keys: ccache-${{matrix.os}}${{matrix.version}}-
 
       - name: Build debug and test
         if: matrix.test != 'skip'
@@ -164,7 +164,7 @@ jobs:
         shell: bash
         env:
           BUILD_DIR: build
-          SUFFIX: '-${{matrix.distro}}${{matrix.version}}'
+          SUFFIX: '-${{matrix.os}}${{matrix.version}}'
           type: '${{matrix.package}}'
           CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
         run: |
@@ -184,7 +184,7 @@ jobs:
         if: matrix.package != 'skip'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{matrix.distro}}${{matrix.version}}-package
+          name: ${{matrix.os}}${{matrix.version}}-package
           path: ${{steps.build.outputs.path}}
           if-no-files-found: error
 
