@@ -133,13 +133,40 @@ jobs:
             package: DEB
             cmake-generator: Ninja
 
+          - version: 13
+            soc: Intel
+            os: macos-13
+            xcode: "14.3.1"
+            type: Release
+            make_package: 1
+
+          - version: 14
+            soc: Apple
+            os: macos-14
+            xcode: "15.4"
+            type: Release
+            make_package: 1
+
+          - version: 15
+            soc: Apple
+            os: macos-15
+            xcode: "16.2"
+            type: Release
+            make_package: 1
+
+          - version: 15
+            soc: Apple
+            os: macos-15
+            xcode: "16.2"
+            type: Debug
+
     name: ${{matrix.distro}} ${{matrix.version}}
     needs: configure
     runs-on: ubuntu-latest
     continue-on-error: ${{matrix.allow-failure == 'yes'}}
     env:
       NAME: ${{matrix.distro}}${{matrix.version}}
-      CACHE: /tmp/${{matrix.distro}}${{matrix.version}}-cache    # ${{runner.temp}} does not work?
+      CCACHE_DIR: /tmp/${{matrix.distro}}${{matrix.version}}-cache    # ${{runner.temp}} does not work?
       # Cache size over the entire repo is 10Gi:
       # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CCACHE_SIZE: 500M
@@ -167,12 +194,12 @@ jobs:
         env:
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         with:
-          path: ${{env.CACHE}}
+          path: ${{env.CCACHE_DIR}}
           key: ${{env.CCACHE_KEY_BASE}}-${{env.BRANCH_NAME}}
-          restore-keys: ${{github.env.CCACHE_KEY_BASE}}-
+          restore-keys: ${{env.CCACHE_KEY_BASE}}-
 
-      - name: Build debug and test
-        if: matrix.test != 'skip'
+      - name: Build debug and test (Linux)
+        if: matrix.test != 'skip' && matrix.os == 'linux'
         shell: bash
         env:
           CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
@@ -180,9 +207,9 @@ jobs:
           source .ci/docker.sh
           RUN --server --debug --test --ccache "$CCACHE_SIZE"
 
-      - name: Build release package
+      - name: Build release package (Linux)
         id: build
-        if: matrix.package != 'skip'
+        if: matrix.package != 'skip' && matrix.os == 'linux'
         shell: bash
         env:
           BUILD_DIR: build
