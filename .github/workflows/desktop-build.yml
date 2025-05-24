@@ -154,6 +154,14 @@ jobs:
         shell: bash
         run: source .ci/docker.sh --build
 
+      - name: Configure ccache key
+        if: ${{ !contains(matrix.os, 'windows') }}
+        run: |
+            KEY=ccache-${{ matrix.os }}
+            KEY="$KEY${{ matrix.distro && '-${{matrix.distro}}'}}"
+            KEY="$KEY${{ matrix.version && '-${{matrix.version}}'}}"
+            echo "CCACHE_KEY_BASE=$KEY" >> "$GITHUB_ENV"
+
       - name: Restore compiler cache (ccache)
         id: ccache_restore
         uses: actions/cache/restore@v4
@@ -161,8 +169,8 @@ jobs:
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         with:
           path: ${{env.CACHE}}
-          key: ccache-${{matrix.distro}}${{matrix.version}}-${{env.BRANCH_NAME}}
-          restore-keys: ccache-${{matrix.distro}}${{matrix.version}}-
+          key: ${CCACHE_KEY_BASE}-${{env.BRANCH_NAME}}
+          restore-keys: ${CCACHE_KEY_BASE}-
 
       - name: Build debug and test
         if: matrix.test != 'skip'
