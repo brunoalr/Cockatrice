@@ -174,7 +174,7 @@ jobs:
           .ci/name_build.sh
 
       - name: Save caches (docker and ccache)
-        if: github.ref == 'refs/heads/master'
+        # if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v4
         with:
           path: ${{env.CACHE}}
