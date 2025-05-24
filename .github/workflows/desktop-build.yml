@@ -186,6 +186,7 @@ jobs:
         run: |
             KEY=ccache-${{ matrix.os }}
             KEY="$KEY${{ matrix.distro && format('-{0}{1}', matrix.distro, matrix.version) }}"
+            KEY="$KEY${{ matrix.type && format('-{0}', matrix.type) }}"
             echo "CCACHE_KEY_BASE=$KEY" >> "$GITHUB_ENV"
 
       - name: Restore compiler cache (ccache)
