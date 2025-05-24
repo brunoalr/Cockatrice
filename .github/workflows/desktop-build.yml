@@ -226,7 +226,7 @@ jobs:
         if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v4
         with:
-          path: ${{env.CACHE}}
+          path: ${{env.CCACHE_DIR}}
           key: ${{ steps.ccache_restore.outputs.cache-primary-key }}
 
       - name: Upload artifact
