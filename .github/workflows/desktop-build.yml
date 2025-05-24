@@ -88,36 +88,50 @@ jobs:
       matrix:
         # These names correspond to the files in ".ci/$distro$version"
         include:
-          - distro: Arch
+          - os: Linux
+            distro: Arch
             package: skip    # We are packaged in Arch already
+            cmake-generator: Ninja
             allow-failure: yes
 
-          - distro: Debian
+          - os: Linux
+            distro: Debian
             version: 11
             package: DEB
+            cmake-generator: Ninja
             test: skip    # Running tests on all distros is superfluous
 
-          - distro: Debian
+          - os: Linux
+            distro: Debian
             version: 12
             package: DEB
+            cmake-generator: Ninja
 
-          - distro: Fedora
+          - os: Linux
+            distro: Fedora
             version: 41
             package: RPM
+            cmake-generator: Ninja
             test: skip    # Running tests on all distros is superfluous
 
-          - distro: Fedora
+          - os: Linux
+            distro: Fedora
             version: 42
             package: RPM
+            cmake-generator: Ninja
 
-          - distro: Ubuntu
+          - os: Linux
+            distro: Ubuntu
             version: 22.04
             package: DEB
+            cmake-generator: Ninja
             test: skip    # Running tests on all distros is superfluous
 
-          - distro: Ubuntu
+          - os: Linux
+            distro: Ubuntu
             version: 24.04
             package: DEB
+            cmake-generator: Ninja
 
     name: ${{matrix.distro}} ${{matrix.version}}
     needs: configure
@@ -129,13 +143,14 @@ jobs:
       # Cache size over the entire repo is 10Gi:
       # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CCACHE_SIZE: 500M
-      CMAKE_GENERATOR: 'Ninja'
+      CMAKE_GENERATOR: ${{matrix.cmake-generator}}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build ${{matrix.distro}} ${{matrix.version}} Docker image
+        if: matrix.os == 'linux'
         shell: bash
         run: source .ci/docker.sh --build
 
