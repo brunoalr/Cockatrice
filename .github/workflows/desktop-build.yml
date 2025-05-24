@@ -166,7 +166,7 @@ jobs:
     continue-on-error: ${{matrix.allow-failure == 'yes'}}
     env:
       NAME: ${{matrix.distro}}${{matrix.version}}
-      CCACHE_DIR: /tmp/${{matrix.distro}}${{matrix.version}}-cache    # ${{runner.temp}} does not work?
+      CACHE: /tmp/${{matrix.distro}}${{matrix.version}}-cache    # ${{runner.temp}} does not work?
       # Cache size over the entire repo is 10Gi:
       # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CCACHE_SIZE: 500M
@@ -177,7 +177,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build ${{matrix.distro}} ${{matrix.version}} Docker image
-        if: matrix.os == 'linux'
+        if: matrix.os == 'Linux'
         shell: bash
         run: source .ci/docker.sh --build
 
@@ -194,12 +194,12 @@ jobs:
         env:
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         with:
-          path: ${{env.CCACHE_DIR}}
+          path: ${{env.CACHE}}
           key: ${{env.CCACHE_KEY_BASE}}-${{env.BRANCH_NAME}}
           restore-keys: ${{env.CCACHE_KEY_BASE}}-
 
       - name: Build debug and test (Linux)
-        if: matrix.test != 'skip' && matrix.os == 'linux'
+        if: matrix.test != 'skip' && matrix.os == 'Linux'
         shell: bash
         env:
           CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
@@ -209,7 +209,7 @@ jobs:
 
       - name: Build release package (Linux)
         id: build
-        if: matrix.package != 'skip' && matrix.os == 'linux'
+        if: matrix.package != 'skip' && matrix.os == 'Linux'
         shell: bash
         env:
           BUILD_DIR: build
@@ -226,7 +226,7 @@ jobs:
         if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v4
         with:
-          path: ${{env.CCACHE_DIR}}
+          path: ${{env.CACHE}}
           key: ${{ steps.ccache_restore.outputs.cache-primary-key }}
 
       - name: Upload artifact
