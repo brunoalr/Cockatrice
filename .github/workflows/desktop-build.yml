@@ -160,7 +160,7 @@ jobs:
             xcode: "16.2"
             type: Debug
 
-    name: ${{matrix.distro}} ${{matrix.version}}
+    name: ${{matrix.os}}${{matrix.distro && format(' {0}', matrix.distro)}} ${{matrix.version}}${{matrix.type && format(' ({0})', matrix.type)}}
     needs: configure
     runs-on: ubuntu-latest
     continue-on-error: ${{matrix.allow-failure == 'yes'}}
@@ -231,7 +231,7 @@ jobs:
           key: ${{ steps.ccache_restore.outputs.cache-primary-key }}
 
       - name: Upload artifact
-        if: matrix.package != 'skip'
+        if: matrix.package != 'skip' && matrix.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: ${{matrix.distro}}${{matrix.version}}-package
