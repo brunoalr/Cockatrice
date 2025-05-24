@@ -86,46 +86,52 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cmake-generator: [Ninja]
         # These names correspond to the files in ".ci/$distro$version"
         include:
           - os: Linux
             distro: Arch
             package: skip    # We are packaged in Arch already
+            cmake-generator: Ninja
             allow-failure: yes
 
           - os: Linux
             distro: Debian
             version: 11
             package: DEB
+            cmake-generator: Ninja
             test: skip    # Running tests on all distros is superfluous
 
           - os: Linux
             distro: Debian
             version: 12
             package: DEB
+            cmake-generator: Ninja
 
           - os: Linux
             distro: Fedora
             version: 41
             package: RPM
+            cmake-generator: Ninja
             test: skip    # Running tests on all distros is superfluous
 
           - os: Linux
             distro: Fedora
             version: 42
             package: RPM
+            cmake-generator: Ninja
 
           - os: Linux
             distro: Ubuntu
             version: 22.04
             package: DEB
+            cmake-generator: Ninja
             test: skip    # Running tests on all distros is superfluous
 
           - os: Linux
             distro: Ubuntu
             version: 24.04
             package: DEB
+            cmake-generator: Ninja
 
     name: ${{matrix.distro}} ${{matrix.version}}
     needs: configure
