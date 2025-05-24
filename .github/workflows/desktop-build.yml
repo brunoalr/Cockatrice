@@ -150,6 +150,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build ${{matrix.distro}} ${{matrix.version}} Docker image
+        if: matrix.os == 'linux'
         shell: bash
         run: source .ci/docker.sh --build
 
