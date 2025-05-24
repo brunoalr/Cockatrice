@@ -158,8 +158,7 @@ jobs:
         if: ${{ !contains(matrix.os, 'windows') }}
         run: |
             KEY=ccache-${{ matrix.os }}
-            KEY="$KEY${{ matrix.distro && join('-',matrix.distro)}}"
-            KEY="$KEY${{ matrix.version && join('-',matrix.version)}}"
+            KEY="$KEY${{ matrix.distro && format('-{0}{1}', matrix.distro, matrix.version) }}"
             echo "CCACHE_KEY_BASE=$KEY" >> "$GITHUB_ENV"
 
       - name: Restore compiler cache (ccache)
@@ -169,7 +168,7 @@ jobs:
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         with:
           path: ${{env.CACHE}}
-          key: ${{github.env.CCACHE_KEY_BASE}}-${{env.BRANCH_NAME}}
+          key: ${{env.CCACHE_KEY_BASE}}-${{env.BRANCH_NAME}}
           restore-keys: ${{github.env.CCACHE_KEY_BASE}}-
 
       - name: Build debug and test
