@@ -408,11 +408,11 @@ jobs:
       CMAKE_GENERATOR: 'Visual Studio 17 2022'
 
     steps:
-      - name: Add msbuild to PATH
-        id: add-msbuild
-        uses: microsoft/setup-msbuild@v2
-        with:
-          msbuild-architecture: x64
+      # - name: Add msbuild to PATH
+      #   id: add-msbuild
+      #   uses: microsoft/setup-msbuild@v2
+      #   with:
+      #     msbuild-architecture: x64
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -429,11 +429,21 @@ jobs:
           tools: ${{matrix.qt_tools}}
           modules: ${{matrix.qt_modules}}
 
-      - name: Setup vcpkg cache
-        id: vcpkg-cache
-        uses: TAServers/vcpkg-cache@v3
+      # - name: Setup vcpkg cache
+      #   id: vcpkg-cache
+      #   uses: TAServers/vcpkg-cache@v3
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Ccache
+        uses: hendrikmuhs/ccache-action@63069e3931dedbf3b63792097479563182fe70d1 # 1.2.18
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          verbose: 1
+          key: windows-${{matrix.target}}-${{github.ref_name}}
+          restore-keys: |
+            windows-${{matrix.target}}-main
+          append-timestamp: true
+          variant: sccache
 
       - name: Setup Conan
         id: setup-conan
@@ -448,7 +458,6 @@ jobs:
           key: conan-windows-${{ matrix.target }}-${{ hashFiles('conanfile.txt', 'conan-profiles/**') }}
           restore-keys: |
             conan-windows-${{ matrix.target }}-
-            conan-windows-
 
       - name: Copy Conan profiles
         run: |
@@ -475,6 +484,8 @@ jobs:
           PACKAGE_SUFFIX: '-Win${{matrix.target}}'
           CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
           CMAKE_GENERATOR_PLATFORM: 'x64'
+          CMAKE_C_COMPILER_LAUNCHER: sccache
+          CMAKE_CXX_COMPILER_LAUNCHER: sccache
           QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\${{matrix.qt_arch}}'
         # env:
         #   CMAKE_C_COMPILER_LAUNCHER: sccache
@@ -505,40 +516,40 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Windows${{matrix.target}}-installer
-          path: ${{steps.build.outputs.path}}
+          path: build/release
           if-no-files-found: error
 
-      - name: Upload pdb database
-        uses: actions/upload-artifact@v4
-        with:
-          name: Windows${{matrix.target}}-debug-pdbs
-          path: |
-            build/cockatrice/Release/*.pdb
-            build/servatrice/Release/*.pdb
-          if-no-files-found: error
+      # - name: Upload pdb database
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: Windows${{matrix.target}}-debug-pdbs
+      #     path: |
+      #       build/cockatrice/Release/*.pdb
+      #       build/servatrice/Release/*.pdb
+      #     if-no-files-found: error
 
-      - name: Upload to release
-        id: upload_release
-        if: needs.configure.outputs.tag != null
-        shell: bash
-        env:
-          GH_TOKEN: ${{github.token}}
-          tag_name: ${{needs.configure.outputs.tag}}
-          asset_path: ${{steps.build.outputs.path}}
-          asset_name: ${{steps.build.outputs.name}}
-        run: gh release upload "$tag_name" "$asset_path#$asset_name"
+      # - name: Upload to release
+      #   id: upload_release
+      #   if: needs.configure.outputs.tag != null
+      #   shell: bash
+      #   env:
+      #     GH_TOKEN: ${{github.token}}
+      #     tag_name: ${{needs.configure.outputs.tag}}
+      #     asset_path: ${{steps.build.outputs.path}}
+      #     asset_name: ${{steps.build.outputs.name}}
+      #   run: gh release upload "$tag_name" "$asset_path#$asset_name"
 
-      - name: Attest binary provenance
-        id: attestation
-        if: steps.upload_release.outcome == 'success'
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-name: ${{steps.build.outputs.name}}
-          subject-digest: sha256:${{ steps.upload_artifact.outputs.artifact-digest }}
+      # - name: Attest binary provenance
+      #   id: attestation
+      #   if: steps.upload_release.outcome == 'success'
+      #   uses: actions/attest-build-provenance@v2
+      #   with:
+      #     subject-name: ${{steps.build.outputs.name}}
+      #     subject-digest: sha256:${{ steps.upload_artifact.outputs.artifact-digest }}
 
-      - name: Verify binary attestation
-        if: steps.attestation.outcome == 'success'
-        shell: bash
-        env:
-          GH_TOKEN: ${{github.token}}
-        run: gh attestation verify ${{steps.build.outputs.path}} -R Cockatrice/Cockatrice
+      # - name: Verify binary attestation
+      #   if: steps.attestation.outcome == 'success'
+      #   shell: bash
+      #   env:
+      #     GH_TOKEN: ${{github.token}}
+      #   run: gh attestation verify ${{steps.build.outputs.path}} -R Cockatrice/Cockatrice
