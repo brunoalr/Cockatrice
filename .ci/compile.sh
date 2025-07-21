@@ -113,9 +113,6 @@ fi
 if [[ $PACKAGE_TYPE ]]; then
   flags+=("-DCPACK_GENERATOR=$PACKAGE_TYPE")
 fi
-if [[ $RUNNER_OS == Windows ]]; then
-  flags+=("--preset conan-release -DCMAKE_INSTALL_PREFIX=out -GNinja")
-fi
 
 # Add cmake --build flags
 buildflags=(--config "$BUILDTYPE")
@@ -163,7 +160,7 @@ echo "::group::Build project"
 if [[ $RUNNER_OS == Windows ]]; then
   # Enable MTT, see https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
   # and https://devblogs.microsoft.com/cppblog/cpp-build-throughput-investigation-and-tune-up/#multitooltask-mtt
-  cmake --build build\Release "${buildflags[@]}"
+  cmake --build . "${buildflags[@]}" -- -p:UseMultiToolTask=true -p:EnableClServerMode=true
 else
   cmake --build . "${buildflags[@]}"
 fi

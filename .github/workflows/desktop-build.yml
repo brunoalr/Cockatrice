@@ -471,19 +471,14 @@ jobs:
       # to ensure all commands run in the same shell session and directory changes persist.
       - name: Build (Windows)
         shell: cmd
-        env:
-          PACKAGE_SUFFIX: '-Win${{matrix.target}}'
-          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
-          CMAKE_GENERATOR_PLATFORM: 'x64'
-          QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\${{matrix.qt_arch}}'
         # env:
         #   CMAKE_C_COMPILER_LAUNCHER: sccache
         #   CMAKE_CXX_COMPILER_LAUNCHER: sccache
         run: >
           build\Release\generators\conanbuild.bat &&
           cmake --version &&
-          # cmake --preset conan-release -DCMAKE_INSTALL_PREFIX=out -G "Ninja" &&
-          # cmake --build build\Release --target install
+          cmake --preset conan-release -DCMAKE_INSTALL_PREFIX=out -G "Ninja" &&
+          cmake --build build\Release --target install
 
       # - name: Build Cockatrice
       #   id: build
