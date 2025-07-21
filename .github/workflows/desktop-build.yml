@@ -435,6 +435,36 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup Conan
+        id: setup-conan
+        uses: conan-io/setup-conan@434f093a557d1ee6972c4ed78693c3191653537b # 1.1.0
+
+      - name: Restore Conan cache
+        id: restore-conan-cache
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # 4.2.3
+        with:
+          enableCrossOsArchive: true
+          path: ${{ steps.setup-conan.outputs.conan-home }}
+          key: conan-windows-${{ hashFiles('conanfile.txt', 'conan-profiles/**') }}
+          restore-keys: |
+            conan-windows-
+
+      - name: Copy Conan profiles
+        run: |
+          cp conan-profiles/* '${{ steps.setup-conan.outputs.conan-home }}/profiles'
+
+      - name: Conan install
+        run: |
+          conan install . -pr=mingw-profile --output-folder=. --build=missing --update --settings=compiler.cppstd=17 --settings=tools.cmake.cmaketoolchain:generator=Ninja
+
+      - name: Save Conan cache
+        if: ${{ steps.restore-conan-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # 4.2.3
+        with:
+          enableCrossOsArchive: true
+          path: ${{ steps.setup-conan.outputs.conan-home }}
+          key: conan-windows-${{ hashFiles('conanfile.txt', 'conan-profiles/**') }}
+
       - name: Build Cockatrice
         id: build
         shell: bash
