@@ -394,11 +394,11 @@ jobs:
         include:
           - target: 7
             qt_version: 5.15.*
-            qt_arch: msvc2019_64
+            qt_arch: win64_mingw81
 
           - target: 10
             qt_version: 6.6.*
-            qt_arch: msvc2019_64
+            qt_arch: win64_mingw
             qt_modules: "qtimageformats qtmultimedia qtwebsockets"
 
     name: Windows ${{matrix.target}}
@@ -425,7 +425,7 @@ jobs:
           cache: true
           setup-python: true
           version: ${{matrix.qt_version}}
-          arch: win64_${{matrix.qt_arch}}
+          arch: ${{matrix.qt_arch}}
           tools: ${{matrix.qt_tools}}
           modules: ${{matrix.qt_modules}}
 
@@ -445,8 +445,9 @@ jobs:
         with:
           enableCrossOsArchive: true
           path: ${{ steps.setup-conan.outputs.conan-home }}
-          key: conan-windows-${{ hashFiles('conanfile.txt', 'conan-profiles/**') }}
+          key: conan-windows-${{ matrix.target }}-${{ hashFiles('conanfile.txt', 'conan-profiles/**') }}
           restore-keys: |
+            conan-windows-${{ matrix.target }}-
             conan-windows-
 
       - name: Copy Conan profiles
@@ -463,7 +464,7 @@ jobs:
         with:
           enableCrossOsArchive: true
           path: ${{ steps.setup-conan.outputs.conan-home }}
-          key: conan-windows-${{ hashFiles('conanfile.txt', 'conan-profiles/**') }}
+          key: conan-windows-${{ matrix.target }}-${{ hashFiles('conanfile.txt', 'conan-profiles/**') }}
 
       # Use YAML's folded style (>) to keep the command readable across multiple lines,
       # but have it executed as a single line in the shell. This is necessary for Windows 'cmd' steps
