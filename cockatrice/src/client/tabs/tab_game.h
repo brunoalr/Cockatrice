@@ -118,6 +118,7 @@ private:
         *aPlayerListDockVisible, *aPlayerListDockFloating, *aReplayDockVisible, *aReplayDockFloating;
     QAction *aFocusChat;
     QList<QAction *> phaseActions;
+    QAction *aCardMenu;
 
     Player *addPlayer(int playerId, const ServerInfo_User &info);
 
@@ -171,7 +172,7 @@ private slots:
     void incrementGameTime();
     void adminLockChanged(bool lock);
     void newCardAdded(AbstractCardItem *card);
-    void updateCardMenu(AbstractCardItem *card);
+    void setCardMenu(QMenu *menu);
 
     void actGameInfo();
     void actConcede();
@@ -234,15 +235,14 @@ public:
         return gameInfo.game_id();
     }
     QString getTabText() const override;
-    bool getSpectator() const
+    bool isSpectator() const
     {
         return spectator;
     }
-    bool getSpectatorsSeeEverything() const
+    bool isSpectatorsOmniscient() const
     {
         return gameInfo.spectators_omniscient();
     }
-    bool isSpectator();
     Player *getActiveLocalPlayer() const;
     AbstractClient *getClientForPlayer(int playerId) const;
 

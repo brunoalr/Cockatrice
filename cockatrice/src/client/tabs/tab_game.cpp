@@ -261,6 +261,10 @@ void TabGame::retranslateUi()
         sayLabel->setText(tr("&Say:"));
     }
 
+    if (aCardMenu) {
+        aCardMenu->setText(tr("Selected cards"));
+    }
+
     viewMenu->setTitle(tr("&View"));
     cardInfoDockMenu->setTitle(tr("Card Info"));
     messageLayoutDockMenu->setTitle(tr("Messages"));
@@ -409,11 +413,6 @@ void TabGame::adminLockChanged(bool lock)
     bool v = !(spectator && !gameInfo.spectators_can_chat() && lock);
     sayLabel->setVisible(v);
     sayEdit->setVisible(v);
-}
-
-bool TabGame::isSpectator()
-{
-    return spectator;
 }
 
 void TabGame::actGameInfo()
@@ -576,6 +575,7 @@ Player *TabGame::addPlayer(int playerId, const ServerInfo_User &info)
     scene->addPlayer(newPlayer);
 
     connect(newPlayer, &Player::newCardAdded, this, &TabGame::newCardAdded);
+    connect(newPlayer, &Player::cardMenuUpdated, this, &TabGame::setCardMenu);
     messageLog->connectToPlayer(newPlayer);
 
     if (local && !spectator) {
@@ -1213,22 +1213,17 @@ Player *TabGame::getActiveLocalPlayer() const
 void TabGame::setActiveCard(CardItem *card)
 {
     activeCard = card;
-    updateCardMenu(card);
 }
 
-void TabGame::updateCardMenu(AbstractCardItem *card)
+/**
+ * @param menu The menu to set. Pass in nullptr to set the menu to empty.
+ */
+void TabGame::setCardMenu(QMenu *menu)
 {
-    if (card == nullptr) {
-        return;
-    }
-    Player *player;
-    if ((clients.size() > 1) || !players.contains(localPlayerId)) {
-        player = card->getOwner();
+    if (menu) {
+        aCardMenu->setMenu(menu);
     } else {
-        player = players.value(localPlayerId);
-    }
-    if (player != nullptr) {
-        player->updateCardMenu(static_cast<CardItem *>(card));
+        aCardMenu->setMenu(new QMenu);
     }
 }
 
@@ -1285,6 +1280,11 @@ void TabGame::createMenuItems()
     gameMenu->addAction(aConcede);
     gameMenu->addAction(aFocusChat);
     gameMenu->addAction(aLeaveGame);
+
+    gameMenu->addSeparator();
+
+    aCardMenu = gameMenu->addMenu(new QMenu(this));
+
     addTabMenu(gameMenu);
 }
 
