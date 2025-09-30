@@ -126,7 +126,7 @@ fi
 if [[ $PACKAGE_TYPE ]]; then
   flags+=("-DCPACK_GENERATOR=$PACKAGE_TYPE")
 fi
-if [[ $x86_MACOS ]]; then
+if [[ $x86_MACOS == true ]]; then
   flags+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0")
 fi
 
