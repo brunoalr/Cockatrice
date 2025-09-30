@@ -128,6 +128,7 @@ if [[ $PACKAGE_TYPE ]]; then
 fi
 if [[ $x86_MACOS == true ]]; then
   flags+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0")
+  export VCPKG_OSX_DEPLOYMENT_TARGET=13.0
 fi
 
 # Add cmake --build flags
