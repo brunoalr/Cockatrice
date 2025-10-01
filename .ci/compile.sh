@@ -130,7 +130,6 @@ if [[ $x86_MACOS == true ]]; then
   flags+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0")
   flags+=("-DVCPKG_TARGET_TRIPLET=x64-osx-13")
   flags+=("-DVCPKG_OVERLAY_TRIPLETS=../cmake/triplets")
-  export VCPKG_OSX_DEPLOYMENT_TARGET=13.0
 fi
 
 # Add cmake --build flags

@@ -318,6 +318,7 @@ jobs:
         id: build
         env:
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
+          VCPKG_OSX_DEPLOYMENT_TARGET: ${{ matrix.soc == 'Intel' && '13.0' || '' }}
         run: .ci/compile.sh --server --test --ccache "$CCACHE_SIZE" --x86-macos ${{ matrix.soc == 'Intel' }}
 
       - name: Sign app bundle
