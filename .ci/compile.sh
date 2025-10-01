@@ -128,6 +128,8 @@ if [[ $PACKAGE_TYPE ]]; then
 fi
 if [[ $x86_MACOS == true ]]; then
   flags+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0")
+  flags+=("-DCMAKE_VCPKG_DEFAULT_TRIPLET=x64-osx-13")
+  flags+=("-DCMAKE_VCPKG_OVERLAY_TRIPLETS=cmake/triplets")
   export VCPKG_OSX_DEPLOYMENT_TARGET=13.0
 fi
 
