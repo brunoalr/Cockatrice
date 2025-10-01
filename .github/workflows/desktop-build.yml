@@ -318,7 +318,7 @@ jobs:
         id: build
         env:
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
-          CMAKE_VCPKG_DEFAULT_TRIPLET: ${{ matrix.target == 13 && matrix.soc == 'Intel' && 'x64-osx-13' || 'x64-osx' }}
+          CMAKE_VCPKG_DEFAULT_TRIPLET: ${{ matrix.target == 13 && matrix.soc == 'Intel' && 'x64-osx' || 'x64-osx' }}
           CMAKE_VCPKG_OVERLAY_TRIPLETS: ${{ matrix.target == 13 && matrix.soc == 'Intel' && 'cmake/triplets' || '' }}
         run: .ci/compile.sh --server --test --ccache "$CCACHE_SIZE" --x86-macos ${{ matrix.soc == 'Intel' }}
 
