@@ -11,6 +11,7 @@
 # --debug or --release sets the build type ie CMAKE_BUILD_TYPE
 # --ccache [<size>] uses ccache and shows stats, optionally provide size
 # --dir <dir> sets the name of the build dir, default is "build"
+# --target-macos-version <version> sets the min os version - only used for x86 (Intel) macOS builds
 # uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_TEST USE_CCACHE CCACHE_SIZE BUILD_DIR CMAKE_GENERATOR
 # (correspond to args: --debug/--release --install --package <package type> --suffix <suffix> --server --test --ccache <ccache_size> --dir <dir>)
 # exitcode: 1 for failure, 3 for invalid arguments
@@ -75,6 +76,15 @@ while [[ $# != 0 ]]; do
       BUILD_DIR="$1"
       shift
       ;;
+    '--target-macos-version')
+      shift
+      if [[ $# == 0 ]]; then
+        echo "::error file=$0::--target-macos-version expects an argument"
+        exit 3
+      fi
+      TARGET_MACOS_VERSION="$1"
+      shift
+      ;;
     *)
       echo "::error file=$0::unrecognized option: $1"
       exit 3
@@ -115,6 +125,22 @@ if [[ $USE_CCACHE ]]; then
 fi
 if [[ $PACKAGE_TYPE ]]; then
   flags+=("-DCPACK_GENERATOR=$PACKAGE_TYPE")
+fi
+  if [[ $TARGET_MACOS_VERSION ]]; then
+  TRIPLETS_DIR="../cmake/triplets"
+  mkdir -p "$TRIPLETS_DIR"
+  # Replace dots with hyphens in triplet name for vcpkg compatibility
+  TRIPLET_VERSION=$(echo "${TARGET_MACOS_VERSION}" | sed 's/\./-/g')
+  TRIPLET_FILE="$TRIPLETS_DIR/x64-osx-${TRIPLET_VERSION}.cmake"
+  cp ../vcpkg/triplets/x64-osx.cmake "$TRIPLET_FILE"
+  echo "set(VCPKG_CMAKE_SYSTEM_VERSION ${TARGET_MACOS_VERSION})" >> "$TRIPLET_FILE"
+  echo "set(VCPKG_OSX_DEPLOYMENT_TARGET ${TARGET_MACOS_VERSION})" >> "$TRIPLET_FILE"
+  flags+=("-DVCPKG_OVERLAY_TRIPLETS=$TRIPLETS_DIR")
+  flags+=("-DVCPKG_TARGET_TRIPLET=x64-osx-${TRIPLET_VERSION}")
+  flags+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=${TARGET_MACOS_VERSION}")
+  echo "::group::Generated triplet $TRIPLET_FILE"
+  cat "$TRIPLET_FILE"
+  echo "::endgroup::"
 fi
 
 # Add cmake --build flags
