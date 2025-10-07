@@ -255,10 +255,10 @@ jobs:
             type: Release
             make_package: 1
 
-          - target: 15
+          - target: 26
             soc: Apple
-            os: macos-15
-            xcode: "16.2"
+            os: macos-26
+            xcode: "26.0.1"
             type: Release
             make_package: 1
 
