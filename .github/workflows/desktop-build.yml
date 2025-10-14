@@ -272,6 +272,13 @@ jobs:
             xcode: "16.4"
             type: Debug
 
+          - target: 15
+            soc: Apple
+            os: macos-15-intel
+            xcode: "16.4"
+            type: Release
+            make_package: 1
+
     name: macOS ${{matrix.target}}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
     runs-on: ${{matrix.os}}
@@ -333,7 +340,7 @@ jobs:
           CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
-          TARGET_MACOS_ARCH: ${{ matrix.soc == 'Intel' && 'x86_64' || '' }}
+          TARGET_MACOS_ARCH: ${{ matrix.soc == 'Intel' && 'x86_64' || matrix.soc == 'Apple' && 'arm64' || '' }}
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
         run: .ci/compile.sh --server --test --ccache "$CCACHE_SIZE" --vcpkg
 
