@@ -333,6 +333,7 @@ jobs:
           CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
+          TARGET_MACOS_ARCH: ${{ matrix.soc == 'Intel' && 'x86_64' || '' }}
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
         run: .ci/compile.sh --server --test --ccache "$CCACHE_SIZE" --vcpkg
 
