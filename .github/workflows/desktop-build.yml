@@ -246,7 +246,7 @@ jobs:
         include:
           - target: 13
             soc: Intel
-            os: macos-15-intel
+            os: macos-15
             xcode: "16.4"
             type: Release
             make_package: 1
