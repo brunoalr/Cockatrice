@@ -150,25 +150,29 @@ function ccachestatsverbose() {
 # Compile
 if [[ $RUNNER_OS == macOS ]]; then
   if [[ $TARGET_MACOS_VERSION ]]; then
-    # CMAKE_OSX_DEPLOYMENT_TARGET is a vanilla cmake flag needed to compile to target macOS version
+    # CMAKE_OSX_DEPLOYMENT_TARGET and CMAKE_OSX_ARCHITECTURES are vanilla cmake flags needed to compile to target macOS version and architecture
     flags+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=$TARGET_MACOS_VERSION")
+    flags+=("-DCMAKE_OSX_ARCHITECTURES=x86_64")
 
     # vcpkg dependencies need a vcpkg triplet file to compile to the target macOS version
     # an easy way is to copy the x64-osx.cmake file and modify it
     triplets_dir="/tmp/cmake/triplets"
     triplet_version="custom-triplet"
     triplet_file="$triplets_dir/$triplet_version.cmake"
-    arch=$(uname -m)
-    if [[ $arch == x86_64 ]]; then
-      arch="x64"
-    fi
+    # arch=$(uname -m)
+    # if [[ $arch == x86_64 ]]; then
+    #   arch="x64"
+    # fi
+    arch="x64"
     mkdir -p "$triplets_dir"
     cp "../vcpkg/triplets/$arch-osx.cmake" "$triplet_file"
     echo "set(VCPKG_CMAKE_SYSTEM_VERSION $TARGET_MACOS_VERSION)" >>"$triplet_file"
     echo "set(VCPKG_OSX_DEPLOYMENT_TARGET $TARGET_MACOS_VERSION)" >>"$triplet_file"
+
     flags+=("-DVCPKG_OVERLAY_TRIPLETS=$triplets_dir")
     flags+=("-DVCPKG_HOST_TRIPLET=$triplet_version")
     flags+=("-DVCPKG_TARGET_TRIPLET=$triplet_version")
+
     echo "::group::Generated triplet $triplet_file"
     cat "$triplet_file"
     echo "::endgroup::"
