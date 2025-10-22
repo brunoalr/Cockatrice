@@ -574,6 +574,7 @@ jobs:
       QT_VERSION: 6.6.*
       QT_ARCH: ${{ matrix.os == 'macOS' && 'clang_64' || 'win64_msvc2019_64' }}
       QT_MODULES: "qtimageformats qtmultimedia qtwebsockets"
+      CACHE_QT_INSTALL: ${{ matrix.os != 'macOS' && 'true' || 'false' }} # qt caches take too much space for macOS (1.1Gi)
       CMAKE_GENERATOR: ${{ matrix.os == 'macOS' && 'Ninja' || '' }}
 
     steps:
@@ -598,10 +599,10 @@ jobs:
           ccache-key-prefix: ccache-${{ matrix.os }}-${{ matrix.soc }}-${{ matrix.type }}
           gh-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Qt ${{matrix.qt_version}}
+      - name: Install Qt ${{ env.QT_VERSION }}
         uses: jurplel/install-qt-action@v4
         with:
-          cache: true
+          cache: ${{ env.CACHE_QT_INSTALL }}
           version: ${{ env.QT_VERSION }}
           arch: ${{ env.QT_ARCH }}
           modules: ${{ env.QT_MODULES }}
@@ -622,7 +623,6 @@ jobs:
           CMAKE_GENERATOR: '${{ env.CMAKE_GENERATOR }}'
           CMAKE_GENERATOR_PLATFORM: ${{ matrix.os == 'Windows' && 'x64' || '' }}
           QTDIR: ${{ matrix.os == 'Windows' && format('{0}\Qt\{1}\{2}', github.workspace, env.QT_VERSION, env.QT_ARCH) || '' }}
-          CACHE_QT_INSTALL: ${{ matrix.os != 'macOS' && 'true' || 'false' }}
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
           PACKAGE_FLAG: ${{ matrix.os == 'Windows' && '--package' || '' }}
