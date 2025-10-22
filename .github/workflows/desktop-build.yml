@@ -590,11 +590,8 @@ jobs:
 
       - name: Install Qt ${{matrix.qt_version}}
         uses: jurplel/install-qt-action@v4
-        env:
-          SHOULD_SETUP_PYTHON: ${{ matrix.os == 'Windows' && 'true' || 'false' }}
         with:
           cache: true
-          setup-python: ${{ env.SHOULD_SETUP_PYTHON }}
           version: ${{ matrix.qt_version }}
           arch: ${{ matrix.qt_arch }}
           modules: ${{ matrix.qt_modules }}
