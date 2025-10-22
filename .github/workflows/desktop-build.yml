@@ -529,15 +529,10 @@ jobs:
           - os: Windows
             target: 7
             runner: windows-2022
-            qt_version: 5.15.*
-            qt_arch: win64_msvc2019_64
 
           - os: Windows
             target: 10
             runner: windows-2022
-            qt_version: 6.6.*
-            qt_arch: win64_msvc2019_64
-            qt_modules: "qtimageformats qtmultimedia qtwebsockets"
 
           - os: macOS
             target: 13
@@ -574,6 +569,11 @@ jobs:
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
     runs-on: ${{ matrix.runner }}
+    env:
+      # Common parameters for all builds
+      QT_VERSION: 6.6.*
+      QT_ARCH: ${{ matrix.os == 'macOS' && 'clang_64' || 'win64_msvc2019_64' }}
+      QT_MODULES: "qtimageformats qtmultimedia qtwebsockets"
 
     steps:
       - if: matrix.os == 'Windows'
@@ -592,9 +592,9 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           cache: true
-          version: ${{ matrix.qt_version }}
-          arch: ${{ matrix.qt_arch }}
-          modules: ${{ matrix.qt_modules }}
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ env.QT_ARCH }}
+          modules: ${{ env.QT_MODULES }}
 
       - name: Setup vcpkg cache
         id: vcpkg-cache
