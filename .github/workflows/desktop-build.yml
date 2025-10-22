@@ -606,10 +606,12 @@ jobs:
         id: build
         shell: bash
         env:
+          BUILDTYPE: '${{matrix.type}}'
+          MAKE_PACKAGE: '${{matrix.make_package}}'
           PACKAGE_SUFFIX: '-Win${{matrix.target}}'
           CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
           CMAKE_GENERATOR_PLATFORM: 'x64'
-          QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\win64_${{matrix.qt_arch}}'
+          QTDIR: ${{ matrix.os == 'Windows' && format('{0}\Qt\{1}\{2}', github.workspace, env.QT_VERSION, env.QT_ARCH) || '' }}
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
