@@ -574,6 +574,7 @@ jobs:
       QT_VERSION: 6.6.*
       QT_ARCH: ${{ matrix.os == 'macOS' && 'clang_64' || 'win64_msvc2019_64' }}
       QT_MODULES: "qtimageformats qtmultimedia qtwebsockets"
+      CMAKE_GENERATOR: ${{ matrix.os == 'macOS' && 'Ninja' || '' }}
 
     steps:
       - if: matrix.os == 'Windows'
@@ -606,11 +607,11 @@ jobs:
         id: build
         shell: bash
         env:
-          BUILDTYPE: '${{matrix.type}}'
-          MAKE_PACKAGE: '${{matrix.make_package}}'
-          PACKAGE_SUFFIX: '-Win${{matrix.target}}'
-          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
-          CMAKE_GENERATOR_PLATFORM: 'x64'
+          BUILDTYPE: '${{ matrix.type }}'
+          MAKE_PACKAGE: '${{ matrix.make_package }}'
+          PACKAGE_SUFFIX: '-Win${{ matrix.target }}'
+          CMAKE_GENERATOR: '${{ env.CMAKE_GENERATOR }}'
+          CMAKE_GENERATOR_PLATFORM: ${{ matrix.os == 'Windows' && 'x64' || '' }}
           QTDIR: ${{ matrix.os == 'Windows' && format('{0}\Qt\{1}\{2}', github.workspace, env.QT_VERSION, env.QT_ARCH) || '' }}
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
