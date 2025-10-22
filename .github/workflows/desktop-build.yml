@@ -589,6 +589,15 @@ jobs:
         with:
           submodules: recursive
 
+      # Using jianmingyong/ccache-action to setup ccache without using brew
+      # It tries to download a binary of ccache from GitHub Release and falls back to building from source if it fails
+      - name: Setup ccache
+        uses: jianmingyong/ccache-action@v1
+        with:
+          install-type: "binary"
+          ccache-key-prefix: ccache-${{ matrix.os }}-${{ matrix.soc }}-${{ matrix.type }}
+          gh-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install Qt ${{matrix.qt_version}}
         uses: jurplel/install-qt-action@v4
         with:
