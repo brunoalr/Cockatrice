@@ -629,9 +629,10 @@ jobs:
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
+          PACKAGE_FLAG: ${{ matrix.os == 'Windows' && '--package' || '' }}
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
-        run: .ci/compile.sh --server --release --test --ccache "$CCACHE_SIZE" --vcpkg
+        run: .ci/compile.sh --server --release --test --ccache "$CCACHE_SIZE" --vcpkg ${{ env.PACKAGE_FLAG }}
 
       - name: Sign app bundle
         if: matrix.os == 'macOS' && matrix.make_package && (github.ref == 'refs/heads/master' || needs.configure.outputs.tag != null)
@@ -679,9 +680,10 @@ jobs:
 
       - name: Upload artifact
         id: upload_artifact
+        if: matrix.make_package
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}${{ matrix.target }}-installer
+          name: ${{ matrix.os }}${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}-${{ matrix.os == 'Windows' && 'installer' || 'package' }}
           path: ${{ steps.build.outputs.path }}
           if-no-files-found: error
 
