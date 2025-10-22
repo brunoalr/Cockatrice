@@ -240,6 +240,7 @@ jobs:
         run: gh attestation verify ${{steps.build.outputs.path}} -R Cockatrice/Cockatrice
 
   build-macos:
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -416,6 +417,7 @@ jobs:
         run: gh attestation verify ${{steps.build.outputs.path}} -R Cockatrice/Cockatrice
 
   build-windows:
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -455,6 +457,147 @@ jobs:
           version: ${{matrix.qt_version}}
           arch: win64_${{matrix.qt_arch}}
           modules: ${{matrix.qt_modules}}
+
+      - name: Setup vcpkg cache
+        id: vcpkg-cache
+        uses: TAServers/vcpkg-cache@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Cockatrice
+        id: build
+        shell: bash
+        env:
+          PACKAGE_SUFFIX: '-Win${{matrix.target}}'
+          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
+          CMAKE_GENERATOR_PLATFORM: 'x64'
+          QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\win64_${{matrix.qt_arch}}'
+          VCPKG_DISABLE_METRICS: 1
+          VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
+        # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
+        # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
+        run: .ci/compile.sh --server --release --test --package
+
+      - name: Upload artifact
+        id: upload_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows${{matrix.target}}-installer
+          path: ${{steps.build.outputs.path}}
+          if-no-files-found: error
+
+      - name: Upload pdb database
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows${{matrix.target}}-debug-pdbs
+          path: |
+            build/cockatrice/Release/*.pdb
+            build/servatrice/Release/*.pdb
+          if-no-files-found: error
+
+      - name: Upload to release
+        id: upload_release
+        if: needs.configure.outputs.tag != null
+        shell: bash
+        env:
+          GH_TOKEN: ${{github.token}}
+          tag_name: ${{needs.configure.outputs.tag}}
+          asset_path: ${{steps.build.outputs.path}}
+          asset_name: ${{steps.build.outputs.name}}
+        run: gh release upload "$tag_name" "$asset_path#$asset_name"
+
+      - name: Attest binary provenance
+        id: attestation
+        if: steps.upload_release.outcome == 'success'
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-name: ${{steps.build.outputs.name}}
+          subject-digest: sha256:${{ steps.upload_artifact.outputs.artifact-digest }}
+
+      - name: Verify binary attestation
+        if: steps.attestation.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{github.token}}
+        run: gh attestation verify ${{steps.build.outputs.path}} -R Cockatrice/Cockatrice
+
+  build-vcpkg:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Windows
+            target: 7
+            runner: windows-2022
+            qt_version: 5.15.*
+            qt_arch: win64_msvc2019_64
+
+          - os: Windows
+            target: 10
+            runner: windows-2022
+            qt_version: 6.6.*
+            qt_arch: win64_msvc2019_64
+            qt_modules: "qtimageformats qtmultimedia qtwebsockets"
+
+          - os: macOS
+            target: 13
+            runner: macos-15-intel
+            soc: Intel
+            xcode: "16.4"
+            type: Release
+            make_package: 1
+            override_target: 13
+
+          - os: macOS
+            target: 14
+            runner: macos-14
+            soc: Apple      
+            xcode: "15.4"
+            type: Release
+            make_package: 1
+
+          - os: macOS
+            target: 15
+            runner: macos-15
+            soc: Apple
+            xcode: "16.4"
+            type: Release
+            make_package: 1
+
+          - os: macOS
+            target: 15
+            runner: macos-15
+            soc: Apple
+            xcode: "16.4"
+            type: Debug
+
+    name: macOS ${{matrix.target}}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
+    needs: configure
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - if: matrix.os == 'Windows'
+        name: Add msbuild to PATH
+        id: add-msbuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install Qt ${{matrix.qt_version}}
+        uses: jurplel/install-qt-action@v4
+        env:
+          SHOULD_SETUP_PYTHON: matrix.os == 'Windows' && 'true' || 'false'
+        with:
+          cache: true
+          setup-python: ${{ env.SHOULD_SETUP_PYTHON }}
+          version: ${{ matrix.qt_version }}
+          arch: ${{ matrix.qt_arch }}
+          modules: ${{ matrix.qt_modules }}
 
       - name: Setup vcpkg cache
         id: vcpkg-cache
