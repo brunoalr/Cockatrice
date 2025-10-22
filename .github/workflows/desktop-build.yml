@@ -626,6 +626,10 @@ jobs:
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
           PACKAGE_FLAG: ${{ matrix.os == 'Windows' && '--package' || '' }}
+          # Build-specific environment variables
+          CCACHE_DIR: ${{github.workspace}}/.ccache/${{matrix.os}}-${{matrix.type}}
+          CCACHE_SIZE: 500M
+          DEVELOPER_DIR: /Applications/Xcode_${{matrix.xcode}}.app/Contents/Developer
           # macOS-specific env vars:
           MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
