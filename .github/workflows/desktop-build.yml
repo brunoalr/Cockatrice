@@ -615,9 +615,13 @@ jobs:
           QTDIR: ${{ matrix.os == 'Windows' && format('{0}\Qt\{1}\{2}', github.workspace, env.QT_VERSION, env.QT_ARCH) || '' }}
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
+          # macOS-specific env vars:
+          MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
+          MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
+          MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
-        run: .ci/compile.sh --server --release --test --package
+        run: .ci/compile.sh --server --release --test --package --vcpkg
 
       - name: Upload artifact
         id: upload_artifact
