@@ -598,7 +598,7 @@ jobs:
         uses: jianmingyong/ccache-action@v1
         with:
           install-type: "binary"
-          ccache-key-prefix: ccache-${{ matrix.os }}-${{ matrix.soc }}-${{ matrix.type }}
+          ccache-key-prefix: ccache-${{ matrix.runner }}-${{ matrix.soc }}-${{ matrix.type }}
           gh-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Qt ${{ env.QT_VERSION }}
