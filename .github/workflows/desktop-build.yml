@@ -529,10 +529,12 @@ jobs:
           - os: Windows
             target: 7
             runner: windows-2022
+            make_package: 1
 
           - os: Windows
             target: 10
             runner: windows-2022
+            make_package: 1
 
           - os: macOS
             target: 13
@@ -625,8 +627,9 @@ jobs:
           QTDIR: ${{ matrix.os == 'Windows' && format('{0}\Qt\{1}\{2}', github.workspace, env.QT_VERSION, env.QT_ARCH) || '' }}
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
-          PACKAGE_FLAG: ${{ matrix.os == 'Windows' && '--package' || '' }}
           # Build-specific environment variables
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
           CCACHE_DIR: ${{github.workspace}}/.ccache/${{matrix.os}}-${{matrix.type}}
           CCACHE_SIZE: 500M
           DEVELOPER_DIR: /Applications/Xcode_${{matrix.xcode}}.app/Contents/Developer
@@ -637,7 +640,7 @@ jobs:
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
-        run: .ci/compile.sh --server --release --test --ccache "$CCACHE_SIZE" --vcpkg ${{ env.PACKAGE_FLAG }}
+        run: .ci/compile.sh --server --release --test --ccache "$CCACHE_SIZE" --vcpkg
 
       - name: Sign app bundle
         if: matrix.os == 'macOS' && matrix.make_package && (github.ref == 'refs/heads/master' || needs.configure.outputs.tag != null)
