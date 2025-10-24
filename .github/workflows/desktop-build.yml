@@ -316,7 +316,7 @@ jobs:
           echo "QT_ARCH=win64_msvc2019_64" >> $GITHUB_ENV
           echo "CACHE_QT_INSTALL=true" >> $GITHUB_ENV
           # CMake environment variables
-          echo "CMAKE_GENERATOR='Visual Studio 17 2022'" >> $GITHUB_ENV
+          echo "CMAKE_GENERATOR=Visual Studio 17 2022" >> $GITHUB_ENV
           echo "PACKAGE_SUFFIX=-Win${{ matrix.target }}" >> $GITHUB_ENV
           echo "CMAKE_GENERATOR_PLATFORM=x64" >> $GITHUB_ENV
 
