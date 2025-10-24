@@ -601,6 +601,7 @@ jobs:
 
       - if: matrix.os == 'Windows'
         name: Configure Windows
+        shell: bash
         run: |
           # Qt environment variables
           echo "QT_VERSION=6.6.*" >> $GITHUB_ENV
@@ -626,6 +627,7 @@ jobs:
       # Using jianmingyong/ccache-action to setup ccache without using brew
       # It tries to download a binary of ccache from GitHub Release and falls back to building from source if it fails
       - name: Setup ccache
+        if: matrix.os == 'macOS'
         uses: jianmingyong/ccache-action@v1
         with:
           install-type: "binary"
