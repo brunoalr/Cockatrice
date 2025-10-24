@@ -526,16 +526,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: Windows
-            target: 7
-            runner: windows-2022
-            make_package: 1
-
-          - os: Windows
-            target: 10
-            runner: windows-2022
-            make_package: 1
-
           - os: macOS
             target: 13
             runner: macos-15-intel
@@ -568,11 +558,22 @@ jobs:
             xcode: "16.4"
             type: Debug
 
+          - os: Windows
+            target: 7
+            runner: windows-2022
+            make_package: 1
+
+          - os: Windows
+            target: 10
+            runner: windows-2022
+            make_package: 1
+
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
     runs-on: ${{ matrix.runner }}
     env:
       QT_VERSION: 6.6.*
+      QT_MODULES: "qtimageformats qtmultimedia qtwebsockets"
 
     steps:
       # Set environment variables used by the build script
@@ -628,7 +629,7 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           arch: ${{ env.QT_ARCH }}
-          modules: qtimageformats qtmultimedia qtwebsockets
+          modules: ${{ env.QT_MODULES }}
           cache: ${{ env.CACHE_QT_INSTALL }}
 
       - name: Setup vcpkg cache
