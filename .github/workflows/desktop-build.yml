@@ -630,7 +630,7 @@ jobs:
           # Build-specific environment variables
           CMAKE_C_COMPILER_LAUNCHER: ccache
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
-          CCACHE_DIR: ${{ github.workspace}}/.ccache/${{ matrix.runner }}-${{ matrix.target }}-${{ matrix.type }}
+          CCACHE_DIR: ${{ github.workspace}}/.ccache/${{ matrix.runner }}-${{ matrix.type }}
           CCACHE_SIZE: 500M
           DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
           # macOS-specific env vars:
