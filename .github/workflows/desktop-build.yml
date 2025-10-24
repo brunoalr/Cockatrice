@@ -309,7 +309,7 @@ jobs:
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
         run: |
           for var in $(env); do
-            echo $var >> $GITHUB_ENV
+            echo "$var" >> $GITHUB_ENV
           done
 
       # Set environment variables used by the build script
@@ -326,7 +326,7 @@ jobs:
           CMAKE_GENERATOR_PLATFORM: x64
         run: |
           for var in $(env); do
-            echo $var >> $GITHUB_ENV
+            echo "$var" >> $GITHUB_ENV
           done
 
       - name: Add msbuild to PATH
