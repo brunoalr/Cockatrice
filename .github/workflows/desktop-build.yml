@@ -281,20 +281,17 @@ jobs:
             runner: windows-2022
             make_package: 1
             qt_version: 5.15.*
-            qt_arch: win64_msvc2019_64
 
           - os: Windows
             target: 10
             runner: windows-2022
             make_package: 1
             qt_version: 6.6.*
-            qt_arch: win64_msvc2022_64
+            qt_modules: "qtimageformats qtmultimedia qtwebsockets"
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
     runs-on: ${{ matrix.runner }}
-    env:
-      QT_MODULES: "qtimageformats qtmultimedia qtwebsockets"
 
     steps:
       # Set environment variables used by the build script
@@ -304,6 +301,7 @@ jobs:
           # Qt environment variables
           echo "QT_VERSION=6.6.*" >> $GITHUB_ENV
           echo "QT_ARCH=clang_64" >> $GITHUB_ENV
+          echo "QT_MODULES=qtimageformats qtmultimedia qtwebsockets" >> $GITHUB_ENV
           echo "CACHE_QT_INSTALL=false" >> $GITHUB_ENV # Qt caches take too much space for macOS (1.1Gi)
           # CMake environment variables
           echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
@@ -318,12 +316,16 @@ jobs:
         run: |
           # Qt environment variables
           echo "QT_VERSION=${{ matrix.qt_version }}" >> $GITHUB_ENV
-          echo "QT_ARCH=${{ matrix.qt_arch }}" >> $GITHUB_ENV
+          echo "QT_ARCH=win64_msvc2019_64" >> $GITHUB_ENV
+          echo "QT_MODULES=${{ matrix.qt_modules }}" >> $GITHUB_ENV
           echo "CACHE_QT_INSTALL=true" >> $GITHUB_ENV
           # CMake environment variables
           echo "CMAKE_GENERATOR=Visual Studio 17 2022" >> $GITHUB_ENV
           echo "PACKAGE_SUFFIX=-Win${{ matrix.target }}" >> $GITHUB_ENV
           echo "CMAKE_GENERATOR_PLATFORM=x64" >> $GITHUB_ENV
+          # macOS environment variables
+          echo "DEVELOPER_DIR=/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer" >> $GITHUB_ENV
+          echo "TARGET_MACOS_VERSION=${{ matrix.override_target }}" >> $GITHUB_ENV
 
       - name: Add msbuild to PATH
         if: matrix.os == 'Windows'
@@ -375,8 +377,6 @@ jobs:
           MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
-          DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
-          TARGET_MACOS_VERSION: ${{ matrix.override_target }}
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
         run: .ci/compile.sh --server --release --test --vcpkg
