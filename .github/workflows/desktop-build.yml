@@ -307,11 +307,7 @@ jobs:
           USE_CCACHE: 1
           DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
-        run: |
-          env
-          for var in $(env); do
-            echo "$var" >> $GITHUB_ENV
-          done
+        run: env >> $GITHUB_ENV
 
       # Set environment variables used by the build script
       - name: Configure Windows
@@ -325,11 +321,7 @@ jobs:
           CMAKE_GENERATOR: Visual Studio 17 2022
           PACKAGE_SUFFIX: -Win${{ matrix.target }}
           CMAKE_GENERATOR_PLATFORM: x64
-        run: |
-          env
-          for var in $(env); do
-            echo "$var" >> $GITHUB_ENV
-          done
+        run: env >> $GITHUB_ENV
 
       - name: Add msbuild to PATH
         if: matrix.os == 'Windows'
