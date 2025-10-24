@@ -571,40 +571,27 @@ jobs:
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
     runs-on: ${{ matrix.runner }}
-    env:
-      # Common parameters for all builds
-      QT_MODULES: "qtimageformats qtmultimedia qtwebsockets"
 
     steps:
       - if: matrix.os == 'macOS'
         name: Configure macOS
         run: |
           # Qt environment variables
-          echo "QT_VERSION=6.6.*" >> $GITHUB_ENV
           echo "QT_ARCH=clang_64" >> $GITHUB_ENV
           echo "CACHE_QT_INSTALL=false" >> $GITHUB_ENV
           # CMake environment variables
           echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
           echo "PACKAGE_SUFFIX=-macOS${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}" >> $GITHUB_ENV
-          # macOS-specific environment variables
-          echo "DEVELOPER_DIR=/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer" >> $GITHUB_ENV
-          echo "TARGET_MACOS_VERSION=${{ matrix.override_target }}" >> $GITHUB_ENV
           # CCache environment variables
           echo "USE_CCACHE=1" >> $GITHUB_ENV
-          echo "CMAKE_C_COMPILER_LAUNCHER=ccache" >> $GITHUB_ENV
-          echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache" >> $GITHUB_ENV
-          echo "CCACHE_DIR=${{ github.workspace}}/.ccache/${{ matrix.runner }}-${{ matrix.type }}" >> $GITHUB_ENV
-          echo "CCACHE_SIZE=500M" >> $GITHUB_ENV
 
       - if: matrix.os == 'Windows'
         name: Configure Windows
         shell: bash
         run: |
           # Qt environment variables
-          echo "QT_VERSION=6.6.*" >> $GITHUB_ENV
           echo "QT_ARCH=win64_msvc2019_64" >> $GITHUB_ENV
           echo "CACHE_QT_INSTALL=true" >> $GITHUB_ENV
-          echo "QTDIR=C:\Qt\${{ env.QT_VERSION }}\${{ env.QT_ARCH }}" >> $GITHUB_ENV
           # CMake environment variables
           echo "PACKAGE_SUFFIX=-Win${{ matrix.target }}" >> $GITHUB_ENV
           echo "CMAKE_GENERATOR_PLATFORM=x64" >> $GITHUB_ENV
@@ -629,15 +616,16 @@ jobs:
         with:
           install-type: "binary"
           ccache-key-prefix: ccache-${{ matrix.runner }}-${{ matrix.soc }}-${{ matrix.type }}
+          max-size: 500M
           gh-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Qt ${{ env.QT_VERSION }}
         uses: jurplel/install-qt-action@v4
         with:
           cache: ${{ env.CACHE_QT_INSTALL }}
-          version: ${{ env.QT_VERSION }}
+          version: 6.6.*
           arch: ${{ env.QT_ARCH }}
-          modules: ${{ env.QT_MODULES }}
+          modules: qtimageformats qtmultimedia qtwebsockets
 
       - name: Setup vcpkg cache
         id: vcpkg-cache
@@ -657,6 +645,8 @@ jobs:
           MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
+          DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
+          TARGET_MACOS_VERSION: ${{ matrix.override_target }}
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
         run: .ci/compile.sh --server --release --test --vcpkg
