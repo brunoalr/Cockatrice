@@ -297,32 +297,12 @@ jobs:
       QT_ARCH: ${{ matrix.os == 'macOS' && 'clang_64' || 'win64_msvc2019_64' }}
       QT_MODULES: ${{ matrix.qt_version == '6.6.*' && 'qtimageformats qtmultimedia qtwebsockets' || '' }}
       CACHE_QT: ${{ matrix.os != 'macOS' && 'true' || 'false' }} # qt caches take too much space for macOS (1.1Gi)
-      CMAKE_GENERATOR: ${{ matrix.os == 'macOS' && 'Ninja' || 'Visual Studio 17 2022' }}
-      USE_CCACHE: ${{ matrix.os == 'macOS' && '1' || '' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
           submodules: recursive
-
-      # Set environment variables used by the build script
-      - name: Configure macOS
-        if: matrix.os == 'macOS'
-        run: |
-          echo "PACKAGE_SUFFIX=-macOS${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}" >> $GITHUB_ENV
-          echo "DEVELOPER_DIR=/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer" >> $GITHUB_ENV
-          echo "TARGET_MACOS_VERSION=${{ matrix.override_target }}" >> $GITHUB_ENV
-          echo "ARTIFACT_NAME=${{ matrix.os }}${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}-package" >> $GITHUB_ENV
-
-      # Set environment variables used by the build script
-      - name: Configure Windows
-        if: matrix.os == 'Windows'
-        shell: bash # needs to be bash to export environment variables via GITHUB_ENV
-        run: |
-          echo "PACKAGE_SUFFIX=-Win${{ matrix.target }}" >> $GITHUB_ENV
-          echo "CMAKE_GENERATOR_PLATFORM=x64" >> $GITHUB_ENV
-          echo "ARTIFACT_NAME=${{ matrix.os }}${{ matrix.target }}-installer" >> $GITHUB_ENV
 
       - name: Add msbuild to PATH
         if: matrix.os == 'Windows'
@@ -356,6 +336,19 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Configure macOS
+        if: matrix.os == 'macOS'
+        run: |
+          echo "PACKAGE_SUFFIX=-macOS${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}" >> $GITHUB_ENV
+          echo "ARTIFACT_NAME=${{ matrix.os }}${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}-package" >> $GITHUB_ENV
+
+      - name: Configure Windows
+        if: matrix.os == 'Windows'
+        shell: bash # needs to be bash to export environment variables via GITHUB_ENV
+        run: |
+          echo "PACKAGE_SUFFIX=-Win${{ matrix.target }}" >> $GITHUB_ENV
+          echo "ARTIFACT_NAME=${{ matrix.os }}${{ matrix.target }}-installer" >> $GITHUB_ENV
+
       # uses environment variables, see compile.sh for more details
       - name: Build Cockatrice
         id: build
@@ -363,14 +356,17 @@ jobs:
         env:
           BUILDTYPE: '${{ matrix.type }}'
           MAKE_PACKAGE: '${{ matrix.make_package }}'
+          CMAKE_GENERATOR: ${{ matrix.os == 'macOS' && 'Ninja' || 'Visual Studio 17 2022' }}
+          CMAKE_GENERATOR_PLATFORM: ${{ matrix.os == 'Windows' && 'x64' || '' }}
+          USE_CCACHE: ${{ matrix.os == 'macOS' && '1' || '' }}
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
           # macOS-specific environment variables, will be ignored on Windows
           MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
-        # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
-        # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
+          DEVELOPER_DIR: '/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer'
+          TARGET_MACOS_VERSION: ${{ matrix.override_target }}
         run: .ci/compile.sh --server --release --test --vcpkg
 
       - name: Sign app bundle
