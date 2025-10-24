@@ -280,17 +280,20 @@ jobs:
             target: 7
             runner: windows-2022
             make_package: 1
+            qt_version: 5.15.*
+            qt_arch: win64_msvc2019_64
 
           - os: Windows
             target: 10
             runner: windows-2022
             make_package: 1
+            qt_version: 6.6.*
+            qt_arch: win64_msvc2022_64
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
     runs-on: ${{ matrix.runner }}
     env:
-      QT_VERSION: 6.6.*
       QT_MODULES: "qtimageformats qtmultimedia qtwebsockets"
 
     steps:
@@ -299,6 +302,7 @@ jobs:
         if: matrix.os == 'macOS'
         run: |
           # Qt environment variables
+          echo "QT_VERSION=6.6.*" >> $GITHUB_ENV
           echo "QT_ARCH=clang_64" >> $GITHUB_ENV
           echo "CACHE_QT_INSTALL=false" >> $GITHUB_ENV # Qt caches take too much space for macOS (1.1Gi)
           # CMake environment variables
@@ -313,7 +317,8 @@ jobs:
         shell: bash # needs to be bash to export environment variables via GITHUB_ENV
         run: |
           # Qt environment variables
-          echo "QT_ARCH=win64_msvc2019_64" >> $GITHUB_ENV
+          echo "QT_VERSION=${{ matrix.qt_version }}" >> $GITHUB_ENV
+          echo "QT_ARCH=${{ matrix.qt_arch }}" >> $GITHUB_ENV
           echo "CACHE_QT_INSTALL=true" >> $GITHUB_ENV
           # CMake environment variables
           echo "CMAKE_GENERATOR=Visual Studio 17 2022" >> $GITHUB_ENV
