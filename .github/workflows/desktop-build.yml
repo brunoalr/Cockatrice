@@ -573,13 +573,44 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       # Common parameters for all builds
-      QT_VERSION: 6.6.*
-      QT_ARCH: ${{ matrix.os == 'macOS' && 'clang_64' || 'win64_msvc2019_64' }}
       QT_MODULES: "qtimageformats qtmultimedia qtwebsockets"
-      CACHE_QT_INSTALL: ${{ matrix.os != 'macOS' && 'true' || 'false' }} # qt caches take too much space for macOS (1.1Gi)
-      CMAKE_GENERATOR: ${{ matrix.os == 'macOS' && 'Ninja' || '' }}
 
     steps:
+      - if: matrix.os == 'macOS'
+        name: Configure macOS
+        run: |
+          # Qt environment variables
+          echo "QT_VERSION=6.6.*" >> $GITHUB_ENV
+          echo "QT_ARCH=clang_64" >> $GITHUB_ENV
+          echo "CACHE_QT_INSTALL=false" >> $GITHUB_ENV
+          # CMake environment variables
+          echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
+          echo "PACKAGE_SUFFIX=-macOS${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}" >> $GITHUB_ENV
+          # macOS-specific environment variables
+          echo "DEVELOPER_DIR=/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer" >> $GITHUB_ENV
+          echo "MACOS_CERTIFICATE_PWD=${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}" >> $GITHUB_ENV
+          echo "MACOS_CERTIFICATE_NAME=${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}" >> $GITHUB_ENV
+          echo "MACOS_CI_KEYCHAIN_PWD=${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}" >> $GITHUB_ENV
+          echo "TARGET_MACOS_VERSION=${{ matrix.override_target }}" >> $GITHUB_ENV
+          # CCache environment variables
+          echo "USE_CCACHE=1" >> $GITHUB_ENV
+          echo "CMAKE_C_COMPILER_LAUNCHER=ccache" >> $GITHUB_ENV
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache" >> $GITHUB_ENV
+          echo "CCACHE_DIR=${{ github.workspace}}/.ccache/${{ matrix.runner }}-${{ matrix.type }}" >> $GITHUB_ENV
+          echo "CCACHE_SIZE=500M" >> $GITHUB_ENV
+
+      - if: matrix.os == 'Windows'
+        name: Configure Windows
+        run: |
+          # Qt environment variables
+          echo "QT_VERSION=6.6.*" >> $GITHUB_ENV
+          echo "QT_ARCH=win64_msvc2019_64" >> $GITHUB_ENV
+          echo "CACHE_QT_INSTALL=true" >> $GITHUB_ENV
+          echo "QTDIR=C:\Qt\${{ env.QT_VERSION }}\${{ env.QT_ARCH }}" >> $GITHUB_ENV
+          # CMake environment variables
+          echo "PACKAGE_SUFFIX=-Win${{ matrix.target }}" >> $GITHUB_ENV
+          echo "CMAKE_GENERATOR_PLATFORM=x64" >> $GITHUB_ENV
+
       - if: matrix.os == 'Windows'
         name: Add msbuild to PATH
         id: add-msbuild
@@ -621,26 +652,11 @@ jobs:
         env:
           BUILDTYPE: '${{ matrix.type }}'
           MAKE_PACKAGE: '${{ matrix.make_package }}'
-          PACKAGE_SUFFIX: ${{ matrix.os == 'Windows' && format('-Win{0}', matrix.target) || format('-macOS{0}_{1}', matrix.target, matrix.soc) }}
-          CMAKE_GENERATOR: '${{ env.CMAKE_GENERATOR }}'
-          CMAKE_GENERATOR_PLATFORM: ${{ matrix.os == 'Windows' && 'x64' || '' }}
-          QTDIR: ${{ matrix.os == 'Windows' && format('{0}\Qt\{1}\{2}', github.workspace, env.QT_VERSION, env.QT_ARCH) || '' }}
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
-          # Build-specific environment variables
-          CMAKE_C_COMPILER_LAUNCHER: ccache
-          CMAKE_CXX_COMPILER_LAUNCHER: ccache
-          CCACHE_DIR: ${{ github.workspace}}/.ccache/${{ matrix.runner }}-${{ matrix.type }}
-          CCACHE_SIZE: 500M
-          DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
-          # macOS-specific env vars:
-          MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
-          MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
-          MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
-          TARGET_MACOS_VERSION: ${{ matrix.override_target }}
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
-        run: .ci/compile.sh --server --release --test --ccache "$CCACHE_SIZE" --vcpkg
+        run: .ci/compile.sh --server --release --test --vcpkg
 
       - name: Sign app bundle
         if: matrix.os == 'macOS' && matrix.make_package && (github.ref == 'refs/heads/master' || needs.configure.outputs.tag != null)
