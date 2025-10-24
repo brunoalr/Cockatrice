@@ -302,32 +302,31 @@ jobs:
       # Set environment variables used by the build script
       - name: Configure macOS
         if: matrix.os == 'macOS'
-        env:
-          QT_VERSION: 6.6.*
-          QT_ARCH: clang_64
-          QT_MODULES: qtimageformats qtmultimedia qtwebsockets
-          CACHE_QT_INSTALL: false
-          CMAKE_GENERATOR: Ninja
-          PACKAGE_SUFFIX: -macOS${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}
-          USE_CCACHE: 1
-          DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
-          TARGET_MACOS_VERSION: ${{ matrix.override_target }}
-        run: env >> $GITHUB_ENV
+        run: |
+          echo "QT_VERSION=6.6.*" >> $GITHUB_ENV
+          echo "QT_ARCH=clang_64" >> $GITHUB_ENV
+          echo "QT_MODULES=qtimageformats qtmultimedia qtwebsockets" >> $GITHUB_ENV
+          echo "CACHE_QT_INSTALL=false" >> $GITHUB_ENV # Qt caches take too much space for macOS (1.1Gi)
+          echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
+          echo "PACKAGE_SUFFIX=-macOS${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}" >> $GITHUB_ENV
+          echo "USE_CCACHE=1" >> $GITHUB_ENV
+          echo "DEVELOPER_DIR=/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer" >> $GITHUB_ENV
+          echo "TARGET_MACOS_VERSION=${{ matrix.override_target }}" >> $GITHUB_ENV
+          echo "ARTIFACT_NAME=${{ matrix.os }}${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}-package" >> $GITHUB_ENV
 
       # Set environment variables used by the build script
       - name: Configure Windows
         if: matrix.os == 'Windows'
         shell: bash # needs to be bash to export environment variables via GITHUB_ENV
-        env:
-          QT_VERSION: ${{ matrix.qt_version }}
-          QT_ARCH: win64_msvc2019_64
-          QT_MODULES: ${{ matrix.qt_modules }}
-          CACHE_QT_INSTALL: true
-          CMAKE_GENERATOR: Visual Studio 17 2022
-          PACKAGE_SUFFIX: -Win${{ matrix.target }}
-          CMAKE_GENERATOR_PLATFORM: x64
-        run: env >> $GITHUB_ENV
-
+        run: |
+          echo "QT_VERSION=${{ matrix.qt_version }}" >> $GITHUB_ENV
+          echo "QT_ARCH=win64_msvc2019_64" >> $GITHUB_ENV
+          echo "QT_MODULES=${{ matrix.qt_modules }}" >> $GITHUB_ENV
+          echo "CACHE_QT_INSTALL=true" >> $GITHUB_ENV
+          echo "CMAKE_GENERATOR=Visual Studio 17 2022" >> $GITHUB_ENV
+          echo "PACKAGE_SUFFIX=-Win${{ matrix.target }}" >> $GITHUB_ENV
+          echo "CMAKE_GENERATOR_PLATFORM=x64" >> $GITHUB_ENV
+          echo "ARTIFACT_NAME=${{ matrix.os }}${{ matrix.target }}-installer" >> $GITHUB_ENV
       - name: Add msbuild to PATH
         if: matrix.os == 'Windows'
         id: add-msbuild
@@ -426,7 +425,7 @@ jobs:
         if: matrix.make_package
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}-${{ matrix.os == 'Windows' && 'installer' || 'package' }}
+          name: ${{ env.ARTIFACT_NAME }}
           path: ${{ steps.build.outputs.path }}
           if-no-files-found: error
 
