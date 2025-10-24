@@ -571,23 +571,27 @@ jobs:
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
     runs-on: ${{ matrix.runner }}
+    env:
+      QT_VERSION: 6.6.*
 
     steps:
-      - if: matrix.os == 'macOS'
-        name: Configure macOS
+      # Set environment variables used by the build script
+      - name: Configure macOS
+        if: matrix.os == 'macOS'
         run: |
           # Qt environment variables
           echo "QT_ARCH=clang_64" >> $GITHUB_ENV
-          echo "CACHE_QT_INSTALL=false" >> $GITHUB_ENV
+          echo "CACHE_QT_INSTALL=false" >> $GITHUB_ENV # Qt caches take too much space for macOS (1.1Gi)
           # CMake environment variables
           echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
           echo "PACKAGE_SUFFIX=-macOS${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}" >> $GITHUB_ENV
           # CCache environment variables
           echo "USE_CCACHE=1" >> $GITHUB_ENV
 
-      - if: matrix.os == 'Windows'
-        name: Configure Windows
-        shell: bash
+      # Set environment variables used by the build script
+      - name: Configure Windows
+        if: matrix.os == 'Windows'
+        shell: bash # needs to be bash to export environment variables via GITHUB_ENV
         run: |
           # Qt environment variables
           echo "QT_ARCH=win64_msvc2019_64" >> $GITHUB_ENV
@@ -596,8 +600,8 @@ jobs:
           echo "PACKAGE_SUFFIX=-Win${{ matrix.target }}" >> $GITHUB_ENV
           echo "CMAKE_GENERATOR_PLATFORM=x64" >> $GITHUB_ENV
 
-      - if: matrix.os == 'Windows'
-        name: Add msbuild to PATH
+      - name: Add msbuild to PATH
+        if: matrix.os == 'Windows'
         id: add-msbuild
         uses: microsoft/setup-msbuild@v2
         with:
@@ -622,10 +626,10 @@ jobs:
       - name: Install Qt ${{ env.QT_VERSION }}
         uses: jurplel/install-qt-action@v4
         with:
-          cache: ${{ env.CACHE_QT_INSTALL }}
-          version: 6.6.*
+          version: ${{ env.QT_VERSION }}
           arch: ${{ env.QT_ARCH }}
           modules: qtimageformats qtmultimedia qtwebsockets
+          cache: ${{ env.CACHE_QT_INSTALL }}
 
       - name: Setup vcpkg cache
         id: vcpkg-cache
@@ -633,6 +637,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # uses environment variables, see compile.sh for more details
       - name: Build Cockatrice
         id: build
         shell: bash
