@@ -308,6 +308,7 @@ jobs:
           DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
         run: |
+          env
           for var in $(env); do
             echo "$var" >> $GITHUB_ENV
           done
@@ -325,6 +326,7 @@ jobs:
           PACKAGE_SUFFIX: -Win${{ matrix.target }}
           CMAKE_GENERATOR_PLATFORM: x64
         run: |
+          env
           for var in $(env); do
             echo "$var" >> $GITHUB_ENV
           done
