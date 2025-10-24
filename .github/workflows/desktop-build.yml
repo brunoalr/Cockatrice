@@ -588,9 +588,6 @@ jobs:
           echo "PACKAGE_SUFFIX=-macOS${{ matrix.target }}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}" >> $GITHUB_ENV
           # macOS-specific environment variables
           echo "DEVELOPER_DIR=/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer" >> $GITHUB_ENV
-          echo "MACOS_CERTIFICATE_PWD=${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}" >> $GITHUB_ENV
-          echo "MACOS_CERTIFICATE_NAME=${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}" >> $GITHUB_ENV
-          echo "MACOS_CI_KEYCHAIN_PWD=${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}" >> $GITHUB_ENV
           echo "TARGET_MACOS_VERSION=${{ matrix.override_target }}" >> $GITHUB_ENV
           # CCache environment variables
           echo "USE_CCACHE=1" >> $GITHUB_ENV
@@ -656,6 +653,10 @@ jobs:
           MAKE_PACKAGE: '${{ matrix.make_package }}'
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
+          # macOS-specific environment variables, will be ignored on Windows
+          MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
+          MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
+          MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
         run: .ci/compile.sh --server --release --test --vcpkg
