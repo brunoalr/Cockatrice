@@ -295,7 +295,7 @@ jobs:
       # Common parameters for all builds
       QT_VERSION: ${{ matrix.qt_version || '6.6.*' }}
       QT_ARCH: ${{ matrix.os == 'macOS' && 'clang_64' || 'win64_msvc2019_64' }}
-      QT_MODULES: ${{ matrix.qt_version == '5.15.*' && '' || 'qtimageformats qtmultimedia qtwebsockets' }}
+      QT_MODULES: ${{ matrix.qt_version == '6.6.*' && 'qtimageformats qtmultimedia qtwebsockets' || '' }}
       CACHE_QT: ${{ matrix.os != 'macOS' && 'true' || 'false' }} # qt caches take too much space for macOS (1.1Gi)
       CMAKE_GENERATOR: ${{ matrix.os == 'macOS' && 'Ninja' || 'Visual Studio 17 2022' }}
       USE_CCACHE: ${{ matrix.os == 'macOS' && '1' || '' }}
