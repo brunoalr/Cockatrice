@@ -1,9 +1,17 @@
+/**
+ * @file abstract_card_item.h
+ * @ingroup GameGraphicsCards
+ * @brief TODO: Document this.
+ */
+
 #ifndef ABSTRACTCARDITEM_H
 #define ABSTRACTCARDITEM_H
 
-#include "../cards/exact_card.h"
 #include "arrow_target.h"
-#include "card_ref.h"
+#include "graphics_item_type.h"
+
+#include <libcockatrice/card/printing/exact_card.h>
+#include <libcockatrice/utility/card_ref.h>
 
 class Player;
 

@@ -24,6 +24,8 @@ option(WITH_ORACLE "build oracle" ON)
 option(WITH_DBCONVERTER "build dbconverter" ON)
 # Compile tests
 option(TEST "build tests" OFF)
+# Use vcpkg regardless of OS
+option(USE_VCPKG "Use vcpkg regardless of OS" OFF)
 
 # Default to "Release" build type
 # User-provided value for CMAKE_BUILD_TYPE must be checked before the PROJECT() call
@@ -48,8 +50,8 @@ if(USE_CCACHE)
   endif()
 endif()
 
-if(WIN32)
-  # Use vcpkg toolchain on Windows
+if(WIN32 OR USE_VCPKG)
+  # Use vcpkg toolchain on Windows (and on macOS in CI)
   # set(CMAKE_TOOLCHAIN_FILE
   #     ${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake
   #     CACHE STRING "Vcpkg toolchain file"
@@ -301,6 +303,7 @@ if(UNIX)
       set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "http://github.com/Cockatrice/Cockatrice")
       if(Qt6_FOUND)
         set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt6multimedia6, libqt6svg6, qt6-qpa-plugins, qt6-image-formats-plugins")
+        set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "libqt6sql6-mysql") # for connecting servatrice to a mysql db
       elseif(Qt5_FOUND)
         set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt5multimedia5-plugins, libqt5svg5")
       endif()
@@ -325,7 +328,13 @@ endif()
 
 include(CPack)
 
-add_subdirectory(common)
+add_subdirectory(${CMAKE_SOURCE_DIR}/libcockatrice_protocol ${CMAKE_BINARY_DIR}/libcockatrice_protocol)
+add_subdirectory(${CMAKE_SOURCE_DIR}/libcockatrice_network ${CMAKE_BINARY_DIR}/libcockatrice_network)
+add_subdirectory(${CMAKE_SOURCE_DIR}/libcockatrice_deck_list ${CMAKE_BINARY_DIR}/libcockatrice_deck_list)
+add_subdirectory(${CMAKE_SOURCE_DIR}/libcockatrice_rng ${CMAKE_BINARY_DIR}/libcockatrice_rng)
+add_subdirectory(${CMAKE_SOURCE_DIR}/libcockatrice_settings ${CMAKE_BINARY_DIR}/libcockatrice_settings)
+add_subdirectory(${CMAKE_SOURCE_DIR}/libcockatrice_card ${CMAKE_BINARY_DIR}/libcockatrice_card)
+add_subdirectory(${CMAKE_SOURCE_DIR}/libcockatrice_utility ${CMAKE_BINARY_DIR}/libcockatrice_utility)
 if(WITH_SERVER)
   add_subdirectory(servatrice)
   set(CPACK_INSTALL_CMAKE_PROJECTS "Servatrice;Servatrice;ALL;/" ${CPACK_INSTALL_CMAKE_PROJECTS})

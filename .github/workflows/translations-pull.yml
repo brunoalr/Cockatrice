@@ -7,6 +7,7 @@ on:
     - cron: '0 0 15 1,4,7,10 *'
   pull_request:
     paths:
+      - '.tx/**'
       - '.github/workflows/translations-pull.yml'
 
 jobs:
@@ -19,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Pull translated strings from Transifex
         uses: transifex/cli-action@v2

@@ -1,13 +1,20 @@
+/**
+ * @file view_zone_widget.h
+ * @ingroup GameGraphicsZones
+ * @brief TODO: Document this.
+ */
+
 #ifndef ZONEVIEWWIDGET_H
 #define ZONEVIEWWIDGET_H
 
-#include "../../utility/macros.h"
+#include "logic/card_zone_logic.h"
 
 #include <QCheckBox>
 #include <QComboBox>
 #include <QGraphicsProxyWidget>
 #include <QGraphicsWidget>
 #include <QLineEdit>
+#include <libcockatrice/utility/macros.h>
 
 class QLabel;
 class QPushButton;
@@ -75,7 +82,7 @@ private slots:
 
 public:
     ZoneViewWidget(Player *_player,
-                   CardZone *_origZone,
+                   CardZoneLogic *_origZone,
                    int numberCards = 0,
                    bool _revealZone = false,
                    bool _writeableRevealZone = false,

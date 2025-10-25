@@ -1,6 +1,5 @@
 #include "oracleimporter.h"
 
-#include "game/cards/card_database_parser/cockatrice_xml_4.h"
 #include "parsehelpers.h"
 #include "qt-json/json.h"
 
@@ -8,6 +7,8 @@
 #include <QRegularExpression>
 #include <algorithm>
 #include <climits>
+#include <libcockatrice/card/database/parser/cockatrice_xml_4.h>
+#include <libcockatrice/card/relation/card_relation.h>
 
 SplitCardPart::SplitCardPart(const QString &_name,
                              const QString &_text,
@@ -173,12 +174,12 @@ CardInfoPtr OracleImporter::addCard(QString name,
 
     // DETECT CARD POSITIONING INFO
 
-    // cards that enter the field tapped
-    bool cipt = parseCipt(name, text);
-
     bool landscapeOrientation = properties.value("maintype").toString() == "Battle" ||
                                 properties.value("layout").toString() == "split" ||
                                 properties.value("layout").toString() == "planar";
+
+    // cards that enter the field tapped
+    bool cipt = parseCipt(name, text) || landscapeOrientation;
 
     // table row
     int tableRow = 1;
@@ -379,12 +380,12 @@ int OracleImporter::importCardsFromSet(const CardSetPtr &currentSet, const QList
                     static const QRegularExpression meldNameRegex{"then meld them into ([^\\.]*)"};
                     QString additionalName = meldNameRegex.match(text).captured(1);
                     if (!additionalName.isNull()) {
-                        relatedCards.append(new CardRelation(additionalName, CardRelation::TransformInto));
+                        relatedCards.append(new CardRelation(additionalName, CardRelationType::TransformInto));
                     }
                 } else {
                     for (const QString &additionalName : name.split(" // ")) {
                         if (additionalName != faceName) {
-                            relatedCards.append(new CardRelation(additionalName, CardRelation::TransformInto));
+                            relatedCards.append(new CardRelation(additionalName, CardRelationType::TransformInto));
                         }
                     }
                 }
@@ -399,7 +400,7 @@ int OracleImporter::importCardsFromSet(const CardSetPtr &currentSet, const QList
                     auto spbk = givenRelated.value("spellbook").toStringList();
                     for (const QString &spbkName : spbk) {
                         relatedCards.append(
-                            new CardRelation(spbkName, CardRelation::DoesNotAttach, false, false, 1, true));
+                            new CardRelation(spbkName, CardRelationType::DoesNotAttach, false, false, 1, true));
                     }
                 }
             }

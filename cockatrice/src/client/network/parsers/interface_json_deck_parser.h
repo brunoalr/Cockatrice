@@ -1,9 +1,14 @@
+/**
+ * @file interface_json_deck_parser.h
+ * @ingroup ApiInterfaces
+ * @brief TODO: Document this.
+ */
+
 #ifndef INTERFACE_JSON_DECK_PARSER_H
 #define INTERFACE_JSON_DECK_PARSER_H
-#include "../../../deck/deck_loader.h"
-
 #include <QJsonArray>
 #include <QJsonObject>
+#include <libcockatrice/deck_list/deck_loader.h>
 
 class IJsonDeckParser
 {

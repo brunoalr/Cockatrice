@@ -1,21 +1,21 @@
 #include "player_list_widget.h"
 
-#include "../../client/tabs/tab_account.h"
-#include "../../client/tabs/tab_game.h"
-#include "../../client/tabs/tab_supervisor.h"
-#include "../../client/ui/pixel_map_generator.h"
-#include "../../server/abstract_client.h"
-#include "../../server/user/user_context_menu.h"
-#include "../../server/user/user_list_manager.h"
-#include "../../server/user/user_list_widget.h"
-#include "pb/command_kick_from_game.pb.h"
-#include "pb/serverinfo_playerproperties.pb.h"
-#include "pb/session_commands.pb.h"
+#include "../../interface/pixel_map_generator.h"
+#include "../../interface/widgets/server/user/user_context_menu.h"
+#include "../../interface/widgets/server/user/user_list_manager.h"
+#include "../../interface/widgets/server/user/user_list_widget.h"
+#include "../../interface/widgets/tabs/tab_account.h"
+#include "../../interface/widgets/tabs/tab_game.h"
+#include "../../interface/widgets/tabs/tab_supervisor.h"
 
 #include <QAction>
 #include <QHeaderView>
 #include <QMenu>
 #include <QMouseEvent>
+#include <libcockatrice/network/client/abstract/abstract_client.h>
+#include <libcockatrice/protocol/pb/command_kick_from_game.pb.h>
+#include <libcockatrice/protocol/pb/serverinfo_playerproperties.pb.h>
+#include <libcockatrice/protocol/pb/session_commands.pb.h>
 
 PlayerListItemDelegate::PlayerListItemDelegate(QObject *const parent) : QStyledItemDelegate(parent)
 {
@@ -56,7 +56,7 @@ bool PlayerListTWI::operator<(const QTreeWidgetItem &other) const
 
 PlayerListWidget::PlayerListWidget(TabSupervisor *_tabSupervisor,
                                    AbstractClient *_client,
-                                   TabGame *_game,
+                                   AbstractGame *_game,
                                    QWidget *parent)
     : QTreeWidget(parent), tabSupervisor(_tabSupervisor), client(_client), game(_game), gameStarted(false)
 {

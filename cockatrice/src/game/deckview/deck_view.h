@@ -1,14 +1,20 @@
+/**
+ * @file deck_view.h
+ * @ingroup Lobby
+ * @brief TODO: Document this.
+ */
+
 #ifndef DECKVIEW_H
 #define DECKVIEW_H
 
 #include "../board/abstract_card_drag_item.h"
-#include "pb/move_card_to_zone.pb.h"
 
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QMap>
 #include <QMultiMap>
 #include <QPixmap>
+#include <libcockatrice/protocol/pb/move_card_to_zone.pb.h>
 
 class DeckList;
 class InnerDecklistNode;

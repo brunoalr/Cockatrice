@@ -1,8 +1,8 @@
-#include "../../cockatrice/src/game/cards/card_database_manager.h"
-#include "../../cockatrice/src/game/filters/filter_string.h"
+#include "../../cockatrice/src/filters/filter_string.h"
 #include "mocks.h"
 
 #include "gtest/gtest.h"
+#include <libcockatrice/card/database/card_database_manager.h>
 
 #define QUERY(name, card, query, match)                                                                                \
     TEST_F(CardQuery, name)                                                                                            \
@@ -18,10 +18,10 @@ class CardQuery : public ::testing::Test
 protected:
     void SetUp() override
     {
-        cat = CardDatabaseManager::getInstance()->getCardBySimpleName("Cat");
-        notDeadAfterAll = CardDatabaseManager::getInstance()->getCardBySimpleName("Not Dead");
-        truth = CardDatabaseManager::getInstance()->getCardBySimpleName("Truth");
-        doctor = CardDatabaseManager::getInstance()->getCardBySimpleName("Doctor");
+        cat = CardDatabaseManager::query()->getCardBySimpleName("Cat");
+        notDeadAfterAll = CardDatabaseManager::query()->getCardBySimpleName("Not Dead");
+        truth = CardDatabaseManager::query()->getCardBySimpleName("Truth");
+        doctor = CardDatabaseManager::query()->getCardBySimpleName("Doctor");
     }
     // void TearDown() override {}
 
