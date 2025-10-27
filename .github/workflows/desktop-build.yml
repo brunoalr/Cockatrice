@@ -5,6 +5,7 @@ permissions:
   id-token: write
   attestations: write
   actions: write # needed for ccache action to be able to delete gha caches
+  packages: write # needed to upload vcpkg caches to GitHub Packages
 
 on:
   push:
@@ -434,6 +435,10 @@ jobs:
     runs-on: windows-2022
     env:
       CMAKE_GENERATOR: 'Visual Studio 17 2022'
+      USERNAME: brunoalr
+      VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
+      FEED_URL: https://nuget.pkg.github.com/brunoalr/index.json
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/brunoalr/index.json,readwrite"
 
     steps:
       - name: Add msbuild to PATH
@@ -456,11 +461,23 @@ jobs:
           arch: win64_${{matrix.qt_arch}}
           modules: ${{matrix.qt_modules}}
 
-      - name: Setup vcpkg cache
-        id: vcpkg-cache
-        uses: TAServers/vcpkg-cache@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.bat
+
+      - name: Add NuGet sources
+        shell: pwsh
+        run: |
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+            sources add `
+            -Source "${{ env.FEED_URL }}" `
+            -StorePasswordInClearText `
+            -Name GitHubPackages `
+            -UserName "${{ env.USERNAME }}" `
+            -Password "${{ secrets.GITHUB_TOKEN }}"
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+            setapikey "${{ secrets.GITHUB_TOKEN }}" `
+            -Source "${{ env.FEED_URL }}"
 
       - name: Build Cockatrice
         id: build
@@ -471,7 +488,6 @@ jobs:
           CMAKE_GENERATOR_PLATFORM: 'x64'
           QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\win64_${{matrix.qt_arch}}'
           VCPKG_DISABLE_METRICS: 1
-          VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
         # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
         # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
         run: .ci/compile.sh --server --release --test --package
