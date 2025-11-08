@@ -5,6 +5,7 @@ permissions:
   id-token: write
   attestations: write
   actions: write # needed for ccache action to be able to delete gha caches
+  packages: write # needed to upload vcpkg caches to GitHub Packages
 
 on:
   push:
@@ -240,6 +241,12 @@ jobs:
         run: gh attestation verify ${{steps.build.outputs.path}} -R Cockatrice/Cockatrice
 
   build-vcpkg:
+    env:
+      USERNAME: brunoalr
+      VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
+      FEED_URL: https://nuget.pkg.github.com/brunoalr/index.json
+      VCPKG_DISABLE_METRICS: 1
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/brunoalr/index.json,readwrite"
     strategy:
       fail-fast: false
       matrix:
@@ -343,6 +350,53 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install Mono (macOS)
+        if: matrix.os == 'macOS'
+        shell: bash
+        run: brew install mono
+
+      - name: Bootstrap vcpkg (macOS)
+        if: matrix.os == 'macOS'
+        shell: bash
+        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.sh
+
+      - name: Bootstrap vcpkg (Windows)
+        if: matrix.os == 'Windows'
+        shell: pwsh
+        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.bat
+
+      - name: Add NuGet sources (macOS)
+        if: matrix.os == 'macOS'
+        shell: bash
+        env:
+          VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
+        run: |
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+            sources add \
+            -Source "${{ env.FEED_URL }}" \
+            -StorePasswordInClearText \
+            -Name GitHubPackages \
+            -UserName "${{ env.USERNAME }}" \
+            -Password "${{ secrets.GITHUB_TOKEN }}"
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+            setapikey "${{ secrets.GITHUB_TOKEN }}" \
+            -Source "${{ env.FEED_URL }}"
+
+      - name: Add NuGet sources (Windows)
+        if: matrix.os == 'Windows'
+        shell: pwsh
+        run: |
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+            sources add `
+            -Source "${{ env.FEED_URL }}" `
+            -StorePasswordInClearText `
+            -Name GitHubPackages `
+            -UserName "${{ env.USERNAME }}" `
+            -Password "${{ secrets.GITHUB_TOKEN }}"
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+            setapikey "${{ secrets.GITHUB_TOKEN }}" `
+            -Source "${{ env.FEED_URL }}"
+
       - name: Add msbuild to PATH
         if: matrix.os == 'Windows'
         id: add-msbuild
@@ -432,8 +486,6 @@ jobs:
           CMAKE_GENERATOR: ${{matrix.cmake_generator}}
           CMAKE_GENERATOR_PLATFORM: ${{matrix.cmake_generator_platform}}
           USE_CCACHE: ${{matrix.use_ccache}}
-          VCPKG_DISABLE_METRICS: 1
-          VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
           # macOS-specific environment variables, will be ignored on Windows
           MACOS_CERTIFICATE: ${{ secrets.PROD_MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
