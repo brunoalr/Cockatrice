@@ -5,6 +5,7 @@ permissions:
   attestations: write    # needed to persist the attestation.
   contents: write
   id-token: write    # needed for signing certificate in attestation
+  packages: write    # needed to upload vcpkg caches to GitHub Packages
 
 on:
   push:
@@ -260,6 +261,16 @@ jobs:
         run: gh attestation verify "${{ steps.build.outputs.path }}" --repo Cockatrice/Cockatrice
 
   build-vcpkg:
+    env:
+      USERNAME: brunoalr
+      VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
+      FEED_URL: https://nuget.pkg.github.com/brunoalr/index.json
+      VCPKG_DISABLE_METRICS: 1
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/brunoalr/index.json,readwrite"
+      # Cache size over the entire repo is 10Gi:
+      # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
+      CCACHE_DIR: ${{github.workspace}}/.cache/
+      CCACHE_SIZE: 550M
     strategy:
       fail-fast: false
       matrix:
@@ -344,15 +355,59 @@ jobs:
     needs: configure
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 100
-    env:
-      CCACHE_DIR: ${{ github.workspace }}/.cache/
-      CCACHE_SIZE: 550M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
 
     steps:
       - name: "Checkout"
         uses: actions/checkout@v6
         with:
           submodules: recursive
+
+      - name: "[macOS] Install Mono"
+        if: matrix.os == 'macOS'
+        shell: bash
+        run: brew install mono
+
+      - name: "[macOS] Bootstrap vcpkg"
+        if: matrix.os == 'macOS'
+        shell: bash
+        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+
+      - name: "[Windows] Bootstrap vcpkg"
+        if: matrix.os == 'Windows'
+        shell: pwsh
+        run: ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.bat -disableMetrics
+
+      - name: "[macOS] Add NuGet sources"
+        if: matrix.os == 'macOS'
+        shell: bash
+        env:
+          VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
+        run: |
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+            sources add \
+            -Source "${{ env.FEED_URL }}" \
+            -StorePasswordInClearText \
+            -Name GitHubPackages \
+            -UserName "${{ env.USERNAME }}" \
+            -Password "${{ secrets.GITHUB_TOKEN }}"
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+            setapikey "${{ secrets.GITHUB_TOKEN }}" \
+            -Source "${{ env.FEED_URL }}"
+
+      - name: "[Windows] Add NuGet sources"
+        if: matrix.os == 'Windows'
+        shell: pwsh
+        run: |
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+            sources add `
+            -Source "${{ env.FEED_URL }}" `
+            -StorePasswordInClearText `
+            -Name GitHubPackages `
+            -UserName "${{ env.USERNAME }}" `
+            -Password "${{ secrets.GITHUB_TOKEN }}"
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+            setapikey "${{ secrets.GITHUB_TOKEN }}" `
+            -Source "${{ env.FEED_URL }}"
 
       - name: "[Windows] Add msbuild to PATH"
         if: matrix.os == 'Windows'
@@ -432,12 +487,6 @@ jobs:
         shell: bash
         run: choco install nsis
 
-      - name: "Setup vcpkg cache"
-        id: vcpkg-cache
-        uses: TAServers/vcpkg-cache@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       # Uses environment variables, see compile.sh for more details
       - name: "Build Cockatrice"
         id: build
@@ -456,8 +505,6 @@ jobs:
           PACKAGE_SUFFIX: '${{ matrix.package_suffix }}'
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
           USE_CCACHE: ${{ matrix.use_ccache }}
-          VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
-          VCPKG_DISABLE_METRICS: 1
         run: .ci/compile.sh --server --test --vcpkg
 
       # Delete used cache to emulate a ccache update. See https://github.com/actions/cache/issues/342
