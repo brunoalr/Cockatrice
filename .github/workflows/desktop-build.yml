@@ -264,8 +264,7 @@ jobs:
         include:
           - os: macOS
             target: 13    # EOL 2025-09-15
-            runner: macos-15-intel    # https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md
-                                      # macos-26-intel is very slow and fails in CPack during DMG config if not increasing Finder timeout
+            runner: macos-26    # arm64 runner; x86_64 is cross-compiled, see TARGET_MACOS_ARCH
 
             ccache_eviction_age: 7d
             cmake_generator: Ninja
@@ -277,7 +276,7 @@ jobs:
             soc: Intel
             type: Release
             ccache_variant: ccache
-            xcode: "26.3"
+            xcode: "26.6"
 
           - os: macOS
             target: 14    # EOL 2026-??
@@ -458,6 +457,7 @@ jobs:
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
           MAKE_PACKAGE: '${{ matrix.make_package }}'
           PACKAGE_SUFFIX: '${{ matrix.package_suffix }}'
+          TARGET_MACOS_ARCH: ${{ matrix.soc == 'Intel' && 'x86_64' || '' }}
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
           VCPKG_DISABLE_METRICS: 1
