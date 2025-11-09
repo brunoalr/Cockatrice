@@ -813,6 +813,7 @@ jobs:
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
           MAKE_PACKAGE: '${{ matrix.make_package }}'
           PACKAGE_SUFFIX: '${{ matrix.package_suffix }}'
+          TARGET_MACOS_ARCH: ${{ matrix.soc == 'Intel' && 'x86_64' || '' }}
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
           # Only pushes to the default branch may write the shared binary cache: the
           # archives a run compiles are only as trustworthy as the code they were
@@ -1151,8 +1152,7 @@ jobs:
         include:
           - os: macOS
             target: 13    # EOL 2025-09-15
-            runner: macos-15-intel    # https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md
-                                      # macos-26-intel is very slow and fails in CPack during DMG config if not increasing Finder timeout
+            runner: xcode-27    # arm64 runner; x86_64 is cross-compiled, see TARGET_MACOS_ARCH
 
             ccache_eviction_age: 7d
             cmake_generator: Ninja
