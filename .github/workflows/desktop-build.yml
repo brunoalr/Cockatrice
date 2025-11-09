@@ -263,7 +263,7 @@ jobs:
         include:
           - os: macOS
             target: 13
-            runner: macos-15-intel
+            runner: macos-15
 
             ccache_eviction_age: 7d
             cmake_generator: Ninja
@@ -461,6 +461,7 @@ jobs:
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
           MAKE_PACKAGE: '${{ matrix.make_package }}'
           PACKAGE_SUFFIX: '${{ matrix.package_suffix }}'
+          TARGET_MACOS_ARCH: ${{ matrix.soc == 'Intel' && 'x86_64' || '' }}
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
           VCPKG_DISABLE_METRICS: 1
