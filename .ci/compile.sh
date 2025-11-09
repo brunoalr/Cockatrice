@@ -12,7 +12,8 @@
 # --ccache [<size>] uses ccache and shows stats, optionally provide size
 # --dir <dir> sets the name of the build dir, default is "build"
 # --target-macos-version <version> sets the min os version - only used for macOS builds
-# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_TEST USE_CCACHE CCACHE_SIZE BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION
+# --target-macos-architecture <architecture> sets the architecture - only used for macOS builds
+# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_TEST USE_CCACHE CCACHE_SIZE BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION TARGET_MACOS_ARCH
 # (correspond to args: --debug/--release --install --package <package type> --suffix <suffix> --server --test --ccache <ccache_size> --dir <dir>)
 # exitcode: 1 for failure, 3 for invalid arguments
 
@@ -89,6 +90,15 @@ while [[ $# != 0 ]]; do
       TARGET_MACOS_VERSION="$1"
       shift
       ;;
+    '--target-macos-architecture')
+      shift
+      if [[ $# == 0 ]]; then
+        echo "::error file=$0::--target-macos-architecture expects an argument"
+        exit 3
+      fi
+      TARGET_MACOS_ARCH="$1"
+      shift
+      ;;
     *)
       echo "::error file=$0::unrecognized option: $1"
       exit 3
@@ -149,26 +159,51 @@ function ccachestatsverbose() {
 
 # Compile
 if [[ $RUNNER_OS == macOS ]]; then
-  if [[ $TARGET_MACOS_VERSION ]]; then
-    # CMAKE_OSX_DEPLOYMENT_TARGET is a vanilla cmake flag needed to compile to target macOS version
-    flags+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=$TARGET_MACOS_VERSION")
-
-    # vcpkg dependencies need a vcpkg triplet file to compile to the target macOS version
-    # an easy way is to copy the x64-osx.cmake file and modify it
+  if [[ $TARGET_MACOS_VERSION || $TARGET_MACOS_ARCH ]]; then
+    # if we are using either a custom version or architecture, we need to use a custom triplet file to compile *vcpkg dependencies*
+    # https://learn.microsoft.com/en-us/vcpkg/concepts/triplets
+    # an easy way to get a custom triplet file is to copy a triplet file from the vcpkg repo and then modify it
     triplets_dir="/tmp/cmake/triplets"
     triplet_version="custom-triplet"
     triplet_file="$triplets_dir/$triplet_version.cmake"
-    arch=$(uname -m)
-    if [[ $arch == x86_64 ]]; then
-      arch="x64"
-    fi
     mkdir -p "$triplets_dir"
-    cp "../vcpkg/triplets/$arch-osx.cmake" "$triplet_file"
-    echo "set(VCPKG_CMAKE_SYSTEM_VERSION $TARGET_MACOS_VERSION)" >>"$triplet_file"
-    echo "set(VCPKG_OSX_DEPLOYMENT_TARGET $TARGET_MACOS_VERSION)" >>"$triplet_file"
+    # vcpkg-specific CMake flags needed to use the custom triplet file
+    # both host and target triplet are set to be the same in order to avoid building dependencies twice
     flags+=("-DVCPKG_OVERLAY_TRIPLETS=$triplets_dir")
     flags+=("-DVCPKG_HOST_TRIPLET=$triplet_version")
     flags+=("-DVCPKG_TARGET_TRIPLET=$triplet_version")
+
+    # vcpkg triplet file variables that will be appended later to the generated custom triplet file
+    # https://learn.microsoft.com/en-us/vcpkg/users/triplets
+    declare -a extra_triplet_vars
+
+    if [[ $TARGET_MACOS_ARCH ]]; then
+      # CMAKE_OSX_ARCHITECTURES is a vanilla CMake flag needed to compile cockatrice to target macOS architecture
+      flags+=("-DCMAKE_OSX_ARCHITECTURES=$TARGET_MACOS_ARCH")
+      # for example, by using x64-osx.cmake, even on arm64 macOS, vcpkg will (cross-) compile for x86_64
+      triplet_arch=$TARGET_MACOS_ARCH
+    else
+      triplet_arch=$(uname -m)
+    fi
+
+    if [[ $TARGET_MACOS_VERSION ]]; then
+      # CMAKE_OSX_DEPLOYMENT_TARGET is a vanilla CMake flag needed to compile cockatrice to target macOS version
+      flags+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=$TARGET_MACOS_VERSION")
+      extra_triplet_vars+=("set(VCPKG_CMAKE_SYSTEM_VERSION $TARGET_MACOS_VERSION)")
+      extra_triplet_vars+=("set(VCPKG_OSX_DEPLOYMENT_TARGET $TARGET_MACOS_VERSION)")
+    fi
+
+    if [[ $triplet_arch == x86_64 ]]; then
+      # vcpkg uses x64-osx.cmake as default for x86_64
+      triplet_arch="x64"
+    fi
+
+    # generate the custom triplet file
+    cp "../vcpkg/triplets/$triplet_arch-osx.cmake" "$triplet_file"
+    for var in "${extra_triplet_vars[@]}"; do
+      echo "$var" >>"$triplet_file"
+    done
+
     echo "::group::Generated triplet $triplet_file"
     cat "$triplet_file"
     echo "::endgroup::"
@@ -249,7 +284,6 @@ fi
 
 if [[ $MAKE_PACKAGE ]]; then
   echo "::group::Create package"
-  
   cmake --build . --target package --config "$BUILDTYPE"
   echo "::endgroup::"
 
