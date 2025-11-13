@@ -13,7 +13,7 @@
 # --dir <dir> sets the name of the build dir, default is "build"
 # --target-macos-version <version> sets the min os version - only used for macOS builds
 # --target-macos-architecture <architecture> sets the architecture - only used for macOS builds
-# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_TEST USE_CCACHE CCACHE_SIZE BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION TARGET_MACOS_ARCH
+# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION TARGET_MACOS_ARCH
 # (correspond to args: --debug/--release --install --package <package type> --suffix <suffix> --server --test --ccache <ccache_size> --dir <dir>)
 # exitcode: 1 for failure, 3 for invalid arguments
 
@@ -46,6 +46,10 @@ while [[ $# != 0 ]]; do
       ;;
     '--server')
       MAKE_SERVER=1
+      shift
+      ;;
+    '--no-client')
+      MAKE_NO_CLIENT=1
       shift
       ;;
     '--test')
@@ -126,6 +130,9 @@ export CMAKE_POLICY_VERSION_MINIMUM=3.10
 flags=("-DCMAKE_BUILD_TYPE=$BUILDTYPE")
 if [[ $MAKE_SERVER ]]; then
   flags+=("-DWITH_SERVER=1")
+fi
+if [[ $MAKE_NO_CLIENT ]]; then
+  flags+=("-DWITH_CLIENT=0" "-DWITH_ORACLE=0" "-DWITH_DBCONVERTER=0")
 fi
 if [[ $MAKE_TEST ]]; then
   flags+=("-DTEST=1")
@@ -255,12 +262,12 @@ fi
 
 echo "::group::Configure cmake"
 cmake --version
-echo "Running cmake with flags: ${flags[@]}"
+echo "Running cmake with flags: ${flags[*]}"
 cmake .. "${flags[@]}"
 echo "::endgroup::"
 
 echo "::group::Build project"
-echo "Running cmake --build with flags: ${buildflags[@]}"
+echo "Running cmake --build with flags: ${buildflags[*]}"
 cmake --build . "${buildflags[@]}"
 echo "::endgroup::"
 
