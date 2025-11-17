@@ -270,7 +270,6 @@ jobs:
             qt_version: 6.6.3
             qt_arch: clang_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
-            cache_qt: false # caching manually after thinning
             cmake_generator: Ninja
             use_ccache: 1
 
@@ -286,7 +285,6 @@ jobs:
             qt_version: 6.6.3
             qt_arch: clang_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
-            cache_qt: true
             cmake_generator: Ninja
             use_ccache: 1
 
@@ -302,7 +300,6 @@ jobs:
             qt_version: 6.6.3
             qt_arch: clang_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
-            cache_qt: true
             cmake_generator: Ninja
             use_ccache: 1
 
@@ -315,7 +312,6 @@ jobs:
             qt_version: 6.6.3
             qt_arch: clang_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
-            cache_qt: true
             cmake_generator: Ninja
             use_ccache: 1
 
@@ -328,7 +324,6 @@ jobs:
             artifact_name: Windows7-installer
             qt_version: 5.15.*
             qt_arch: win64_msvc2019_64
-            cache_qt: true
             cmake_generator: "Visual Studio 17 2022"
             cmake_generator_platform: x64
 
@@ -342,7 +337,6 @@ jobs:
             qt_version: 6.6.3
             qt_arch: win64_msvc2019_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
-            cache_qt: true
             cmake_generator: "Visual Studio 17 2022"
             cmake_generator_platform: x64
 
@@ -435,7 +429,7 @@ jobs:
         if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
         uses: jurplel/install-qt-action@v4
         with:
-          cache: ${{matrix.cache_qt}}
+          cache: false
           version: ${{matrix.qt_version}}
           arch: ${{matrix.qt_arch}}
           modules: ${{matrix.qt_modules}}
@@ -473,7 +467,7 @@ jobs:
           version: ${{matrix.qt_version}}
           arch: ${{matrix.qt_arch}}
           modules: ${{matrix.qt_modules}}
-          cache: ${{matrix.cache_qt}}
+          cache: true
 
       # uses environment variables, see compile.sh for more details
       - name: Build Cockatrice
