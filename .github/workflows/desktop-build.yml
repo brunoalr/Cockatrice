@@ -368,12 +368,18 @@ jobs:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Qt ${{matrix.qt_version}}
-        uses: jurplel/install-qt-action@v4
+        id: install_qt
+        uses: brunoalr/install-qt-action@2d9719ae28c5b58e93f63de49bddd9ef98a740e3
         with:
           version: ${{matrix.qt_version}}
           arch: ${{matrix.qt_arch}}
           modules: ${{matrix.qt_modules}}
           cache: ${{matrix.cache_qt}}
+
+      - name: Print Qt Path
+        shell: bash
+        run: |
+          echo "Qt path: ${{ steps.install_qt.outputs.install-path }}"
 
       - name: Setup vcpkg cache
         id: vcpkg-cache
