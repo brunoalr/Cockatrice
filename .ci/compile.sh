@@ -237,17 +237,18 @@ if [[ $RUNNER_OS == macOS ]]; then
     hdiutil_script="/tmp/hdiutil.sh"
     # shellcheck disable=SC2016
     echo '#!/bin/bash
-i=0
-while ! hdiutil "$@"; do
-  if (( ++i >= 10 )); then
-    echo "Error: hdiutil failed $i times!" >&2
-    break
-  fi
-  sleep 1
-done' >"$hdiutil_script"
+    i=0
+    while ! hdiutil "$@"; do
+      if (( ++i >= 10 )); then
+        echo "Error: hdiutil failed $i times!" >&2
+        break
+      fi
+      sleep 1
+    done' >"$hdiutil_script"
     chmod +x "$hdiutil_script"
     flags+=(-DCPACK_COMMAND_HDIUTIL="$hdiutil_script")
   fi
+
 elif [[ $RUNNER_OS == Windows ]]; then
   # Enable MTT, see https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
   # and https://devblogs.microsoft.com/cppblog/cpp-build-throughput-investigation-and-tune-up/#multitooltask-mtt
@@ -274,6 +275,19 @@ echo "::endgroup::"
 if [[ $USE_CCACHE ]]; then
   echo "::group::Show ccache stats again"
   ccachestatsverbose
+  echo "::endgroup::"
+fi
+
+if [[ $RUNNER_OS == macOS ]]; then
+  echo "::group::Inspect Mach-O binaries"
+  for app in cockatrice oracle servatrice dbconverter; do
+    binary="$GITHUB_WORKSPACE/build/$app/$app.app/Contents/MacOS/$app"
+    echo "Inspecting $app..."
+    vtool -show-build "$binary"
+    file "$binary"
+    lipo -info "$binary"
+    echo ""
+  done
   echo "::endgroup::"
 fi
 
