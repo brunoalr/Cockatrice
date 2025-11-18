@@ -1,11 +1,11 @@
 #include "card_picture_loader_local.h"
 
+#include "../../client/settings/cache_settings.h"
 #include "card_picture_to_load.h"
 
 #include <QDirIterator>
 #include <QMovie>
 #include <libcockatrice/card/database/card_database_manager.h>
-#include <libcockatrice/settings/cache_settings.h>
 
 static constexpr int REFRESH_INTERVAL_MS = 10 * 1000;
 
@@ -47,12 +47,6 @@ void CardPictureLoaderLocal::refreshIndex()
                                        << customFolderIndex.size() << "entries.";
 }
 
-/**
- * Tries to load the card image from the local images.
- *
- * @param toLoad The card to load
- * @return The loaded image, or an empty QImage if loading failed.
- */
 QImage CardPictureLoaderLocal::tryLoad(const ExactCard &toLoad) const
 {
     PrintingInfo setInstance = toLoad.getPrinting();

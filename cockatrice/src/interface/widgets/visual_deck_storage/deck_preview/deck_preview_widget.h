@@ -7,6 +7,7 @@
 #ifndef DECK_PREVIEW_WIDGET_H
 #define DECK_PREVIEW_WIDGET_H
 
+#include "../../../deck_loader/deck_loader.h"
 #include "../../cards/additional_info/color_identity_widget.h"
 #include "../../cards/deck_preview_card_picture_widget.h"
 #include "../visual_deck_storage_widget.h"
@@ -18,7 +19,6 @@
 #include <QEvent>
 #include <QVBoxLayout>
 #include <QWidget>
-#include <libcockatrice/models/deck_list/deck_loader.h>
 
 class QMenu;
 class VisualDeckStorageWidget;
@@ -33,7 +33,7 @@ public:
                                const QString &_filePath);
     void retranslateUi();
     QString getColorIdentity();
-    QString getDisplayName() const;
+    [[nodiscard]] QString getDisplayName() const;
 
     VisualDeckStorageWidget *visualDeckStorageWidget;
     QVBoxLayout *layout;
@@ -47,11 +47,11 @@ public:
     bool filteredBySearch = false;
     bool filteredByColor = false;
     bool filteredByTags = false;
-    bool checkVisibility() const;
+    [[nodiscard]] bool checkVisibility() const;
 
 signals:
     void deckLoadRequested(const QString &filePath);
-    void openDeckEditor(const DeckLoader *deck);
+    void openDeckEditor(DeckLoader *deck);
 
 public slots:
     void setFilePath(const QString &filePath);

@@ -1,5 +1,6 @@
 #include "card_picture_loader_worker.h"
 
+#include "../../client/settings/cache_settings.h"
 #include "card_picture_loader_local.h"
 #include "card_picture_loader_worker_work.h"
 
@@ -9,7 +10,6 @@
 #include <QNetworkReply>
 #include <QThread>
 #include <libcockatrice/card/database/card_database_manager.h>
-#include <libcockatrice/settings/cache_settings.h>
 #include <utility>
 
 static constexpr int MAX_REQUESTS_PER_SEC = 10;
@@ -105,9 +105,6 @@ void CardPictureLoaderWorker::resetRequestQuota()
     processQueuedRequests();
 }
 
-/**
- * Keeps processing requests from the queue until it is empty or until the quota runs out.
- */
 void CardPictureLoaderWorker::processQueuedRequests()
 {
     while (requestQuota > 0 && processSingleRequest()) {
@@ -115,10 +112,6 @@ void CardPictureLoaderWorker::processQueuedRequests()
     }
 }
 
-/**
- * Immediately processes a single queued request. No-ops if the load queue is empty
- * @return If a request was processed
- */
 bool CardPictureLoaderWorker::processSingleRequest()
 {
     if (!requestLoadQueue.isEmpty()) {

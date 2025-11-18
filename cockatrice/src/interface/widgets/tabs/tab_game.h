@@ -121,7 +121,7 @@ signals:
     void containerProcessingStarted(const GameEventContext &context);
     void containerProcessingDone();
     void openMessageDialog(const QString &userName, bool focus);
-    void openDeckEditor(const DeckLoader *deck);
+    void openDeckEditor(DeckLoader *deck);
     void notIdle();
 
     void phaseChanged(int phase);
@@ -183,9 +183,9 @@ public:
     void updatePlayerListDockTitle();
     bool closeRequest() override;
 
-    QString getTabText() const override;
+    [[nodiscard]] QString getTabText() const override;
 
-    AbstractGame *getGame() const
+    [[nodiscard]] AbstractGame *getGame() const
     {
         return game;
     }

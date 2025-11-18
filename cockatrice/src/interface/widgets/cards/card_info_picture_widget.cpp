@@ -1,5 +1,6 @@
 #include "card_info_picture_widget.h"
 
+#include "../../../client/settings/cache_settings.h"
 #include "../../../game/board/card_item.h"
 #include "../../../interface/card_picture_loader/card_picture_loader.h"
 #include "../../../interface/widgets/tabs/tab_supervisor.h"
@@ -12,7 +13,6 @@
 #include <QWidget>
 #include <libcockatrice/card/database/card_database_manager.h>
 #include <libcockatrice/card/relation/card_relation.h>
-#include <libcockatrice/settings/cache_settings.h>
 #include <utility>
 
 /**
@@ -183,7 +183,7 @@ void CardInfoPictureWidget::paintEvent(QPaintEvent *event)
 
     QPixmap transformedPixmap = resizedPixmap; // Default pixmap
     if (SettingsCache::instance().getAutoRotateSidewaysLayoutCards()) {
-        if (exactCard.getInfo().getLandscapeOrientation()) {
+        if (exactCard.getInfo().getUiAttributes().landscapeOrientation) {
             // Rotate pixmap 90 degrees to the left
             QTransform transform;
             transform.rotate(90);

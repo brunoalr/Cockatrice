@@ -8,6 +8,7 @@
 #ifndef TAB_SUPERVISOR_H
 #define TAB_SUPERVISOR_H
 
+#include "../../deck_loader/deck_loader.h"
 #include "../interface/widgets/server/user/user_list_proxy.h"
 #include "abstract_tab_deck_editor.h"
 #include "api/edhrec/tab_edhrec.h"
@@ -23,7 +24,6 @@
 #include <QMap>
 #include <QProxyStyle>
 #include <QTabWidget>
-#include <libcockatrice/models/deck_list/deck_loader.h>
 
 inline Q_LOGGING_CATEGORY(TabSupervisorLog, "tab_supervisor");
 
@@ -64,8 +64,8 @@ class CloseButton : public QAbstractButton
     Q_OBJECT
 public:
     explicit CloseButton(QWidget *parent = nullptr);
-    QSize sizeHint() const override;
-    inline QSize minimumSizeHint() const override
+    [[nodiscard]] QSize sizeHint() const override;
+    [[nodiscard]] QSize minimumSizeHint() const override
     {
         return sizeHint();
     }
@@ -129,36 +129,36 @@ public:
     void start(const ServerInfo_User &userInfo);
     void startLocal(const QList<AbstractClient *> &_clients);
     void stop();
-    bool getIsLocalGame() const
+    [[nodiscard]] bool getIsLocalGame() const
     {
         return isLocalGame;
     }
-    int getGameCount() const
+    [[nodiscard]] int getGameCount() const
     {
         return gameTabs.size();
     }
-    TabAccount *getTabAccount() const
+    [[nodiscard]] TabAccount *getTabAccount() const
     {
         return tabAccount;
     }
-    ServerInfo_User *getUserInfo() const
+    [[nodiscard]] ServerInfo_User *getUserInfo() const
     {
         return userInfo;
     }
-    AbstractClient *getClient() const;
-    const UserListManager *getUserListManager() const
+    [[nodiscard]] AbstractClient *getClient() const;
+    [[nodiscard]] const UserListManager *getUserListManager() const
     {
         return userListManager;
     }
-    const QMap<int, TabRoom *> &getRoomTabs() const
+    [[nodiscard]] const QMap<int, TabRoom *> &getRoomTabs() const
     {
         return roomTabs;
     }
-    QList<AbstractTabDeckEditor *> getDeckEditorTabs() const
+    [[nodiscard]] QList<AbstractTabDeckEditor *> getDeckEditorTabs() const
     {
         return deckEditorTabs;
     }
-    bool getAdminLocked() const;
+    [[nodiscard]] bool getAdminLocked() const;
     void closeEvent(QCloseEvent *event) override;
     bool switchToGameTabIfAlreadyExists(const int gameId);
     static void actShowPopup(const QString &message);
@@ -169,9 +169,9 @@ signals:
     void showWindowIfHidden();
 
 public slots:
-    void openDeckInNewTab(const DeckLoader *deckToOpen);
-    TabDeckEditor *addDeckEditorTab(const DeckLoader *deckToOpen);
-    TabDeckEditorVisual *addVisualDeckEditorTab(const DeckLoader *deckToOpen);
+    void openDeckInNewTab(DeckLoader *deckToOpen);
+    TabDeckEditor *addDeckEditorTab(DeckLoader *deckToOpen);
+    TabDeckEditorVisual *addVisualDeckEditorTab(DeckLoader *deckToOpen);
     TabVisualDatabaseDisplay *addVisualDatabaseDisplayTab();
     TabEdhRecMain *addEdhrecMainTab();
     TabEdhRec *addEdhrecTab(const CardInfoPtr &cardToQuery, bool isCommander = false);

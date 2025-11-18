@@ -1,5 +1,6 @@
 #include "tab_message.h"
 
+#include "../../../client/settings/cache_settings.h"
 #include "../client/sound_engine.h"
 #include "../interface/widgets/server/chat_view/chat_view.h"
 #include "../interface/widgets/server/user/user_list_manager.h"
@@ -16,7 +17,6 @@
 #include <libcockatrice/protocol/pb/serverinfo_user.pb.h>
 #include <libcockatrice/protocol/pb/session_commands.pb.h>
 #include <libcockatrice/protocol/pending_command.h>
-#include <libcockatrice/settings/cache_settings.h>
 #include <libcockatrice/utility/trice_limits.h>
 
 TabMessage::TabMessage(TabSupervisor *_tabSupervisor,
@@ -34,7 +34,7 @@ TabMessage::TabMessage(TabSupervisor *_tabSupervisor,
     sayEdit->setMaxLength(MAX_TEXT_LENGTH);
     connect(sayEdit, &LineEditUnfocusable::returnPressed, this, &TabMessage::sendMessage);
 
-    QVBoxLayout *vbox = new QVBoxLayout;
+    auto *vbox = new QVBoxLayout;
     vbox->addWidget(chatView);
     vbox->addWidget(sayEdit);
 
@@ -47,7 +47,7 @@ TabMessage::TabMessage(TabSupervisor *_tabSupervisor,
 
     retranslateUi();
 
-    QWidget *mainWidget = new QWidget(this);
+    auto *mainWidget = new QWidget(this);
     mainWidget->setLayout(vbox);
     setCentralWidget(mainWidget);
 }

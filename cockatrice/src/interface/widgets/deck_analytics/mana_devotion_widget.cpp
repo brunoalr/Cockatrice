@@ -1,6 +1,7 @@
 #include "mana_devotion_widget.h"
 
 #include "../../../main.h"
+#include "../../deck_loader/deck_loader.h"
 #include "../general/display/banner_widget.h"
 #include "../general/display/bar_widget.h"
 
@@ -8,7 +9,6 @@
 #include <libcockatrice/card/database/card_database.h>
 #include <libcockatrice/card/database/card_database_manager.h>
 #include <libcockatrice/deck_list/deck_list.h>
-#include <libcockatrice/models/deck_list/deck_loader.h>
 #include <regex>
 #include <string>
 #include <unordered_map>
@@ -46,20 +46,15 @@ void ManaDevotionWidget::setDeckModel(DeckListModel *deckModel)
 std::unordered_map<char, int> ManaDevotionWidget::analyzeManaDevotion()
 {
     manaDevotionMap.clear();
-    InnerDecklistNode *listRoot = deckListModel->getDeckList()->getRoot();
-    for (int i = 0; i < listRoot->size(); i++) {
-        InnerDecklistNode *currentZone = dynamic_cast<InnerDecklistNode *>(listRoot->at(i));
-        for (int j = 0; j < currentZone->size(); j++) {
-            DecklistCardNode *currentCard = dynamic_cast<DecklistCardNode *>(currentZone->at(j));
-            if (!currentCard)
-                continue;
 
-            for (int k = 0; k < currentCard->getNumber(); ++k) {
-                CardInfoPtr info = CardDatabaseManager::query()->getCardInfo(currentCard->getName());
-                if (info) {
-                    auto devotion = countManaSymbols(info->getManaCost());
-                    mergeManaCounts(manaDevotionMap, devotion);
-                }
+    QList<DecklistCardNode *> cardsInDeck = deckListModel->getDeckList()->getCardNodes();
+
+    for (auto currentCard : cardsInDeck) {
+        for (int k = 0; k < currentCard->getNumber(); ++k) {
+            CardInfoPtr info = CardDatabaseManager::query()->getCardInfo(currentCard->getName());
+            if (info) {
+                auto devotion = countManaSymbols(info->getManaCost());
+                mergeManaCounts(manaDevotionMap, devotion);
             }
         }
     }

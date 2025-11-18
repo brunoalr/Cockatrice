@@ -1,13 +1,13 @@
 #include "mana_curve_widget.h"
 
 #include "../../../main.h"
+#include "../../deck_loader/deck_loader.h"
 #include "../general/display/banner_widget.h"
 #include "../general/display/bar_widget.h"
 
 #include <libcockatrice/card/database/card_database.h>
 #include <libcockatrice/card/database/card_database_manager.h>
 #include <libcockatrice/deck_list/deck_list.h>
-#include <libcockatrice/models/deck_list/deck_loader.h>
 #include <unordered_map>
 
 ManaCurveWidget::ManaCurveWidget(QWidget *parent, DeckListModel *_deckListModel)
@@ -44,20 +44,15 @@ void ManaCurveWidget::setDeckModel(DeckListModel *deckModel)
 std::unordered_map<int, int> ManaCurveWidget::analyzeManaCurve()
 {
     manaCurveMap.clear();
-    InnerDecklistNode *listRoot = deckListModel->getDeckList()->getRoot();
-    for (int i = 0; i < listRoot->size(); i++) {
-        InnerDecklistNode *currentZone = dynamic_cast<InnerDecklistNode *>(listRoot->at(i));
-        for (int j = 0; j < currentZone->size(); j++) {
-            DecklistCardNode *currentCard = dynamic_cast<DecklistCardNode *>(currentZone->at(j));
-            if (!currentCard)
-                continue;
 
-            for (int k = 0; k < currentCard->getNumber(); ++k) {
-                CardInfoPtr info = CardDatabaseManager::query()->getCardInfo(currentCard->getName());
-                if (info) {
-                    int cmc = info->getCmc().toInt();
-                    manaCurveMap[cmc]++;
-                }
+    QList<DecklistCardNode *> cardsInDeck = deckListModel->getDeckList()->getCardNodes();
+
+    for (auto currentCard : cardsInDeck) {
+        for (int k = 0; k < currentCard->getNumber(); ++k) {
+            CardInfoPtr info = CardDatabaseManager::query()->getCardInfo(currentCard->getName());
+            if (info) {
+                int cmc = info->getCmc().toInt();
+                manaCurveMap[cmc]++;
             }
         }
     }

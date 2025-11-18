@@ -7,6 +7,7 @@
 #ifndef VISUAL_DECK_STORAGE_WIDGET_H
 #define VISUAL_DECK_STORAGE_WIDGET_H
 
+#include "../../deck_loader/deck_loader.h"
 #include "../cards/card_size_widget.h"
 #include "../general/layout_containers/flow_widget.h"
 #include "../quick_settings/settings_button_widget.h"
@@ -39,7 +40,7 @@ public:
     VisualDeckStorageTagFilterWidget *tagFilterWidget;
     bool deckPreviewSelectionAnimationEnabled;
 
-    const VisualDeckStorageQuickSettingsWidget *settings() const;
+    [[nodiscard]] const VisualDeckStorageQuickSettingsWidget *settings() const;
 
 public slots:
     void createRootFolderWidget(); // Refresh the display of cards based on the current sorting option
@@ -56,7 +57,7 @@ public slots:
 signals:
     void bannerCardsRefreshed();
     void deckLoadRequested(const QString &filePath);
-    void openDeckEditor(const DeckLoader *deck);
+    void openDeckEditor(DeckLoader *deck);
 
 private:
     QVBoxLayout *layout;

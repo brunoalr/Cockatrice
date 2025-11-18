@@ -114,7 +114,12 @@ jobs:
           - distro: Debian
             version: 11
             package: DEB
-            test: skip    # Running tests on all distros is superfluous
+
+          - distro: Servatrice_Debian
+            version: 11
+            package: DEB
+            test: skip
+            server_only: yes
 
           - distro: Debian
             version: 12
@@ -126,12 +131,12 @@ jobs:
             package: DEB
 
           - distro: Fedora
-            version: 41
+            version: 42
             package: RPM
             test: skip    # Running tests on all distros is superfluous
 
           - distro: Fedora
-            version: 42
+            version: 43
             package: RPM
 
           - distro: Ubuntu
@@ -191,10 +196,11 @@ jobs:
           SUFFIX: '-${{matrix.distro}}${{matrix.version}}'
           package: '${{matrix.package}}'
           CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
+          NO_CLIENT: ${{matrix.server_only == 'yes' && '--no-client' || '' }}
         run: |
           source .ci/docker.sh
           RUN --server --release --package "$package" --dir "$BUILD_DIR" \
-                  --ccache "$CCACHE_SIZE"
+                  --ccache "$CCACHE_SIZE" $NO_CLIENT
           .ci/name_build.sh
 
       - name: Save compiler cache (ccache)
@@ -239,54 +245,103 @@ jobs:
           GH_TOKEN: ${{github.token}}
         run: gh attestation verify ${{steps.build.outputs.path}} -R Cockatrice/Cockatrice
 
-  build-macos:
+  build-vcpkg:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - target: 13
+          - os: macOS
+            target: 13
+            runner: macos-15-intel
             soc: Intel
-            os: macos-15-intel
             xcode: "16.4"
             type: Release
-            make_package: 1
             override_target: 13
+            make_package: 1
+            package_suffix: "-macOS13_Intel"
+            artifact_name: macOS13_Intel-package
+            qt_version: 6.6.*
+            qt_arch: clang_64
+            qt_modules: qtimageformats qtmultimedia qtwebsockets
+            cache_qt: false # qt caches take too much space for macOS (1.1Gi)
+            cmake_generator: Ninja
+            use_ccache: 1
 
-          - target: 14
+          - os: macOS
+            target: 14
+            runner: macos-14
             soc: Apple
-            os: macos-14
             xcode: "15.4"
             type: Release
             make_package: 1
+            package_suffix: "-macOS14"
+            artifact_name: macOS14-package
+            qt_version: 6.6.*
+            qt_arch: clang_64
+            qt_modules: qtimageformats qtmultimedia qtwebsockets
+            cache_qt: false
+            cmake_generator: Ninja
+            use_ccache: 1
 
-          - target: 15
+          - os: macOS
+            target: 15
+            runner: macos-15
             soc: Apple
-            os: macos-15
             xcode: "16.4"
             type: Release
             make_package: 1
+            package_suffix: "-macOS15"
+            artifact_name: macOS15-package
+            qt_version: 6.6.*
+            qt_arch: clang_64
+            qt_modules: qtimageformats qtmultimedia qtwebsockets
+            cache_qt: false
+            cmake_generator: Ninja
+            use_ccache: 1
 
-          - target: 15
+          - os: macOS
+            target: 15
+            runner: macos-15
             soc: Apple
-            os: macos-15
             xcode: "16.4"
             type: Debug
+            qt_version: 6.6.*
+            qt_arch: clang_64
+            qt_modules: qtimageformats qtmultimedia qtwebsockets
+            cache_qt: false
+            cmake_generator: Ninja
+            use_ccache: 1
 
-    name: macOS ${{matrix.target}}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
+          - os: Windows
+            target: 7
+            runner: windows-2022
+            type: Release
+            make_package: 1
+            package_suffix: "-Win7"
+            artifact_name: Windows7-installer
+            qt_version: 5.15.*
+            qt_arch: win64_msvc2019_64
+            cache_qt: true
+            cmake_generator: "Visual Studio 17 2022"
+            cmake_generator_platform: x64
+
+          - os: Windows
+            target: 10
+            runner: windows-2022
+            type: Release
+            make_package: 1
+            package_suffix: "-Win10"
+            artifact_name: Windows10-installer
+            qt_version: 6.6.*
+            qt_arch: win64_msvc2019_64
+            qt_modules: qtimageformats qtmultimedia qtwebsockets
+            cache_qt: true
+            cmake_generator: "Visual Studio 17 2022"
+            cmake_generator_platform: x64
+
+    name: ${{matrix.os}} ${{matrix.target}}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
-    runs-on: ${{matrix.os}}
-    continue-on-error: ${{matrix.allow-failure == 'yes'}}
-    env:
-      # Common parameters for all macOS builds
-      QT_VERSION: 6.6.*
-      QT_ARCH: clang_64
-      QT_MODULES: "qtimageformats qtmultimedia qtwebsockets"
-      # Build-specific environment variables
-      CCACHE_DIR: ${{github.workspace}}/.ccache/${{matrix.os}}-${{matrix.type}}
-      CCACHE_SIZE: 500M
-      DEVELOPER_DIR:
-        /Applications/Xcode_${{matrix.xcode}}.app/Contents/Developer
-      CMAKE_GENERATOR: 'Ninja'
+    runs-on: ${{matrix.runner}}
 
     steps:
       - name: Checkout
@@ -294,24 +349,31 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Add msbuild to PATH
+        if: matrix.os == 'Windows'
+        id: add-msbuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+
       # Using jianmingyong/ccache-action to setup ccache without using brew
       # It tries to download a binary of ccache from GitHub Release and falls back to building from source if it fails
       - name: Setup ccache
+        if: matrix.use_ccache == 1
         uses: jianmingyong/ccache-action@v1
         with:
           install-type: "binary"
-          ccache-key-prefix: ccache-${{matrix.os}}-${{matrix.soc}}-${{matrix.type}}
+          ccache-key-prefix: ccache-${{matrix.runner}}-${{matrix.soc}}-${{matrix.type}}
+          max-size: 500M
           gh-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Using jurplel/install-qt-action to install Qt without using brew
-      # qt build using vcpkg either just fails or takes too long to build
-      - name: Install Qt ${{env.QT_VERSION}}
+      - name: Install Qt ${{matrix.qt_version}}
         uses: jurplel/install-qt-action@v4
         with:
-          cache: false # qt caches take too much space for macOS (1.1Gi)
-          version: ${{env.QT_VERSION}}
-          arch: ${{env.QT_ARCH}}
-          modules: ${{env.QT_MODULES}}
+          version: ${{matrix.qt_version}}
+          arch: ${{matrix.qt_arch}}
+          modules: ${{matrix.qt_modules}}
+          cache: ${{matrix.cache_qt}}
 
       - name: Setup vcpkg cache
         id: vcpkg-cache
@@ -319,25 +381,30 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build on Xcode ${{matrix.xcode}}
-        shell: bash
+      # uses environment variables, see compile.sh for more details
+      - name: Build Cockatrice
         id: build
+        shell: bash
         env:
           BUILDTYPE: '${{matrix.type}}'
           MAKE_PACKAGE: '${{matrix.make_package}}'
-          PACKAGE_SUFFIX: '-macOS${{matrix.target}}_${{matrix.soc}}'
+          PACKAGE_SUFFIX: '${{matrix.package_suffix}}'
+          CMAKE_GENERATOR: ${{matrix.cmake_generator}}
+          CMAKE_GENERATOR_PLATFORM: ${{matrix.cmake_generator_platform}}
+          USE_CCACHE: ${{matrix.use_ccache}}
+          VCPKG_DISABLE_METRICS: 1
+          VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
+          # macOS-specific environment variables, will be ignored on Windows
           MACOS_CERTIFICATE: ${{ secrets.PROD_MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
-          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
-          VCPKG_DISABLE_METRICS: 1
-          VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
+          DEVELOPER_DIR: '/Applications/Xcode_${{matrix.xcode}}.app/Contents/Developer'
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
-        run: .ci/compile.sh --server --test --ccache "$CCACHE_SIZE" --vcpkg
+        run: .ci/compile.sh --server --test --vcpkg
 
       - name: Sign app bundle
-        if: matrix.make_package && (github.ref == 'refs/heads/master' || needs.configure.outputs.tag != null)
+        if: matrix.os == 'macOS' && matrix.make_package && (github.ref == 'refs/heads/master' || needs.configure.outputs.tag != null)
         env:
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
@@ -349,7 +416,7 @@ jobs:
           fi
 
       - name: Notarize app bundle
-        if: matrix.make_package && (github.ref == 'refs/heads/master' || needs.configure.outputs.tag != null)
+        if: matrix.os == 'macOS' && matrix.make_package && (github.ref == 'refs/heads/master' || needs.configure.outputs.tag != null)
         env:
           MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.PROD_MACOS_NOTARIZATION_APPLE_ID }}
           MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.PROD_MACOS_NOTARIZATION_TEAM_ID }}
@@ -360,20 +427,20 @@ jobs:
             # Store the notarization credentials so that we can prevent a UI password dialog from blocking the CI
             echo "Create keychain profile"
             xcrun notarytool store-credentials "notarytool-profile" --apple-id "$MACOS_NOTARIZATION_APPLE_ID" --team-id "$MACOS_NOTARIZATION_TEAM_ID" --password "$MACOS_NOTARIZATION_PWD"
-  
+
             # We can't notarize an app bundle directly, but we need to compress it as an archive.
             # Therefore, we create a zip file containing our app bundle, so that we can send it to the
             # notarization service
             echo "Creating temp notarization archive"
             ditto -c -k --keepParent ${{steps.build.outputs.path}} "notarization.zip"
-  
+
             # Here we send the notarization request to the Apple's Notarization service, waiting for the result.
             # This typically takes a few seconds inside a CI environment, but it might take more depending on the App
             # characteristics. Visit the Notarization docs for more information and strategies on how to optimize it if
             # you're curious
             echo "Notarize app"
             xcrun notarytool submit "notarization.zip" --keychain-profile "notarytool-profile" --wait
-  
+
             # Finally, we need to "attach the staple" to our executable, which will allow our app to be
             # validated by macOS even when an internet connection is not available.
             echo "Attach staple"
@@ -385,7 +452,7 @@ jobs:
         if: matrix.make_package
         uses: actions/upload-artifact@v5
         with:
-          name: macOS${{matrix.target}}${{ matrix.soc == 'Intel' && '_Intel' || '' }}${{ matrix.type == 'Debug' && '_Debug' || '' }}-package
+          name: ${{matrix.artifact_name}}
           path: ${{steps.build.outputs.path}}
           if-no-files-found: error
 
@@ -414,6 +481,16 @@ jobs:
         env:
           GH_TOKEN: ${{github.token}}
         run: gh attestation verify ${{steps.build.outputs.path}} -R Cockatrice/Cockatrice
+
+      - name: Upload pdb database
+        if: matrix.os == 'Windows'
+        uses: actions/upload-artifact@v5
+        with:
+          name: Windows${{matrix.target}}-debug-pdbs
+          path: |
+            build/cockatrice/Release/*.pdb
+            build/servatrice/Release/*.pdb
+          if-no-files-found: error
 
   build-windows:
     strategy:

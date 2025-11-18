@@ -1,5 +1,6 @@
 #include "abstract_counter.h"
 
+#include "../../client/settings/cache_settings.h"
 #include "../../interface/widgets/tabs/tab_game.h"
 #include "../player/player.h"
 #include "translate_counter_name.h"
@@ -14,7 +15,6 @@
 #include <QString>
 #include <libcockatrice/protocol/pb/command_inc_counter.pb.h>
 #include <libcockatrice/protocol/pb/command_set_counter.pb.h>
-#include <libcockatrice/settings/cache_settings.h>
 #include <libcockatrice/utility/expression.h>
 
 AbstractCounter::AbstractCounter(Player *_player,
@@ -85,9 +85,13 @@ void AbstractCounter::retranslateUi()
 
 void AbstractCounter::setShortcutsActive()
 {
+    if (!menu) {
+        return;
+    }
     if (!player->getPlayerInfo()->getLocal()) {
         return;
     }
+
     ShortcutsSettings &shortcuts = SettingsCache::instance().shortcuts();
     if (name == "life") {
         shortcutActive = true;
@@ -104,6 +108,10 @@ void AbstractCounter::setShortcutsActive()
 
 void AbstractCounter::setShortcutsInactive()
 {
+    if (!menu) {
+        return;
+    }
+
     shortcutActive = false;
     if (name == "life" || useNameForShortcut) {
         aSet->setShortcut(QKeySequence());

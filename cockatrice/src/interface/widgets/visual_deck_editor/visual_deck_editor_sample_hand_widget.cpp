@@ -1,10 +1,10 @@
 #include "visual_deck_editor_sample_hand_widget.h"
 
+#include "../../../client/settings/cache_settings.h"
+#include "../../deck_loader/deck_loader.h"
 #include "../cards/card_info_picture_widget.h"
 
 #include <libcockatrice/card/database/card_database_manager.h>
-#include <libcockatrice/models/deck_list/deck_loader.h>
-#include <libcockatrice/settings/cache_settings.h>
 #include <random>
 
 VisualDeckEditorSampleHandWidget::VisualDeckEditorSampleHandWidget(QWidget *parent, DeckListModel *_deckListModel)
@@ -83,28 +83,15 @@ QList<ExactCard> VisualDeckEditorSampleHandWidget::getRandomCards(int amountToGe
     DeckList *decklist = deckListModel->getDeckList();
     if (!decklist)
         return randomCards;
-    InnerDecklistNode *listRoot = decklist->getRoot();
-    if (!listRoot)
-        return randomCards;
+
+    QList<DecklistCardNode *> cardsInDeck = decklist->getCardNodes({DECK_ZONE_MAIN});
 
     // Collect all cards in the main deck, allowing duplicates based on their count
-    for (int i = 0; i < listRoot->size(); i++) {
-        InnerDecklistNode *currentZone = dynamic_cast<InnerDecklistNode *>(listRoot->at(i));
-        if (!currentZone)
-            continue;
-        if (currentZone->getName() != DECK_ZONE_MAIN)
-            continue; // Only process the main deck
-
-        for (int j = 0; j < currentZone->size(); j++) {
-            DecklistCardNode *currentCard = dynamic_cast<DecklistCardNode *>(currentZone->at(j));
-            if (!currentCard)
-                continue;
-
-            for (int k = 0; k < currentCard->getNumber(); ++k) {
-                ExactCard card = CardDatabaseManager::query()->getCard(currentCard->toCardRef());
-                if (card) {
-                    mainDeckCards.append(card);
-                }
+    for (auto currentCard : cardsInDeck) {
+        for (int k = 0; k < currentCard->getNumber(); ++k) {
+            ExactCard card = CardDatabaseManager::query()->getCard(currentCard->toCardRef());
+            if (card) {
+                mainDeckCards.append(card);
             }
         }
     }

@@ -7,12 +7,12 @@
 #ifndef ZONEVIEWERZONE_H
 #define ZONEVIEWERZONE_H
 
-#include "../../filters/filter_string.h"
 #include "logic/view_zone_logic.h"
 #include "select_zone.h"
 
 #include <QGraphicsLayoutItem>
 #include <QLoggingCategory>
+#include <libcockatrice/filters/filter_string.h>
 #include <libcockatrice/protocol/pb/commands.pb.h>
 
 inline Q_LOGGING_CATEGORY(ViewZoneLog, "view_zone");
@@ -58,12 +58,12 @@ private:
 
 public:
     ZoneViewZone(ZoneViewZoneLogic *_logic, QGraphicsItem *parent);
-    QRectF boundingRect() const override;
+    [[nodiscard]] QRectF boundingRect() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
     void reorganizeCards() override;
     void initializeCards(const QList<const ServerInfo_Card *> &cardList = QList<const ServerInfo_Card *>());
     void setGeometry(const QRectF &rect) override;
-    QRectF getOptimumRect() const
+    [[nodiscard]] QRectF getOptimumRect() const
     {
         return optimumRect;
     }
@@ -83,7 +83,7 @@ signals:
     void wheelEventReceived(QGraphicsSceneWheelEvent *event);
 
 protected:
-    QSizeF sizeHint(Qt::SizeHint which, const QSizeF &constraint = QSizeF()) const override;
+    [[nodiscard]] QSizeF sizeHint(Qt::SizeHint which, const QSizeF &constraint = QSizeF()) const override;
     void wheelEvent(QGraphicsSceneWheelEvent *event) override;
 };
 

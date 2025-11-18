@@ -27,7 +27,9 @@ class TabDeckStorageVisual final : public Tab
     Q_OBJECT
 public:
     explicit TabDeckStorageVisual(TabSupervisor *_tabSupervisor);
-    void retranslateUi() override{};
+    void retranslateUi() override
+    {
+    }
     [[nodiscard]] QString getTabText() const override
     {
         return tr("Visual Deck Storage");
@@ -37,7 +39,7 @@ public slots:
     void actOpenLocalDeck(const QString &filePath);
 
 signals:
-    void openDeckEditor(const DeckLoader *deckLoader);
+    void openDeckEditor(DeckLoader *deckLoader);
 
 private:
     VisualDeckStorageWidget *visualDeckStorageWidget;

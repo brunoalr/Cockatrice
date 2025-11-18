@@ -1,12 +1,14 @@
 #include "card_picture_to_load.h"
 
+#include "../../client/settings/cache_settings.h"
+
 #include <QCoreApplication>
 #include <QDate>
 #include <QRegularExpression>
 #include <QUrl>
 #include <algorithm>
 #include <libcockatrice/card/set/card_set_comparator.h>
-#include <libcockatrice/settings/cache_settings.h>
+#include <libcockatrice/interfaces/noop_card_set_priority_controller.h>
 
 CardPictureToLoad::CardPictureToLoad(const ExactCard &_card)
     : card(_card), urlTemplates(SettingsCache::instance().downloads().getAllURLs())
@@ -18,12 +20,6 @@ CardPictureToLoad::CardPictureToLoad(const ExactCard &_card)
     }
 }
 
-/**
- * Extracts a list of all the sets from the card, sorted in priority order.
- * If the card does not contain any sets, then a dummy set will be inserted into the list.
- *
- * @return A list of sets. Will not be empty.
- */
 QList<CardSetPtr> CardPictureToLoad::extractSetsSorted(const ExactCard &card)
 {
     QList<CardSetPtr> sortedSets;
@@ -33,7 +29,7 @@ QList<CardSetPtr> CardPictureToLoad::extractSetsSorted(const ExactCard &card)
         }
     }
     if (sortedSets.empty()) {
-        sortedSets << CardSet::newInstance("", "", "", QDate());
+        sortedSets << CardSet::newInstance(new NoopCardSetPriorityController(), "", "", "", QDate());
     }
     std::sort(sortedSets.begin(), sortedSets.end(), SetPriorityComparator());
 
@@ -107,11 +103,6 @@ void CardPictureToLoad::populateSetUrls()
     (void)nextUrl();
 }
 
-/**
- * Advances the currentSet to the next set in the list. Then repopulates the url list with the urls from that set.
- * If we are already at the end of the list, then currentSet is set to empty.
- * @return If we are already at the end of the list
- */
 bool CardPictureToLoad::nextSet()
 {
     if (!sortedSets.isEmpty()) {
@@ -123,11 +114,6 @@ bool CardPictureToLoad::nextSet()
     return false;
 }
 
-/**
- * Advances the currentUrl to the next url in the list.
- * If we are already at the end of the list, then currentUrl is set to empty.
- * @return If we are already at the end of the list
- */
 bool CardPictureToLoad::nextUrl()
 {
     if (!currentSetUrls.isEmpty()) {

@@ -1,5 +1,6 @@
 #include "dlg_create_token.h"
 
+#include "../../client/settings/cache_settings.h"
 #include "../../interface/widgets/cards/card_info_picture_widget.h"
 #include "../../main.h"
 
@@ -20,7 +21,6 @@
 #include <libcockatrice/deck_list/deck_list.h>
 #include <libcockatrice/models/database/card_database_model.h>
 #include <libcockatrice/models/database/token/token_display_model.h>
-#include <libcockatrice/settings/cache_settings.h>
 #include <libcockatrice/utility/trice_limits.h>
 
 DlgCreateToken::DlgCreateToken(const QStringList &_predefinedTokens, QWidget *parent)
@@ -67,7 +67,7 @@ DlgCreateToken::DlgCreateToken(const QStringList &_predefinedTokens, QWidget *pa
     faceDownCheckBox = new QCheckBox(tr("Create face-down (Only hides name)"));
     connect(faceDownCheckBox, &QCheckBox::toggled, this, &DlgCreateToken::faceDownCheckBoxToggled);
 
-    QGridLayout *grid = new QGridLayout;
+    auto *grid = new QGridLayout;
     grid->addWidget(nameLabel, 0, 0);
     grid->addWidget(nameEdit, 0, 1);
     grid->addWidget(colorLabel, 1, 0);
@@ -79,7 +79,7 @@ DlgCreateToken::DlgCreateToken(const QStringList &_predefinedTokens, QWidget *pa
     grid->addWidget(destroyCheckBox, 4, 0, 1, 2);
     grid->addWidget(faceDownCheckBox, 5, 0, 1, 2);
 
-    QGroupBox *tokenDataGroupBox = new QGroupBox(tr("Token data"));
+    auto *tokenDataGroupBox = new QGroupBox(tr("Token data"));
     tokenDataGroupBox->setLayout(grid);
 
     cardDatabaseModel = new CardDatabaseModel(CardDatabaseManager::getInstance(), false, this);
@@ -125,25 +125,25 @@ DlgCreateToken::DlgCreateToken(const QStringList &_predefinedTokens, QWidget *pa
 #endif
     }
 
-    QVBoxLayout *tokenChooseLayout = new QVBoxLayout;
+    auto *tokenChooseLayout = new QVBoxLayout;
     tokenChooseLayout->addWidget(chooseTokenFromAllRadioButton);
     tokenChooseLayout->addWidget(chooseTokenFromDeckRadioButton);
     tokenChooseLayout->addWidget(chooseTokenView);
 
-    QGroupBox *tokenChooseGroupBox = new QGroupBox(tr("Choose token from list"));
+    auto *tokenChooseGroupBox = new QGroupBox(tr("Choose token from list"));
     tokenChooseGroupBox->setLayout(tokenChooseLayout);
 
-    QGridLayout *hbox = new QGridLayout;
+    auto *hbox = new QGridLayout;
     hbox->addWidget(pic, 0, 0, 1, 1);
     hbox->addWidget(tokenDataGroupBox, 1, 0, 1, 1);
     hbox->addWidget(tokenChooseGroupBox, 0, 1, 2, 1);
     hbox->setColumnStretch(1, 1);
 
-    QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    auto *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     connect(buttonBox, &QDialogButtonBox::accepted, this, &DlgCreateToken::actOk);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &DlgCreateToken::actReject);
 
-    QVBoxLayout *mainLayout = new QVBoxLayout;
+    auto *mainLayout = new QVBoxLayout;
     mainLayout->addLayout(hbox);
     mainLayout->addWidget(buttonBox);
     setLayout(mainLayout);
@@ -199,16 +199,7 @@ void DlgCreateToken::tokenSelectionChanged(const QModelIndex &current, const QMo
         annotationEdit->setText("");
     }
 
-    const auto &cardProviderId =
-        SettingsCache::instance().cardOverrides().getCardPreferenceOverride(cardInfo->getName());
-    if (!cardProviderId.isEmpty()) {
-        CardRef ref;
-        ref.name = cardInfo->getName();
-        ref.providerId = cardProviderId;
-        pic->setCard(CardDatabaseManager::query()->getCard(ref));
-    } else {
-        pic->setCard(CardDatabaseManager::query()->getPreferredCard(cardInfo));
-    }
+    pic->setCard(CardDatabaseManager::query()->getPreferredCard(cardInfo));
 }
 
 void DlgCreateToken::updateSearchFieldWithoutUpdatingFilter(const QString &newValue) const

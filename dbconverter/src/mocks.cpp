@@ -2,7 +2,7 @@
 #include "mocks.h"
 
 CardDatabaseSettings::CardDatabaseSettings(const QString &settingPath, QObject *parent)
-    : SettingsManager(settingPath + "cardDatabase.ini", parent)
+    : SettingsManager(settingPath + "cardDatabase.ini", QString(), QString(), parent)
 {
 }
 void CardDatabaseSettings::setSortKey(QString /* shortName */, unsigned int /* sortKey */)
@@ -46,12 +46,7 @@ QString SettingsCache::getSafeConfigFilePath(QString /* configEntry */, QString 
 {
     return defaultPath;
 }
-SettingsCache::SettingsCache()
-    : settings{new QSettings("global.ini", QSettings::IniFormat, this)}, shortcutsSettings{nullptr},
-      cardDatabaseSettings{new CardDatabaseSettings("", this)}, serversSettings{nullptr}, messageSettings{nullptr},
-      gameFiltersSettings{nullptr}, layoutsSettings{nullptr}, downloadSettings{nullptr}
-{
-}
+
 void SettingsCache::setUseTearOffMenus(bool /* _useTearOffMenus */)
 {
 }
@@ -450,11 +445,4 @@ void SettingsCache::setRoundCardCorners(bool /* _roundCardCorners */)
 
 void CardPictureLoader::clearPixmapCache(CardInfoPtr /* card */)
 {
-}
-
-SettingsCache *settingsCache;
-
-SettingsCache &SettingsCache::instance()
-{
-    return *settingsCache;
 }

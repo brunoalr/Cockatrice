@@ -6,13 +6,17 @@
 #include <QDebug>
 #include <QFile>
 #include <QXmlStreamReader>
-#include <libcockatrice/settings/cache_settings.h>
 #include <version_string.h>
 
 #define COCKATRICE_XML4_TAGNAME "cockatrice_carddatabase"
 #define COCKATRICE_XML4_TAGVER 4
 #define COCKATRICE_XML4_SCHEMALOCATION                                                                                 \
     "https://raw.githubusercontent.com/Cockatrice/Cockatrice/master/doc/carddatabase_v4/cards.xsd"
+
+CockatriceXml4Parser::CockatriceXml4Parser(ICardPreferenceProvider *_cardPreferenceProvider)
+    : cardPreferenceProvider(_cardPreferenceProvider)
+{
+}
 
 bool CockatriceXml4Parser::getCanParseFile(const QString &fileName, QIODevice &device)
 {
@@ -132,7 +136,7 @@ QVariantHash CockatriceXml4Parser::loadCardPropertiesFromXml(QXmlStreamReader &x
 
 void CockatriceXml4Parser::loadCardsFromXml(QXmlStreamReader &xml)
 {
-    bool includeRebalancedCards = SettingsCache::instance().getIncludeRebalancedCards();
+    bool includeRebalancedCards = cardPreferenceProvider->getIncludeRebalancedCards();
     while (!xml.atEnd()) {
         if (xml.readNext() == QXmlStreamReader::EndElement) {
             break;
@@ -258,9 +262,12 @@ void CockatriceXml4Parser::loadCardsFromXml(QXmlStreamReader &xml)
                 continue;
             }
 
-            CardInfoPtr newCard =
-                CardInfo::newInstance(name, text, isToken, properties, relatedCards, reverseRelatedCards, _sets, cipt,
-                                      landscapeOrientation, tableRow, upsideDown);
+            CardInfo::UiAttributes attributes = {.cipt = cipt,
+                                                 .landscapeOrientation = landscapeOrientation,
+                                                 .tableRow = tableRow,
+                                                 .upsideDownArt = upsideDown};
+            CardInfoPtr newCard = CardInfo::newInstance(name, text, isToken, properties, relatedCards,
+                                                        reverseRelatedCards, _sets, attributes);
             emit addCard(newCard);
         }
     }
@@ -375,14 +382,15 @@ static QXmlStreamWriter &operator<<(QXmlStreamWriter &xml, const CardInfoPtr &in
     }
 
     // positioning
-    xml.writeTextElement("tablerow", QString::number(info->getTableRow()));
-    if (info->getCipt()) {
+    const CardInfo::UiAttributes &attributes = info->getUiAttributes();
+    xml.writeTextElement("tablerow", QString::number(attributes.tableRow));
+    if (attributes.cipt) {
         xml.writeTextElement("cipt", "1");
     }
-    if (info->getLandscapeOrientation()) {
+    if (attributes.landscapeOrientation) {
         xml.writeTextElement("landscapeOrientation", "1");
     }
-    if (info->getUpsideDownArt()) {
+    if (attributes.upsideDownArt) {
         xml.writeTextElement("upsidedown", "1");
     }
 

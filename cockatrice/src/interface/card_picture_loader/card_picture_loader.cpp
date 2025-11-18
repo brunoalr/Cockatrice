@@ -1,5 +1,7 @@
 #include "card_picture_loader.h"
 
+#include "../../client/settings/cache_settings.h"
+
 #include <QApplication>
 #include <QBuffer>
 #include <QDebug>
@@ -15,7 +17,6 @@
 #include <QStatusBar>
 #include <QThread>
 #include <algorithm>
-#include <libcockatrice/settings/cache_settings.h>
 #include <utility>
 
 // never cache more than 300 cards at once for a single deck
@@ -153,7 +154,7 @@ void CardPictureLoader::imageLoaded(const ExactCard &card, const QImage &image)
         qCDebug(CardPictureLoaderLog) << "Caching NULL pixmap for" << card.getName();
         QPixmapCache::insert(card.getPixmapCacheKey(), QPixmap());
     } else {
-        if (card.getInfo().getUpsideDownArt()) {
+        if (card.getInfo().getUiAttributes().upsideDownArt) {
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 9, 0))
             QImage mirrorImage = image.flipped(Qt::Horizontal | Qt::Vertical);
 #else

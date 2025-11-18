@@ -1,5 +1,7 @@
 #include "dlg_settings.h"
 
+#include "../../../client/settings/cache_settings.h"
+#include "../../../client/settings/shortcut_treeview.h"
 #include "../client/network/update/card_spoiler/spoiler_background_updater.h"
 #include "../client/network/update/client/release_channel.h"
 #include "../client/sound_engine.h"
@@ -12,6 +14,7 @@
 #include "../interface/widgets/utility/sequence_edit.h"
 #include "../main.h"
 
+#include <../../client/settings/card_counter_settings.h>
 #include <QAbstractButton>
 #include <QAbstractListModel>
 #include <QAction>
@@ -45,9 +48,6 @@
 #include <QVariant>
 #include <libcockatrice/card/database/card_database.h>
 #include <libcockatrice/card/database/card_database_manager.h>
-#include <libcockatrice/settings/cache_settings.h>
-#include <libcockatrice/settings/card_counter_settings.h>
-#include <libcockatrice/settings/shortcut_treeview.h>
 
 #define WIKI_CUSTOM_PIC_URL "https://github.com/Cockatrice/Cockatrice/wiki/Custom-Picture-Download-URLs"
 #define WIKI_CUSTOM_SHORTCUTS "https://github.com/Cockatrice/Cockatrice/wiki/Custom-Keyboard-Shortcuts"
@@ -141,38 +141,38 @@ GeneralSettingsPage::GeneralSettingsPage()
 
     deckPathEdit = new QLineEdit(settings.getDeckPath());
     deckPathEdit->setReadOnly(true);
-    QPushButton *deckPathButton = new QPushButton("...");
+    auto *deckPathButton = new QPushButton("...");
     connect(deckPathButton, &QPushButton::clicked, this, &GeneralSettingsPage::deckPathButtonClicked);
 
     filtersPathEdit = new QLineEdit(settings.getFiltersPath());
     filtersPathEdit->setReadOnly(true);
-    QPushButton *filtersPathButton = new QPushButton("...");
+    auto *filtersPathButton = new QPushButton("...");
     connect(filtersPathButton, &QPushButton::clicked, this, &GeneralSettingsPage::filtersPathButtonClicked);
 
     replaysPathEdit = new QLineEdit(settings.getReplaysPath());
     replaysPathEdit->setReadOnly(true);
-    QPushButton *replaysPathButton = new QPushButton("...");
+    auto *replaysPathButton = new QPushButton("...");
     connect(replaysPathButton, &QPushButton::clicked, this, &GeneralSettingsPage::replaysPathButtonClicked);
 
     picsPathEdit = new QLineEdit(settings.getPicsPath());
     picsPathEdit->setReadOnly(true);
-    QPushButton *picsPathButton = new QPushButton("...");
+    auto *picsPathButton = new QPushButton("...");
     connect(picsPathButton, &QPushButton::clicked, this, &GeneralSettingsPage::picsPathButtonClicked);
 
     cardDatabasePathEdit = new QLineEdit(settings.getCardDatabasePath());
     cardDatabasePathEdit->setReadOnly(true);
-    QPushButton *cardDatabasePathButton = new QPushButton("...");
+    auto *cardDatabasePathButton = new QPushButton("...");
     connect(cardDatabasePathButton, &QPushButton::clicked, this, &GeneralSettingsPage::cardDatabasePathButtonClicked);
 
     customCardDatabasePathEdit = new QLineEdit(settings.getCustomCardDatabasePath());
     customCardDatabasePathEdit->setReadOnly(true);
-    QPushButton *customCardDatabasePathButton = new QPushButton("...");
+    auto *customCardDatabasePathButton = new QPushButton("...");
     connect(customCardDatabasePathButton, &QPushButton::clicked, this,
             &GeneralSettingsPage::customCardDatabaseButtonClicked);
 
     tokenDatabasePathEdit = new QLineEdit(settings.getTokenDatabasePath());
     tokenDatabasePathEdit->setReadOnly(true);
-    QPushButton *tokenDatabasePathButton = new QPushButton("...");
+    auto *tokenDatabasePathButton = new QPushButton("...");
     connect(tokenDatabasePathButton, &QPushButton::clicked, this, &GeneralSettingsPage::tokenDatabasePathButtonClicked);
 
     // Required init here to avoid crashing on Portable builds

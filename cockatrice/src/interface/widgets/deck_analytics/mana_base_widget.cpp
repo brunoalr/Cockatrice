@@ -1,5 +1,6 @@
 #include "mana_base_widget.h"
 
+#include "../../deck_loader/deck_loader.h"
 #include "../general/display/banner_widget.h"
 #include "../general/display/bar_widget.h"
 
@@ -8,7 +9,6 @@
 #include <libcockatrice/card/database/card_database.h>
 #include <libcockatrice/card/database/card_database_manager.h>
 #include <libcockatrice/deck_list/deck_list.h>
-#include <libcockatrice/models/deck_list/deck_loader.h>
 
 ManaBaseWidget::ManaBaseWidget(QWidget *parent, DeckListModel *_deckListModel)
     : QWidget(parent), deckListModel(_deckListModel)
@@ -78,20 +78,14 @@ void ManaBaseWidget::updateDisplay()
 QHash<QString, int> ManaBaseWidget::analyzeManaBase()
 {
     manaBaseMap.clear();
-    InnerDecklistNode *listRoot = deckListModel->getDeckList()->getRoot();
-    for (int i = 0; i < listRoot->size(); i++) {
-        InnerDecklistNode *currentZone = dynamic_cast<InnerDecklistNode *>(listRoot->at(i));
-        for (int j = 0; j < currentZone->size(); j++) {
-            DecklistCardNode *currentCard = dynamic_cast<DecklistCardNode *>(currentZone->at(j));
-            if (!currentCard)
-                continue;
+    QList<DecklistCardNode *> cardsInDeck = deckListModel->getDeckList()->getCardNodes();
 
-            for (int k = 0; k < currentCard->getNumber(); ++k) {
-                CardInfoPtr info = CardDatabaseManager::query()->getCardInfo(currentCard->getName());
-                if (info) {
-                    auto devotion = determineManaProduction(info->getText());
-                    mergeManaCounts(manaBaseMap, devotion);
-                }
+    for (auto currentCard : cardsInDeck) {
+        for (int k = 0; k < currentCard->getNumber(); ++k) {
+            CardInfoPtr info = CardDatabaseManager::query()->getCardInfo(currentCard->getName());
+            if (info) {
+                auto devotion = determineManaProduction(info->getText());
+                mergeManaCounts(manaBaseMap, devotion);
             }
         }
     }

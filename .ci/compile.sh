@@ -12,7 +12,7 @@
 # --ccache [<size>] uses ccache and shows stats, optionally provide size
 # --dir <dir> sets the name of the build dir, default is "build"
 # --target-macos-version <version> sets the min os version - only used for macOS builds
-# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_TEST USE_CCACHE CCACHE_SIZE BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION
+# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION
 # (correspond to args: --debug/--release --install --package <package type> --suffix <suffix> --server --test --ccache <ccache_size> --dir <dir>)
 # exitcode: 1 for failure, 3 for invalid arguments
 
@@ -45,6 +45,10 @@ while [[ $# != 0 ]]; do
       ;;
     '--server')
       MAKE_SERVER=1
+      shift
+      ;;
+    '--no-client')
+      MAKE_NO_CLIENT=1
       shift
       ;;
     '--test')
@@ -117,6 +121,9 @@ flags=("-DCMAKE_BUILD_TYPE=$BUILDTYPE")
 if [[ $MAKE_SERVER ]]; then
   flags+=("-DWITH_SERVER=1")
 fi
+if [[ $MAKE_NO_CLIENT ]]; then
+  flags+=("-DWITH_CLIENT=0" "-DWITH_ORACLE=0" "-DWITH_DBCONVERTER=0")
+fi
 if [[ $MAKE_TEST ]]; then
   flags+=("-DTEST=1")
 fi
@@ -149,6 +156,7 @@ function ccachestatsverbose() {
 
 # Compile
 if [[ $RUNNER_OS == macOS ]]; then
+
   if [[ $TARGET_MACOS_VERSION ]]; then
     # CMAKE_OSX_DEPLOYMENT_TARGET is a vanilla cmake flag needed to compile to target macOS version
     flags+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=$TARGET_MACOS_VERSION")
@@ -195,17 +203,18 @@ if [[ $RUNNER_OS == macOS ]]; then
     hdiutil_script="/tmp/hdiutil.sh"
     # shellcheck disable=SC2016
     echo '#!/bin/bash
-i=0
-while ! hdiutil "$@"; do
-  if (( ++i >= 10 )); then
-    echo "Error: hdiutil failed $i times!" >&2
-    break
-  fi
-  sleep 1
-done' >"$hdiutil_script"
+    i=0
+    while ! hdiutil "$@"; do
+      if (( ++i >= 10 )); then
+        echo "Error: hdiutil failed $i times!" >&2
+        break
+      fi
+      sleep 1
+    done' >"$hdiutil_script"
     chmod +x "$hdiutil_script"
     flags+=(-DCPACK_COMMAND_HDIUTIL="$hdiutil_script")
   fi
+
 elif [[ $RUNNER_OS == Windows ]]; then
   # Enable MTT, see https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
   # and https://devblogs.microsoft.com/cppblog/cpp-build-throughput-investigation-and-tune-up/#multitooltask-mtt
@@ -220,16 +229,31 @@ fi
 
 echo "::group::Configure cmake"
 cmake --version
+echo "Running cmake with flags: ${flags[*]}"
 cmake .. "${flags[@]}"
 echo "::endgroup::"
 
 echo "::group::Build project"
+echo "Running cmake --build with flags: ${buildflags[*]}"
 cmake --build . "${buildflags[@]}"
 echo "::endgroup::"
 
 if [[ $USE_CCACHE ]]; then
   echo "::group::Show ccache stats again"
   ccachestatsverbose
+  echo "::endgroup::"
+fi
+
+if [[ $RUNNER_OS == macOS ]]; then
+  echo "::group::Inspect Mach-O binaries"
+  for app in cockatrice oracle servatrice dbconverter; do
+    binary="$GITHUB_WORKSPACE/build/$app/$app.app/Contents/MacOS/$app"
+    echo "Inspecting $app..."
+    vtool -show-build "$binary"
+    file "$binary"
+    lipo -info "$binary"
+    echo ""
+  done
   echo "::endgroup::"
 fi
 
@@ -247,7 +271,6 @@ fi
 
 if [[ $MAKE_PACKAGE ]]; then
   echo "::group::Create package"
-  
   cmake --build . --target package --config "$BUILDTYPE"
   echo "::endgroup::"
 

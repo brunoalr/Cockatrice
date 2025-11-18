@@ -1,5 +1,7 @@
 #include "dlg_load_deck_from_clipboard.h"
 
+#include "../../../client/settings/cache_settings.h"
+#include "../../deck_loader/deck_loader.h"
 #include "dlg_settings.h"
 
 #include <QApplication>
@@ -11,8 +13,6 @@
 #include <QPushButton>
 #include <QTextStream>
 #include <QVBoxLayout>
-#include <libcockatrice/models/deck_list/deck_loader.h>
-#include <libcockatrice/settings/cache_settings.h>
 
 /**
  * Creates the main layout and connects the signals that are common to all versions of this window
@@ -24,7 +24,7 @@ AbstractDlgDeckTextEdit::AbstractDlgDeckTextEdit(QWidget *parent) : QDialog(pare
     refreshButton = new QPushButton(tr("&Refresh"));
     connect(refreshButton, &QPushButton::clicked, this, &AbstractDlgDeckTextEdit::actRefresh);
 
-    QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    auto *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     buttonBox->addButton(refreshButton, QDialogButtonBox::ActionRole);
     connect(buttonBox, &QDialogButtonBox::accepted, this, &AbstractDlgDeckTextEdit::actOK);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &AbstractDlgDeckTextEdit::reject);
@@ -75,16 +75,16 @@ bool AbstractDlgDeckTextEdit::loadIntoDeck(DeckLoader *deckLoader) const
     QString buffer = contentsEdit->toPlainText();
 
     if (buffer.contains("<cockatrice_deck version=\"1\">")) {
-        return deckLoader->loadFromString_Native(buffer);
+        return deckLoader->getDeckList()->loadFromString_Native(buffer);
     }
 
     QTextStream stream(&buffer);
 
-    if (deckLoader->loadFromStream_Plain(stream, true)) {
+    if (deckLoader->getDeckList()->loadFromStream_Plain(stream, true)) {
         if (loadSetNameAndNumberCheckBox->isChecked()) {
-            deckLoader->resolveSetNameAndNumberToProviderID();
+            DeckLoader::resolveSetNameAndNumberToProviderID(deckLoader->getDeckList());
         } else {
-            deckLoader->clearSetNamesAndNumbers();
+            DeckLoader::clearSetNamesAndNumbers(deckLoader->getDeckList());
         }
         return true;
     }
@@ -121,8 +121,7 @@ void DlgLoadDeckFromClipboard::actRefresh()
 
 void DlgLoadDeckFromClipboard::actOK()
 {
-    deckList = new DeckLoader;
-    deckList->setParent(this);
+    deckList = new DeckLoader(this);
 
     if (loadIntoDeck(deckList)) {
         accept();
@@ -155,17 +154,17 @@ DlgEditDeckInClipboard::DlgEditDeckInClipboard(const DeckLoader &deckList, bool 
  * @param addComments Whether to add annotations
  * @return A QString
  */
-static QString deckListToString(const DeckLoader *deckList, bool addComments)
+static QString deckListToString(const DeckList *deckList, bool addComments)
 {
     QString buffer;
     QTextStream stream(&buffer);
-    deckList->saveToStream_Plain(stream, addComments);
+    DeckLoader::saveToStream_Plain(stream, deckList, addComments);
     return buffer;
 }
 
 void DlgEditDeckInClipboard::actRefresh()
 {
-    setText(deckListToString(deckLoader, annotated));
+    setText(deckListToString(deckLoader->getDeckList(), annotated));
 }
 
 void DlgEditDeckInClipboard::actOK()

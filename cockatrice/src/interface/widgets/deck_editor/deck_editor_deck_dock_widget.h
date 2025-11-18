@@ -12,6 +12,7 @@
 #include "../../key_signals.h"
 #include "../utility/custom_line_edit.h"
 #include "../visual_deck_storage/deck_preview/deck_preview_deck_tags_display_widget.h"
+#include "deck_list_style_proxy.h"
 
 #include <QComboBox>
 #include <QDockWidget>
@@ -27,6 +28,8 @@ class DeckEditorDeckDockWidget : public QDockWidget
     Q_OBJECT
 public:
     explicit DeckEditorDeckDockWidget(AbstractTabDeckEditor *parent);
+    DeckLoader *deckLoader;
+    DeckListStyleProxy *proxy;
     DeckListModel *deckModel;
     QTreeView *deckView;
     QComboBox *bannerCardComboBox;
@@ -41,12 +44,17 @@ public:
     {
         return nameEdit->text().simplified();
     }
+    QComboBox *getGroupByComboBox()
+    {
+        return activeGroupCriteriaComboBox;
+    }
 
 public slots:
     void cleanDeck();
     void updateBannerCardComboBox();
     void setDeck(DeckLoader *_deck);
-    DeckLoader *getDeckList();
+    DeckLoader *getDeckLoader();
+    DeckList *getDeckList();
     void actIncrement();
     bool swapCard(const QModelIndex &idx);
     void actDecrementCard(const ExactCard &card, QString zoneName);

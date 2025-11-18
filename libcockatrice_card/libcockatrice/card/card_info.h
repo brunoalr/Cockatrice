@@ -1,9 +1,3 @@
-/**
- * @file card_info.h
- * @ingroup Cards
- * @brief TODO: Document this.
- */
-
 #ifndef CARD_INFO_H
 #define CARD_INFO_H
 
@@ -53,7 +47,26 @@ class CardInfo : public QObject
 {
     Q_OBJECT
 
+public:
+    /**
+     * @class CardInfo::UiAttributes
+     * @ingroup Cards
+     *
+     * @brief Attributes of the card that affect display and game logic.
+     */
+    struct UiAttributes
+    {
+        bool cipt = false;                 ///< Positioning flag used by UI.
+        bool landscapeOrientation = false; ///< Orientation flag for rendering.
+        int tableRow = 0;                  ///< Row index in a table or visual representation.
+        bool upsideDownArt = false;        ///< Whether artwork is flipped for visual purposes.
+    };
+
 private:
+    /** @name Private Card Properties
+     *  @anchor PrivateCardProperties
+     */
+    ///@{
     CardInfoPtr smartThis;                         ///< Smart pointer to self for safe cross-references.
     QString name;                                  ///< Full name of the card.
     QString simpleName;                            ///< Simplified name for fuzzy matching.
@@ -65,10 +78,8 @@ private:
     QList<CardRelation *> reverseRelatedCardsToMe; ///< Cards that consider this card as related.
     SetToPrintingsMap setsToPrintings;             ///< Mapping from set names to printing variations.
     QString setsNames;                             ///< Cached, human-readable list of set names.
-    bool cipt;                                     ///< Positioning flag used by UI.
-    bool landscapeOrientation;                     ///< Orientation flag for rendering.
-    int tableRow;                                  ///< Row index in a table or visual representation.
-    bool upsideDownArt;                            ///< Whether artwork is flipped for visual purposes.
+    UiAttributes uiAttributes;                     ///< Attributes that affect display and game logic
+    ///@}
 
 public:
     /**
@@ -81,10 +92,7 @@ public:
      * @param _relatedCards Forward references to related cards.
      * @param _reverseRelatedCards Backward references to related cards.
      * @param _sets Map of set names to printing information.
-     * @param _cipt UI positioning flag.
-     * @param _landscapeOrientation UI rendering orientation.
-     * @param _tableRow Row index for table placement.
-     * @param _upsideDownArt Whether the artwork should be displayed upside down.
+     * @param _uiAttributes Attributes that affect display and game logic
      */
     explicit CardInfo(const QString &_name,
                       const QString &_text,
@@ -93,10 +101,7 @@ public:
                       const QList<CardRelation *> &_relatedCards,
                       const QList<CardRelation *> &_reverseRelatedCards,
                       SetToPrintingsMap _sets,
-                      bool _cipt,
-                      bool _landscapeOrientation,
-                      int _tableRow,
-                      bool _upsideDownArt);
+                      UiAttributes _uiAttributes);
 
     /**
      * @brief Copy constructor for CardInfo.
@@ -109,8 +114,7 @@ public:
         : QObject(other.parent()), name(other.name), simpleName(other.simpleName), text(other.text),
           isToken(other.isToken), properties(other.properties), relatedCards(other.relatedCards),
           reverseRelatedCards(other.reverseRelatedCards), reverseRelatedCardsToMe(other.reverseRelatedCardsToMe),
-          setsToPrintings(other.setsToPrintings), setsNames(other.setsNames), cipt(other.cipt),
-          landscapeOrientation(other.landscapeOrientation), tableRow(other.tableRow), upsideDownArt(other.upsideDownArt)
+          setsToPrintings(other.setsToPrintings), setsNames(other.setsNames), uiAttributes(other.uiAttributes)
     {
     }
 
@@ -134,10 +138,7 @@ public:
      * @param _relatedCards Forward relationships.
      * @param _reverseRelatedCards Reverse relationships.
      * @param _sets Printing information per set.
-     * @param _cipt UI positioning flag.
-     * @param _landscapeOrientation UI rendering orientation.
-     * @param _tableRow Row index for table placement.
-     * @param _upsideDownArt Artwork orientation flag.
+     * @param _uiAttributes Attributes that affect display and game logic
      * @return Shared pointer to the new CardInfo instance.
      */
     static CardInfoPtr newInstance(const QString &_name,
@@ -147,10 +148,7 @@ public:
                                    const QList<CardRelation *> &_relatedCards,
                                    const QList<CardRelation *> &_reverseRelatedCards,
                                    SetToPrintingsMap _sets,
-                                   bool _cipt,
-                                   bool _landscapeOrientation,
-                                   int _tableRow,
-                                   bool _upsideDownArt);
+                                   UiAttributes _uiAttributes);
 
     /**
      * @brief Clones the current CardInfo instance.
@@ -161,7 +159,7 @@ public:
      */
     CardInfoPtr clone() const
     {
-        CardInfoPtr newCardInfo = CardInfoPtr(new CardInfo(*this));
+        auto newCardInfo = CardInfoPtr(new CardInfo(*this));
         newCardInfo->setSmartPointer(newCardInfo); // Set the smart pointer for the new instance
         return newCardInfo;
     }
@@ -255,28 +253,13 @@ public:
     //@}
 
     /** @name UI Positioning */ //@{
-    bool getCipt() const
+    const UiAttributes &getUiAttributes() const
     {
-        return cipt;
+        return uiAttributes;
     }
-    bool getLandscapeOrientation() const
-    {
-        return landscapeOrientation;
-    }
-    int getTableRow() const
-    {
-        return tableRow;
-    }
-    void setTableRow(int _tableRow)
-    {
-        tableRow = _tableRow;
-    }
-    bool getUpsideDownArt() const
-    {
-        return upsideDownArt;
-    }
-    const QChar getColorChar() const;
     //@}
+
+    const QChar getColorChar() const;
 
     /** @name Legacy/Convenience Property Accessors */ //@{
     const QString getCardType() const;
