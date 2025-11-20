@@ -456,19 +456,9 @@ jobs:
           path: ${{steps.build.outputs.path}}
           if-no-files-found: error
 
-      - name: Upload pdb database
-        if: matrix.os == 'Windows'
-        uses: actions/upload-artifact@v5
-        with:
-          name: Windows${{matrix.target}}-debug-pdbs
-          path: |
-            build/cockatrice/Release/*.pdb
-            build/servatrice/Release/*.pdb
-          if-no-files-found: error
-
       - name: Upload to release
         id: upload_release
-        if: needs.configure.outputs.tag != null
+        if: matrix.make_package && needs.configure.outputs.tag != null
         shell: bash
         env:
           GH_TOKEN: ${{github.token}}
@@ -491,3 +481,179 @@ jobs:
         env:
           GH_TOKEN: ${{github.token}}
         run: gh attestation verify ${{steps.build.outputs.path}} -R Cockatrice/Cockatrice
+
+      - name: Upload pdb database
+        if: matrix.os == 'Windows'
+        uses: actions/upload-artifact@v5
+        with:
+          name: Windows${{matrix.target}}-debug-pdbs
+          path: |
+            build/cockatrice/Release/*.pdb
+            build/servatrice/Release/*.pdb
+          if-no-files-found: error
+
+  build-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: 7
+            qt_version: 5.15.*
+            qt_arch: win64_mingw81
+
+          - target: 10
+            qt_version: 6.6.*
+            qt_arch: win64_mingw
+            qt_modules: "qtimageformats qtmultimedia qtwebsockets"
+
+    name: Windows ${{matrix.target}}
+    needs: configure
+    runs-on: windows-2025
+
+    steps:
+      # - name: Add msbuild to PATH
+      #   id: add-msbuild
+      #   uses: microsoft/setup-msbuild@v2
+      #   with:
+      #     msbuild-architecture: x64
+
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install Qt ${{matrix.qt_version}}
+        uses: jurplel/install-qt-action@v4
+        with:
+          cache: true
+          setup-python: true
+          version: ${{matrix.qt_version}}
+          arch: ${{matrix.qt_arch}}
+          modules: ${{matrix.qt_modules}}
+
+      - run: choco install nsis
+
+      # - name: Setup vcpkg cache
+      #   id: vcpkg-cache
+      #   uses: TAServers/vcpkg-cache@v3
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Ccache
+        uses: hendrikmuhs/ccache-action@63069e3931dedbf3b63792097479563182fe70d1 # 1.2.18
+        with:
+          verbose: 1
+          key: windows-${{matrix.target}}-${{github.ref_name}}
+          restore-keys: |
+            windows-${{matrix.target}}-main
+          append-timestamp: true
+          variant: sccache
+
+      - name: Setup Conan
+        id: setup-conan
+        uses: conan-io/setup-conan@434f093a557d1ee6972c4ed78693c3191653537b # 1.1.0
+
+      - name: Restore Conan cache
+        id: restore-conan-cache
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # 4.2.3
+        with:
+          enableCrossOsArchive: true
+          path: ${{ steps.setup-conan.outputs.conan-home }}
+          key: conan-windows-${{ matrix.target }}-${{ hashFiles('conanfile.txt', 'conan-profiles/**') }}
+          restore-keys: |
+            conan-windows-${{ matrix.target }}-
+
+      - name: Copy Conan profiles
+        run: |
+          cp conan-profiles/* '${{ steps.setup-conan.outputs.conan-home }}/profiles'
+
+      - name: Conan install
+        run: |
+          conan install . -pr=mingw-profile --output-folder=. --build=missing --update --settings=compiler.cppstd=17 --settings=tools.cmake.cmaketoolchain:generator=Ninja
+
+      - name: Save Conan cache
+        if: ${{ steps.restore-conan-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # 4.2.3
+        with:
+          enableCrossOsArchive: true
+          path: ${{ steps.setup-conan.outputs.conan-home }}
+          key: conan-windows-${{ matrix.target }}-${{ hashFiles('conanfile.txt', 'conan-profiles/**') }}
+
+      # Use YAML's folded style (>) to keep the command readable across multiple lines,
+      # but have it executed as a single line in the shell. This is necessary for Windows 'cmd' steps
+      # to ensure all commands run in the same shell session and directory changes persist.
+      - name: Build (Windows)
+        shell: cmd
+        env:
+          PACKAGE_SUFFIX: '-Win${{matrix.target}}'
+          CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
+          CMAKE_GENERATOR_PLATFORM: 'x64'
+          CMAKE_C_COMPILER_LAUNCHER: sccache
+          CMAKE_CXX_COMPILER_LAUNCHER: sccache
+          QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\${{matrix.qt_arch}}'
+        # env:
+        #   CMAKE_C_COMPILER_LAUNCHER: sccache
+        #   CMAKE_CXX_COMPILER_LAUNCHER: sccache
+        run: >
+          build\Release\generators\conanbuild.bat &&
+          cmake --version &&
+          cmake --preset conan-release -DCMAKE_INSTALL_PREFIX=out -G "Ninja" &&
+          cmake --build build\Release &&
+          cmake --build build\Release --target package
+
+      # - name: Build Cockatrice
+      #   id: build
+      #   shell: bash
+      #   env:
+      #     PACKAGE_SUFFIX: '-Win${{matrix.target}}'
+      #     CMAKE_GENERATOR: '${{env.CMAKE_GENERATOR}}'
+      #     CMAKE_GENERATOR_PLATFORM: 'x64'
+      #     QTDIR: '${{github.workspace}}\Qt\${{matrix.qt_version}}\win64_${{matrix.qt_arch}}'
+      #     VCPKG_DISABLE_METRICS: 1
+      #     VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
+      #   # No need for --parallel flag, MTT is added in the compile script to let cmake/msbuild manage core count,
+      #   # project and process parallelism: https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
+      #   run: .ci/compile.sh --server --release --test --package
+
+      - name: Upload artifact
+        id: upload_artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: Windows${{matrix.target}}-installer
+          path: build/release
+          if-no-files-found: error
+
+      # - name: Upload pdb database
+      #   uses: actions/upload-artifact@v5
+      #   with:
+      #     name: Windows${{matrix.target}}-debug-pdbs
+      #     path: |
+      #       build/cockatrice/Release/*.pdb
+      #       build/servatrice/Release/*.pdb
+      #     if-no-files-found: error
+
+      # - name: Upload to release
+      #   id: upload_release
+      #   if: needs.configure.outputs.tag != null
+      #   shell: bash
+      #   env:
+      #     GH_TOKEN: ${{github.token}}
+      #     tag_name: ${{needs.configure.outputs.tag}}
+      #     asset_path: ${{steps.build.outputs.path}}
+      #     asset_name: ${{steps.build.outputs.name}}
+      #   run: gh release upload "$tag_name" "$asset_path#$asset_name"
+
+      - name: Attest binary provenance
+        id: attestation
+        if: steps.upload_release.outcome == 'success'
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-name: ${{steps.build.outputs.name}}
+          subject-digest: sha256:${{ steps.upload_artifact.outputs.artifact-digest }}
+
+      # - name: Verify binary attestation
+      #   if: steps.attestation.outcome == 'success'
+      #   shell: bash
+      #   env:
+      #     GH_TOKEN: ${{github.token}}
+      #   run: gh attestation verify ${{steps.build.outputs.path}} -R Cockatrice/Cockatrice
