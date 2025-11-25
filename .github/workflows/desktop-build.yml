@@ -250,9 +250,9 @@ jobs:
     env:
       USERNAME: brunoalr
       VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
-      FEED_URL: https://nuget.pkg.github.com/brunoalr/index.json
+      FEED_URL: https://nuget.pkg.github.com/bruno-test-org/index.json
       VCPKG_DISABLE_METRICS: 1
-      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/brunoalr/index.json,readwrite"
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/bruno-test-org/index.json,readwrite"
     strategy:
       fail-fast: false
       matrix:
