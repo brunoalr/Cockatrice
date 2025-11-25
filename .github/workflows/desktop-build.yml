@@ -416,7 +416,7 @@ jobs:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Restore thin Qt ${{matrix.qt_version}} libraries
-        if: matrix.os == 'macOS'
+        if: false && matrix.os == 'macOS'
         id: restore_qt
         uses: actions/cache/restore@v4
         with:
@@ -426,7 +426,7 @@ jobs:
       # Using jurplel/install-qt-action to install Qt without using brew
       # qt build using vcpkg either just fails or takes too long to build
       - name: Install fat Qt ${{matrix.qt_version}} (macOS)
-        if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
+        if: false && matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
         uses: jurplel/install-qt-action@v4
         with:
           cache: false
@@ -437,7 +437,7 @@ jobs:
 
       # the binaries from aqt are fat (universal), so we thin them to the target architecture to reduce the size of the packages and caches
       - name: Thin Qt ${{matrix.qt_version}} libraries
-        if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
+        if: false && matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
         run: |
           if [[ ${{ matrix.soc }} == 'Intel' ]]; then
             export ARCH="x86_64"
@@ -454,14 +454,14 @@ jobs:
           echo "::endgroup::"
 
       - name: Cache thin Qt ${{matrix.qt_version}} libraries
-        if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
+        if: false && matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/Qt
           key: thin-qt-macos-${{ matrix.soc }}-${{ matrix.qt_version }}
 
       - name: Install Qt ${{matrix.qt_version}} (Windows)
-        if: matrix.os == 'Windows'
+        if: false && matrix.os == 'Windows'
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{matrix.qt_version}}
@@ -489,7 +489,7 @@ jobs:
           TARGET_MACOS_ARCH: ${{ matrix.soc == 'Intel' && 'x86_64' || '' }}
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
           # QTDIR is needed for macOS since we actually only use the cached thin Qt binaries instead of the install-qt-action, which sets a few environment variables
-          QTDIR: ${{ matrix.os == 'macOS' && format('{0}/Qt/{1}/macos', github.workspace, matrix.qt_version) || '' }}
+          # QTDIR: ${{ matrix.os == 'macOS' && format('{0}/Qt/{1}/macos', github.workspace, matrix.qt_version) || '' }}
         run: .ci/compile.sh --server --test --vcpkg
 
       - name: Sign app bundle
