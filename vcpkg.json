@@ -1,13 +1,16 @@
 {
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "dependencies": [
-    "ffmpeg",
     "gtest",
     "liblzma",
     "openssl",
     "protobuf",
     "pthreads",
-    "qt",
+    "qtbase",
+    "qtmultimedia",
+    "qtsvg",
+    "qtwebsockets",
+    "qttools",
     "zlib"
   ]
 }

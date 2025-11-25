@@ -355,6 +355,11 @@ jobs:
         shell: bash
         run: brew install mono
 
+      - name: Install autotools (macOS)
+        if: matrix.os == 'macOS'
+        shell: bash
+        run: brew install autoconf autoconf-archive automake libtool
+
       - name: Bootstrap vcpkg (macOS)
         if: matrix.os == 'macOS'
         shell: bash
