@@ -206,7 +206,7 @@ if [[ $RUNNER_OS == macOS ]]; then
     fi
 
     # generate the custom triplet file
-    cp "../vcpkg/triplets/$triplet_arch-osx.cmake" "$triplet_file"
+    cp "../vcpkg/triplets/community/$triplet_arch-osx.cmake" "$triplet_file"
     for var in "${extra_triplet_vars[@]}"; do
       echo "$var" >>"$triplet_file"
     done
