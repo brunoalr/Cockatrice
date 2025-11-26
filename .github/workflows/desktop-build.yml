@@ -396,20 +396,6 @@ jobs:
           modules: ${{matrix.qt_modules}}
           dir: ${{github.workspace}}
 
-      # the binaries from aqt are fat (universal), so we thin them to the target architecture to reduce the size of the packages and caches
-      - name: Thin Qt libraries
-        if: matrix.os == 'macOS' && env.QT_CACHE_VALID != 'true'
-        run: |
-          export ARCH=$(uname -m)
-          export NPROC=$(sysctl -n hw.ncpu)
-          echo "::group::Thinning Qt libraries to $ARCH using $NPROC cores"
-          find ${{ github.workspace }}/Qt -type f -print0 | \
-            xargs -0 -n1 -P "$NPROC" sh -c \
-              'file -b --mime-type "$0" | grep -q "application/x-mach-binary" && \
-                echo "Processing $0" && \
-                lipo "$0" -thin "$ARCH" -output "$0" || true'
-          echo "::endgroup::"
-
       - name: Determine concrete Qt version
         if: matrix.os == 'macOS'
         shell: bash
@@ -418,6 +404,20 @@ jobs:
           QT_VER=$(basename "$QT_PATH")
           echo "Found Qt version: $QT_VER"
           echo "QT_VERSION_CONCRETE=$QT_VER" >> $GITHUB_ENV
+
+      # the binaries from aqt are fat (universal), so we thin them to the target architecture to reduce the size of the packages and caches
+      - name: Thin Qt libraries
+        if: matrix.os == 'macOS' && env.QT_CACHE_VALID != 'true'
+        run: |
+          export ARCH=$(uname -m)
+          export NPROC=$(sysctl -n hw.ncpu)
+          echo "::group::Thinning Qt libraries to $ARCH using $NPROC cores"
+          find ${{ github.workspace }}/Qt/${{env.QT_VERSION_CONCRETE}} -type f -print0 | \
+            xargs -0 -n1 -P "$NPROC" sh -c \
+              'file -b --mime-type "$0" | grep -q "application/x-mach-binary" && \
+                echo "Processing $0" && \
+                lipo "$0" -thin "$ARCH" -output "$0" || true'
+          echo "::endgroup::"
 
       - name: Cache thin Qt ${{env.QT_VERSION_CONCRETE}} libraries
         if: matrix.os == 'macOS' && env.QT_CACHE_VALID != 'true'
