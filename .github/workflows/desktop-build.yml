@@ -382,6 +382,7 @@ jobs:
             echo "QT_CACHE_VALID=true" >> $GITHUB_ENV
           else
             echo "QT_CACHE_VALID=false" >> $GITHUB_ENV
+            rm -rf ${{ github.workspace }}/Qt
           fi
 
       # Using jurplel/install-qt-action to install Qt without using brew
