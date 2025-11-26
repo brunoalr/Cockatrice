@@ -389,10 +389,6 @@ jobs:
 
       # Using jurplel/install-qt-action to install Qt without using brew
       # qt build using vcpkg either just fails or takes too long to build
-      - name: Clean Qt directory on mismatch
-        if: matrix.os == 'macOS' && env.CACHE_VALID != 'true'
-        run: rm -rf ${{ github.workspace }}/Qt
-
       - name: Install fat Qt ${{matrix.qt_version}} (macOS)
         if: matrix.os == 'macOS' && env.CACHE_VALID != 'true'
         uses: jurplel/install-qt-action@v4
