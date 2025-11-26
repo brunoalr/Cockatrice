@@ -267,7 +267,7 @@ jobs:
             make_package: 1
             package_suffix: "-macOS13_Intel"
             artifact_name: macOS13_Intel-package
-            qt_version: 6.6.3
+            qt_version: 6.7.*
             qt_arch: clang_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             cmake_generator: Ninja
@@ -282,7 +282,7 @@ jobs:
             make_package: 1
             package_suffix: "-macOS14"
             artifact_name: macOS14-package
-            qt_version: 6.6.3
+            qt_version: 6.7.*
             qt_arch: clang_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             cmake_generator: Ninja
@@ -297,7 +297,7 @@ jobs:
             make_package: 1
             package_suffix: "-macOS15"
             artifact_name: macOS15-package
-            qt_version: 6.6.3
+            qt_version: 6.7.*
             qt_arch: clang_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             cmake_generator: Ninja
@@ -309,7 +309,7 @@ jobs:
             soc: Apple
             xcode: "16.4"
             type: Debug
-            qt_version: 6.6.3
+            qt_version: 6.7.*
             qt_arch: clang_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             cmake_generator: Ninja
@@ -334,7 +334,7 @@ jobs:
             make_package: 1
             package_suffix: "-Win10"
             artifact_name: Windows10-installer
-            qt_version: 6.6.3
+            qt_version: 6.6.*
             qt_arch: win64_msvc2019_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             cmake_generator: "Visual Studio 17 2022"
@@ -415,18 +415,36 @@ jobs:
           max-size: 500M
           gh-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Restore thin Qt ${{matrix.qt_version}} libraries
+      - name: Setup Qt version format
+        if: matrix.os == 'macOS'
+        shell: bash
+        run: |
+          # Strip trailing .* if present
+          VERSION_PREFIX=$(echo "${{ matrix.qt_version }}" | sed 's/\.\*//')
+          echo "QT_VERSION_PREFIX=$VERSION_PREFIX" >> $GITHUB_ENV
+
+      - name: Restore thin Qt libraries
         if: matrix.os == 'macOS'
         id: restore_qt
         uses: actions/cache/restore@v4
         with:
           path: ${{ github.workspace }}/Qt
           key: thin-qt-macos-${{ matrix.soc }}-${{ matrix.qt_version }}
+          restore-keys: thin-qt-macos-${{ matrix.soc }}-${{ env.QT_VERSION_PREFIX }}
+
+      - name: Check cache validity
+        if: matrix.os == 'macOS'
+        run: |
+          if [[ "${{ steps.restore_qt.outputs.cache-matched-key }}" == "thin-qt-macos-${{ matrix.soc }}-${{ env.QT_VERSION_PREFIX }}"* ]]; then
+            echo "CACHE_VALID=true" >> $GITHUB_ENV
+          else
+            echo "CACHE_VALID=false" >> $GITHUB_ENV
+          fi
 
       # Using jurplel/install-qt-action to install Qt without using brew
       # qt build using vcpkg either just fails or takes too long to build
       - name: Install fat Qt ${{matrix.qt_version}} (macOS)
-        if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
+        if: matrix.os == 'macOS' && env.CACHE_VALID != 'true'
         uses: jurplel/install-qt-action@v4
         with:
           cache: false
@@ -436,8 +454,8 @@ jobs:
           dir: ${{github.workspace}}
 
       # the binaries from aqt are fat (universal), so we thin them to the target architecture to reduce the size of the packages and caches
-      - name: Thin Qt ${{matrix.qt_version}} libraries
-        if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
+      - name: Thin Qt libraries
+        if: matrix.os == 'macOS' && env.CACHE_VALID != 'true'
         run: |
           if [[ ${{ matrix.soc }} == 'Intel' ]]; then
             export ARCH="x86_64"
@@ -453,12 +471,21 @@ jobs:
                 lipo "$0" -thin "$ARCH" -output "$0" || true'
           echo "::endgroup::"
 
-      - name: Cache thin Qt ${{matrix.qt_version}} libraries
-        if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
+      - name: Determine concrete Qt version
+        if: matrix.os == 'macOS'
+        shell: bash
+        run: |
+          QT_PATH=$(find ${{ github.workspace }}/Qt -maxdepth 1 -type d -name "${{ matrix.qt_version }}" | sort -V | tail -n1)
+          QT_VER=$(basename "$QT_PATH")
+          echo "Found Qt version: $QT_VER"
+          echo "QT_VERSION_CONCRETE=$QT_VER" >> $GITHUB_ENV
+
+      - name: Cache thin Qt ${{env.QT_VERSION_CONCRETE}} libraries
+        if: matrix.os == 'macOS' && env.CACHE_VALID != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/Qt
-          key: thin-qt-macos-${{ matrix.soc }}-${{ matrix.qt_version }}
+          key: thin-qt-macos-${{ matrix.soc }}-${{ env.QT_VERSION_CONCRETE }}
 
       - name: Install Qt ${{matrix.qt_version}} (Windows)
         if: matrix.os == 'Windows'
@@ -489,7 +516,7 @@ jobs:
           TARGET_MACOS_ARCH: ${{ matrix.soc == 'Intel' && 'x86_64' || '' }}
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
           # QTDIR is needed for macOS since we actually only use the cached thin Qt binaries instead of the install-qt-action, which sets a few environment variables
-          QTDIR: ${{ matrix.os == 'macOS' && format('{0}/Qt/{1}/macos', github.workspace, matrix.qt_version) || '' }}
+          QTDIR: ${{ matrix.os == 'macOS' && format('{0}/Qt/{1}/macos', github.workspace, env.QT_VERSION_CONCRETE) || '' }}
         run: .ci/compile.sh --server --test --vcpkg
 
       - name: Sign app bundle
