@@ -378,10 +378,23 @@ jobs:
           key: thin-qt-macos-${{ matrix.soc }}-${{ matrix.qt_version }}
           restore-keys: thin-qt-macos-${{ matrix.soc }}-${{ env.QT_VERSION_PREFIX }}
 
+      - name: Check cache validity
+        if: matrix.os == 'macOS'
+        run: |
+          if [[ "${{ steps.restore_qt.outputs.cache-matched-key }}" == "thin-qt-macos-${{ matrix.soc }}-${{ env.QT_VERSION_PREFIX }}"* ]]; then
+            echo "CACHE_VALID=true" >> $GITHUB_ENV
+          else
+            echo "CACHE_VALID=false" >> $GITHUB_ENV
+          fi
+
       # Using jurplel/install-qt-action to install Qt without using brew
       # qt build using vcpkg either just fails or takes too long to build
+      - name: Clean Qt directory on mismatch
+        if: matrix.os == 'macOS' && env.CACHE_VALID != 'true'
+        run: rm -rf ${{ github.workspace }}/Qt
+
       - name: Install fat Qt ${{matrix.qt_version}} (macOS)
-        if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
+        if: matrix.os == 'macOS' && env.CACHE_VALID != 'true'
         uses: jurplel/install-qt-action@v4
         with:
           cache: false
@@ -392,7 +405,7 @@ jobs:
 
       # the binaries from aqt are fat (universal), so we thin them to the target architecture to reduce the size of the packages and caches
       - name: Thin Qt libraries
-        if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
+        if: matrix.os == 'macOS' && env.CACHE_VALID != 'true'
         run: |
           export ARCH=$(uname -m)
           export NPROC=$(sysctl -n hw.ncpu)
@@ -414,7 +427,7 @@ jobs:
           echo "QT_VERSION_CONCRETE=$QT_VER" >> $GITHUB_ENV
 
       - name: Cache thin Qt ${{env.QT_VERSION_CONCRETE}} libraries
-        if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
+        if: matrix.os == 'macOS' && env.CACHE_VALID != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/Qt
