@@ -397,14 +397,14 @@ jobs:
           modules: ${{matrix.qt_modules}}
           dir: ${{github.workspace}}
 
-      - name: Determine concrete Qt version
+      - name: Determine resolved Qt version
         if: matrix.os == 'macOS'
         shell: bash
         run: |
           QT_PATH=$(find ${{ github.workspace }}/Qt -maxdepth 1 -type d -name "${{ matrix.qt_version }}" | sort -V | tail -n1)
           QT_VER=$(basename "$QT_PATH")
           echo "Found Qt version: $QT_VER"
-          echo "QT_VERSION_CONCRETE=$QT_VER" >> $GITHUB_ENV
+          echo "QT_VERSION_RESOLVED=$QT_VER" >> $GITHUB_ENV
 
       # the binaries from aqt are fat (universal), so we thin them to the target architecture to reduce the size of the packages and caches
       - name: Thin Qt libraries
@@ -413,19 +413,19 @@ jobs:
           export ARCH=$(uname -m)
           export NPROC=$(sysctl -n hw.ncpu)
           echo "::group::Thinning Qt libraries to $ARCH using $NPROC cores"
-          find ${{ github.workspace }}/Qt/${{env.QT_VERSION_CONCRETE}} -type f -print0 | \
+          find ${{ github.workspace }}/Qt/${{env.QT_VERSION_RESOLVED}} -type f -print0 | \
             xargs -0 -n1 -P "$NPROC" sh -c \
               'file -b --mime-type "$0" | grep -q "application/x-mach-binary" && \
                 echo "Processing $0" && \
                 lipo "$0" -thin "$ARCH" -output "$0" || true'
           echo "::endgroup::"
 
-      - name: Cache thin Qt ${{env.QT_VERSION_CONCRETE}} libraries
+      - name: Cache thin Qt ${{env.QT_VERSION_RESOLVED}} libraries
         if: matrix.os == 'macOS' && env.QT_CACHE_VALID != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/Qt
-          key: thin-qt-macos-${{ matrix.soc }}-${{ env.QT_VERSION_CONCRETE }}
+          key: thin-qt-macos-${{ matrix.soc }}-${{ env.QT_VERSION_RESOLVED }}
 
       - name: Install Qt ${{matrix.qt_version}} (Windows)
         if: matrix.os == 'Windows'
@@ -463,7 +463,7 @@ jobs:
           DEVELOPER_DIR: '/Applications/Xcode_${{matrix.xcode}}.app/Contents/Developer'
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
           # QTDIR is needed for macOS since we actually only use the cached thin Qt binaries instead of the install-qt-action, which sets a few environment variables
-          QTDIR: ${{ matrix.os == 'macOS' && format('{0}/Qt/{1}/macos', github.workspace, env.QT_VERSION_CONCRETE) || '' }}
+          QTDIR: ${{ matrix.os == 'macOS' && format('{0}/Qt/{1}/macos', github.workspace, env.QT_VERSION_RESOLVED) || '' }}
         run: .ci/compile.sh --server --test --vcpkg
 
       - name: Sign app bundle
