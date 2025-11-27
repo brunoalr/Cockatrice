@@ -370,6 +370,7 @@ jobs:
           key: thin-qt-macos-${{ matrix.soc }}-${{ matrix.qt_version }}
           restore-keys: thin-qt-macos-${{ matrix.soc }}-
 
+
       - name: Check Qt cache validity
         if: matrix.os == 'macOS'
         shell: bash
@@ -377,13 +378,16 @@ jobs:
           # Extract version prefix (e.g., 6.9 from 6.9.*)
           VERSION_PREFIX=$(echo "${{ matrix.qt_version }}" | sed 's/\.\*//')
           echo "QT_VERSION_PREFIX=$VERSION_PREFIX" >> $GITHUB_ENV
+          echo "QT_VERSION_PREFIX=$VERSION_PREFIX"
 
           if [[ "${{ steps.restore_qt.outputs.cache-matched-key }}" == "thin-qt-macos-${{ matrix.soc }}-${VERSION_PREFIX}"* ]]; then
-            echo "QT_CACHE_VALID=true" >> $GITHUB_ENV
+            QT_CACHE_VALID=true
           else
-            echo "QT_CACHE_VALID=false" >> $GITHUB_ENV
+            QT_CACHE_VALID=false
             rm -rf ${{ github.workspace }}/Qt
           fi
+          echo "QT_CACHE_VALID=$QT_CACHE_VALID" >> $GITHUB_ENV
+          echo "QT_CACHE_VALID=$QT_CACHE_VALID"
 
       # Using jurplel/install-qt-action to install Qt without using brew
       # qt build using vcpkg either just fails or takes too long to build
