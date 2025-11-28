@@ -6,6 +6,11 @@
     "openssl",
     "protobuf",
     "pthreads",
+    "qtbase",
+    "qtmultimedia",
+    "qtsvg",
+    "qtwebsockets",
+    "qttools",
     "zlib"
   ]
 }
