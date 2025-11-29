@@ -366,6 +366,7 @@ jobs:
           ccache-key-prefix: ccache-${{matrix.runner}}-${{matrix.soc}}-${{matrix.type}}
           max-size: 500M
           gh-token: ${{ secrets.GITHUB_TOKEN }}
+          save-cache-once-per-key: true
 
       - name: Install Qt ${{matrix.qt_version}}
         uses: jurplel/install-qt-action@v4
