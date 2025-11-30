@@ -6,6 +6,7 @@
 #include "deck_preview_deck_tags_display_widget.h"
 
 #include <QClipboard>
+#include <QDir>
 #include <QFileInfo>
 #include <QInputDialog>
 #include <QMenu>
@@ -79,7 +80,7 @@ void DeckPreviewWidget::initializeUi(const bool deckLoadSuccess)
 
     bannerCardDisplayWidget->setCard(bannerCard);
     bannerCardDisplayWidget->setFontSize(24);
-    setFilePath(deckLoader->getLastFileName());
+    setFilePath(deckLoader->getLastLoadInfo().fileName);
 
     colorIdentityWidget = new ColorIdentityWidget(this, getColorIdentity());
     deckTagsDisplayWidget = new DeckPreviewDeckTagsDisplayWidget(this, deckLoader->getDeckList());
@@ -185,7 +186,7 @@ QString DeckPreviewWidget::getColorIdentity()
  */
 QString DeckPreviewWidget::getDisplayName() const
 {
-    return deckLoader->getDeckList()->getName().isEmpty() ? QFileInfo(deckLoader->getLastFileName()).fileName()
+    return deckLoader->getDeckList()->getName().isEmpty() ? QFileInfo(deckLoader->getLastLoadInfo().fileName).fileName()
                                                           : deckLoader->getDeckList()->getName();
 }
 
@@ -408,7 +409,9 @@ void DeckPreviewWidget::actRenameFile()
         return;
     }
 
-    deckLoader->setLastFileName(newFilePath);
+    DeckLoader::LoadInfo lastLoadInfo = deckLoader->getLastLoadInfo();
+    lastLoadInfo.fileName = newFilePath;
+    deckLoader->setLastLoadInfo(lastLoadInfo);
 
     // update VDS
     setFilePath(newFilePath);
