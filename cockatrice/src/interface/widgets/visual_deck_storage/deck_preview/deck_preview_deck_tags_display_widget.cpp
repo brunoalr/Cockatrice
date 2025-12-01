@@ -11,7 +11,6 @@
 
 #include <QDirIterator>
 #include <QHBoxLayout>
-#include <QLabel>
 #include <QMessageBox>
 
 DeckPreviewDeckTagsDisplayWidget::DeckPreviewDeckTagsDisplayWidget(QWidget *_parent, DeckList *_deckList)
@@ -112,7 +111,7 @@ void DeckPreviewDeckTagsDisplayWidget::openTagEditDlg()
                         return;
 
                     deckPreviewWidget->deckLoader->convertToCockatriceFormat(deckPreviewWidget->filePath);
-                    deckPreviewWidget->filePath = deckPreviewWidget->deckLoader->getLastFileName();
+                    deckPreviewWidget->filePath = deckPreviewWidget->deckLoader->getLastLoadInfo().fileName;
                     deckPreviewWidget->refreshBannerCardText();
                     canAddTags = true;
                 }
@@ -125,7 +124,7 @@ void DeckPreviewDeckTagsDisplayWidget::openTagEditDlg()
                         return;
 
                     deckPreviewWidget->deckLoader->convertToCockatriceFormat(deckPreviewWidget->filePath);
-                    deckPreviewWidget->filePath = deckPreviewWidget->deckLoader->getLastFileName();
+                    deckPreviewWidget->filePath = deckPreviewWidget->deckLoader->getLastLoadInfo().fileName;
                     deckPreviewWidget->refreshBannerCardText();
                     canAddTags = true;
 

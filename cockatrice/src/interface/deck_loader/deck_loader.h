@@ -29,6 +29,21 @@ public:
     };
 
     /**
+     * @brief Information about where the deck was loaded from.
+     *
+     * For local decks, the remoteDeckId field will always be -1.
+     * For remote decks, fileName will be empty and fileFormat will always be CockatriceFormat
+     */
+    struct LoadInfo
+    {
+        static constexpr int NON_REMOTE_ID = -1;
+
+        QString fileName = "";
+        FileFormat fileFormat = CockatriceFormat;
+        int remoteDeckId = NON_REMOTE_ID;
+    };
+
+    /**
      * Supported file extensions for decklist files
      */
     static const QStringList ACCEPTED_FILE_EXTENSIONS;
@@ -46,9 +61,7 @@ public:
 
 private:
     DeckList *deckList;
-    QString lastFileName;
-    FileFormat lastFileFormat;
-    int lastRemoteDeckId;
+    LoadInfo lastLoadInfo;
 
 public:
     DeckLoader(QObject *parent);
@@ -56,26 +69,19 @@ public:
     DeckLoader(const DeckLoader &) = delete;
     DeckLoader &operator=(const DeckLoader &) = delete;
 
-    const QString &getLastFileName() const
+    const LoadInfo &getLastLoadInfo() const
     {
-        return lastFileName;
-    }
-    void setLastFileName(const QString &_lastFileName)
-    {
-        lastFileName = _lastFileName;
-    }
-    FileFormat getLastFileFormat() const
-    {
-        return lastFileFormat;
-    }
-    int getLastRemoteDeckId() const
-    {
-        return lastRemoteDeckId;
+        return lastLoadInfo;
     }
 
-    bool hasNotBeenLoaded() const
+    void setLastLoadInfo(const LoadInfo &info)
     {
-        return getLastFileName().isEmpty() && getLastRemoteDeckId() == -1;
+        lastLoadInfo = info;
+    }
+
+    [[nodiscard]] bool hasNotBeenLoaded() const
+    {
+        return lastLoadInfo.fileName.isEmpty() && lastLoadInfo.remoteDeckId == LoadInfo::NON_REMOTE_ID;
     }
 
     static void clearSetNamesAndNumbers(const DeckList *deckList);

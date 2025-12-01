@@ -6,6 +6,7 @@
 #include "background_sources.h"
 #include "home_styled_button.h"
 
+#include <QGroupBox>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPushButton>
@@ -195,6 +196,9 @@ QGroupBox *HomeWidget::createButtons()
     auto edhrecButton = new HomeStyledButton(tr("Browse EDHRec"), gradientColors);
     connect(edhrecButton, &QPushButton::clicked, tabSupervisor, &TabSupervisor::addEdhrecMainTab);
     boxLayout->addWidget(edhrecButton);
+    auto archidektButton = new HomeStyledButton(tr("Browse Archidekt"), gradientColors);
+    connect(archidektButton, &QPushButton::clicked, tabSupervisor, &TabSupervisor::addArchidektTab);
+    boxLayout->addWidget(archidektButton);
     auto replaybutton = new HomeStyledButton(tr("View Replays"), gradientColors);
     connect(replaybutton, &QPushButton::clicked, tabSupervisor, [this] { tabSupervisor->actTabReplays(true); });
     boxLayout->addWidget(replaybutton);
