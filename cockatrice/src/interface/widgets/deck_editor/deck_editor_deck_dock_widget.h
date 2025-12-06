@@ -69,6 +69,7 @@ public slots:
     void actSwapCard();
     void actRemoveCard();
     void offsetCountAtIndex(const QModelIndex &idx, int offset);
+    void expandAll();
 
 signals:
     void nameChanged();
@@ -111,13 +112,13 @@ private slots:
     void updateName(const QString &name);
     void updateComments();
     void setBannerCard(int);
+    void setTags(const QStringList &tags);
     void syncDeckListBannerCardWithComboBox();
     void updateHash();
     void refreshShortcuts();
     void updateShowBannerCardComboBox(bool visible);
     void updateShowTagsWidget(bool visible);
     void syncBannerCardComboBoxSelectionWithDeck();
-    void expandAll();
 };
 
 #endif // DECK_EDITOR_DECK_DOCK_WIDGET_H
