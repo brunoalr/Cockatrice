@@ -1,12 +1,12 @@
 #ifndef DECKLISTMODEL_H
 #define DECKLISTMODEL_H
 
+#include <../../../../libcockatrice_deck_list/libcockatrice/deck_list/tree/abstract_deck_list_card_node.h>
+#include <../../../../libcockatrice_deck_list/libcockatrice/deck_list/tree/deck_list_card_node.h>
 #include <QAbstractItemModel>
 #include <QList>
 #include <libcockatrice/card/printing/exact_card.h>
-#include <libcockatrice/deck_list/abstract_deck_list_card_node.h>
 #include <libcockatrice/deck_list/deck_list.h>
-#include <libcockatrice/deck_list/deck_list_card_node.h>
 
 class CardDatabase;
 class QPrinter;
@@ -74,6 +74,29 @@ enum Type
     MANA_COST, /**< Group cards by their total mana cost. */
     COLOR      /**< Group cards by their color identity. */
 };
+static inline QString toString(Type t)
+{
+    switch (t) {
+        case MAIN_TYPE:
+            return "Main Type";
+        case MANA_COST:
+            return "Mana Cost";
+        case COLOR:
+            return "Colors";
+    }
+    return {};
+}
+
+static inline Type fromString(const QString &s)
+{
+    if (s == "Main Type")
+        return MAIN_TYPE;
+    if (s == "Mana Cost")
+        return MANA_COST;
+    if (s == "Colors")
+        return COLOR;
+    return MAIN_TYPE; // default
+}
 } // namespace DeckListModelGroupCriteria
 
 /**
@@ -234,8 +257,8 @@ public:
      */
     [[nodiscard]] QModelIndex findCard(const QString &cardName,
                                        const QString &zoneName,
-                         const QString &providerId = "",
-                         const QString &cardNumber = "") const;
+                                       const QString &providerId = "",
+                                       const QString &cardNumber = "") const;
 
     /**
      * @brief Adds a card using the preferred printing if available.
@@ -296,8 +319,8 @@ private:
     QModelIndex nodeToIndex(AbstractDecklistNode *node) const;
     [[nodiscard]] DecklistModelCardNode *findCardNode(const QString &cardName,
                                                       const QString &zoneName,
-                                        const QString &providerId = "",
-                                        const QString &cardNumber = "") const;
+                                                      const QString &providerId = "",
+                                                      const QString &cardNumber = "") const;
     void emitRecursiveUpdates(const QModelIndex &index);
     void sortHelper(InnerDecklistNode *node, Qt::SortOrder order);
 
