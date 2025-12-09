@@ -2,13 +2,12 @@
 
 #include <QDesktopServices>
 #include <QMessageBox>
-#include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QRegularExpression>
 #include <QUrlQuery>
 #include <libcockatrice/deck_list/deck_list.h>
-#include <libcockatrice/deck_list/deck_list_card_node.h>
+#include <libcockatrice/deck_list/tree/deck_list_card_node.h>
 
 DeckStatsInterface::DeckStatsInterface(CardDatabase &_cardDatabase, QObject *parent)
     : QObject(parent), cardDatabase(_cardDatabase)
