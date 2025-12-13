@@ -99,6 +99,35 @@ set(DESKTOPDIR
 # Build servatrice binary and link it
 add_executable(servatrice MACOSX_BUNDLE ${servatrice_MOC_SRCS} ${servatrice_RESOURCES_RCC} ${servatrice_SOURCES})
 
+# Add FFmpeg library directory to search path for QtMultimedia
+# QtMultimedia uses pkg-config which returns -lavformat etc., but the linker needs to know where to find them
+find_package(FFMPEG QUIET)
+if(FFMPEG_FOUND AND FFMPEG_LIBRARY_DIRS)
+  target_link_directories(servatrice PRIVATE ${FFMPEG_LIBRARY_DIRS})
+else()
+  # Fallback: add vcpkg library directories directly
+  # Get vcpkg triplet from VCPKG_TARGET_TRIPLET or detect it
+  if(DEFINED VCPKG_TARGET_TRIPLET)
+    set(VCPKG_TRIPLET ${VCPKG_TARGET_TRIPLET})
+  else()
+    # Try to detect common triplets
+    if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+      set(VCPKG_TRIPLET "arm64-osx")
+    elseif(APPLE)
+      set(VCPKG_TRIPLET "x64-osx")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+      set(VCPKG_TRIPLET "x64-linux")
+    else()
+      set(VCPKG_TRIPLET "x86-linux")
+    endif()
+  endif()
+  # For debug builds, add debug/lib; for release builds, add lib
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_CONFIGURATION_TYPES)
+    target_link_directories(servatrice PRIVATE "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TRIPLET}/debug/lib")
+  endif()
+  target_link_directories(servatrice PRIVATE "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TRIPLET}/lib")
+endif()
+
 if(CMAKE_HOST_SYSTEM MATCHES "FreeBSD")
   target_link_libraries(
     servatrice libcockatrice_deck_list libcockatrice_network_server_remote Threads::Threads ${SERVATRICE_QT_MODULES}
