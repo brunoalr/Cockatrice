@@ -126,6 +126,7 @@ public:
     {
         QString name;                ///< User-defined deck name.
         QString comments;            ///< Free-form comments or notes.
+        QString gameFormat;          ///< The name of the game format this deck contains legal cards for
         CardRef bannerCard;          ///< Optional representative card for the deck.
         QStringList tags;            ///< User-defined tags for deck classification.
         QString lastLoadedTimestamp; ///< Timestamp string of last load.
@@ -148,8 +149,6 @@ private:
     mutable QString cachedDeckHash;
 
     // Helpers for traversing the tree
-    static void getCardListHelper(InnerDecklistNode *node, QSet<QString> &result);
-    static void getCardRefListHelper(InnerDecklistNode *item, QList<CardRef> &result);
     InnerDecklistNode *getZoneObjFromName(const QString &zoneName);
 
 public:
@@ -182,6 +181,10 @@ public:
     void setLastLoadedTimestamp(const QString &_lastLoadedTimestamp = QString())
     {
         metadata.lastLoadedTimestamp = _lastLoadedTimestamp;
+    }
+    void setGameFormat(const QString &_gameFormat = QString())
+    {
+        metadata.gameFormat = _gameFormat;
     }
     ///@}
 
@@ -220,6 +223,10 @@ public:
     QString getLastLoadedTimestamp() const
     {
         return metadata.lastLoadedTimestamp;
+    }
+    QString getGameFormat() const
+    {
+        return metadata.gameFormat;
     }
     ///@}
 
@@ -267,7 +274,8 @@ public:
     }
     QStringList getCardList() const;
     QList<CardRef> getCardRefList() const;
-    QList<DecklistCardNode *> getCardNodes(const QStringList &restrictToZones = QStringList()) const;
+    QList<const DecklistCardNode *> getCardNodes(const QStringList &restrictToZones = QStringList()) const;
+    QList<const InnerDecklistNode *> getZoneNodes() const;
     int getSideboardSize() const;
     InnerDecklistNode *getRoot() const
     {
@@ -278,7 +286,8 @@ public:
                               int position,
                               const QString &cardSetName = QString(),
                               const QString &cardSetCollectorNumber = QString(),
-                              const QString &cardProviderId = QString());
+                              const QString &cardProviderId = QString(),
+                              const bool formatLegal = true);
     bool deleteNode(AbstractDecklistNode *node, InnerDecklistNode *rootNode = nullptr);
     ///@}
 
