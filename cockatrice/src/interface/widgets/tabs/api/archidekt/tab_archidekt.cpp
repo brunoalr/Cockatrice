@@ -22,6 +22,7 @@
 #include <libcockatrice/card/database/card_database_manager.h>
 #include <libcockatrice/models/database/card/card_completer_proxy_model.h>
 #include <libcockatrice/models/database/card/card_search_model.h>
+#include <version_string.h>
 
 TabArchidekt::TabArchidekt(TabSupervisor *_tabSupervisor) : Tab(_tabSupervisor)
 {
@@ -213,7 +214,7 @@ TabArchidekt::TabArchidekt(TabSupervisor *_tabSupervisor) : Tab(_tabSupervisor)
     minDeckSizeLogicCombo->addItems({"Exact", "≥", "≤"}); // Exact = unset, ≥ = GTE, ≤ = LTE
     minDeckSizeLogicCombo->setCurrentIndex(1);            // default GTE
 
-    connect(minDeckSizeSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &TabArchidekt::doSearch);
+    connect(minDeckSizeSpin, qOverload<int>(&QSpinBox::valueChanged), this, &TabArchidekt::doSearch);
     connect(minDeckSizeLogicCombo, &QComboBox::currentTextChanged, this, &TabArchidekt::doSearch);
 
     // Page number
@@ -223,7 +224,7 @@ TabArchidekt::TabArchidekt(TabSupervisor *_tabSupervisor) : Tab(_tabSupervisor)
     pageSpin->setRange(1, 9999);
     pageSpin->setValue(1);
 
-    connect(pageSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &TabArchidekt::doSearch);
+    connect(pageSpin, qOverload<int>(&QSpinBox::valueChanged), this, &TabArchidekt::doSearch);
 
     // Page display
     currentPageDisplay = new QWidget(container);
@@ -426,18 +427,21 @@ void TabArchidekt::doSearchImmediate()
 {
     QString url = buildSearchUrl();
     QNetworkRequest req{QUrl(url)};
+    req.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
     networkManager->get(req);
 }
 
 void TabArchidekt::actNavigatePage(QString url)
 {
     QNetworkRequest request{QUrl(url)};
+    request.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
     networkManager->get(request);
 }
 
 void TabArchidekt::getTopDecks()
 {
     QNetworkRequest request{QUrl(buildSearchUrl())};
+    request.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
     networkManager->get(request);
 }
 
