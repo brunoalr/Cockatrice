@@ -1,5 +1,6 @@
 #include "dlg_select_set_for_cards.h"
 
+#include "../../deck_loader/card_node_function.h"
 #include "../../deck_loader/deck_loader.h"
 #include "../interface/widgets/cards/card_info_picture_widget.h"
 #include "../interface/widgets/general/layout_containers/flow_widget.h"
@@ -177,7 +178,7 @@ void DlgSelectSetForCards::actOK()
 void DlgSelectSetForCards::actClear()
 {
     emit deckAboutToBeModified(tr("Cleared all printing information."));
-    DeckLoader::clearSetNamesAndNumbers(model->getDeckList());
+    model->getDeckList()->forEachCard(CardNodeFunction::ClearPrintingData());
     emit deckModified();
     accept();
 }
@@ -185,8 +186,8 @@ void DlgSelectSetForCards::actClear()
 void DlgSelectSetForCards::actSetAllToPreferred()
 {
     emit deckAboutToBeModified(tr("Set all printings to preferred."));
-    DeckLoader::clearSetNamesAndNumbers(model->getDeckList());
-    DeckLoader::setProviderIdToPreferredPrinting(model->getDeckList());
+    model->getDeckList()->forEachCard(CardNodeFunction::ClearPrintingData());
+    model->getDeckList()->forEachCard(CardNodeFunction::SetProviderIdToPreferred());
     emit deckModified();
     accept();
 }
@@ -227,7 +228,7 @@ QMap<QString, int> DlgSelectSetForCards::getSetsForCards()
     if (!decklist)
         return setCounts;
 
-    QList<DecklistCardNode *> cardsInDeck = decklist->getCardNodes();
+    QList<const DecklistCardNode *> cardsInDeck = decklist->getCardNodes();
 
     for (auto currentCard : cardsInDeck) {
         CardInfoPtr infoPtr = CardDatabaseManager::query()->getCardInfo(currentCard->getName());
@@ -270,7 +271,7 @@ void DlgSelectSetForCards::updateCardLists()
     if (!decklist)
         return;
 
-    QList<DecklistCardNode *> cardsInDeck = decklist->getCardNodes();
+    QList<const DecklistCardNode *> cardsInDeck = decklist->getCardNodes();
 
     for (auto currentCard : cardsInDeck) {
         bool found = false;
@@ -359,7 +360,7 @@ QMap<QString, QStringList> DlgSelectSetForCards::getCardsForSets()
     if (!decklist)
         return setCards;
 
-    QList<DecklistCardNode *> cardsInDeck = decklist->getCardNodes();
+    QList<const DecklistCardNode *> cardsInDeck = decklist->getCardNodes();
 
     for (auto currentCard : cardsInDeck) {
         CardInfoPtr infoPtr = CardDatabaseManager::query()->getCardInfo(currentCard->getName());
