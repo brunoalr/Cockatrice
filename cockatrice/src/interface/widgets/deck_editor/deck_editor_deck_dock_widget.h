@@ -12,9 +12,9 @@
 #include "../../key_signals.h"
 #include "../utility/custom_line_edit.h"
 #include "../visual_deck_storage/deck_preview/deck_preview_deck_tags_display_widget.h"
+#include "deck_list_history_manager_widget.h"
 #include "deck_list_style_proxy.h"
 
-#include <QComboBox>
 #include <QDockWidget>
 #include <QLabel>
 #include <QTextEdit>
@@ -49,10 +49,17 @@ public:
         return activeGroupCriteriaComboBox;
     }
 
+    [[nodiscard]] QItemSelectionModel *getSelectionModel() const
+    {
+        return deckView->selectionModel();
+    }
+
 public slots:
     void cleanDeck();
     void updateBannerCardComboBox();
     void setDeck(DeckLoader *_deck);
+    void syncDisplayWidgetsToModel();
+    void sortDeckModelToDeckView();
     DeckLoader *getDeckLoader();
     DeckList *getDeckList();
     void actIncrement();
@@ -62,6 +69,8 @@ public slots:
     void actSwapCard();
     void actRemoveCard();
     void offsetCountAtIndex(const QModelIndex &idx, int offset);
+    void initializeFormats();
+    void expandAll();
 
 signals:
     void nameChanged();
@@ -69,29 +78,36 @@ signals:
     void hashChanged();
     void deckChanged();
     void deckModified();
+    void requestDeckHistorySave(const QString &modificationReason);
+    void requestDeckHistoryClear();
     void cardChanged(const ExactCard &_card);
 
 private:
     AbstractTabDeckEditor *deckEditor;
+    DeckListHistoryManagerWidget *historyManagerWidget;
     KeySignals deckViewKeySignals;
     QLabel *nameLabel;
     LineEditUnfocusable *nameEdit;
+    QTimer *nameDebounceTimer;
     SettingsButtonWidget *quickSettingsWidget;
     QCheckBox *showBannerCardCheckBox;
     QCheckBox *showTagsWidgetCheckBox;
     QLabel *commentsLabel;
     QTextEdit *commentsEdit;
+    QTimer *commentsDebounceTimer;
     QLabel *bannerCardLabel;
     DeckPreviewDeckTagsDisplayWidget *deckTagsDisplayWidget;
     QLabel *hashLabel1;
     LineEditUnfocusable *hashLabel;
     QLabel *activeGroupCriteriaLabel;
     QComboBox *activeGroupCriteriaComboBox;
+    QLabel *formatLabel;
+    QComboBox *formatComboBox;
 
     QAction *aRemoveCard, *aIncrement, *aDecrement, *aSwapCard;
 
     void recursiveExpand(const QModelIndex &index);
-    QModelIndexList getSelectedCardNodes() const;
+    [[nodiscard]] QModelIndexList getSelectedCardNodes() const;
 
 private slots:
     void decklistCustomMenu(QPoint point);
@@ -99,6 +115,8 @@ private slots:
     void updateName(const QString &name);
     void updateComments();
     void setBannerCard(int);
+    void setTags(const QStringList &tags);
+    void syncDeckListBannerCardWithComboBox();
     void updateHash();
     void refreshShortcuts();
     void updateShowBannerCardComboBox(bool visible);

@@ -11,7 +11,7 @@
 #include "../zones/pile_zone.h"
 #include "../zones/stack_zone.h"
 #include "../zones/table_zone.h"
-#include "../zones/view_zone.h"
+#include "player_actions.h"
 #include "player_target.h"
 
 #include <QDebug>
@@ -263,9 +263,10 @@ void Player::deleteCard(CardItem *card)
     }
 }
 
-void Player::setDeck(const DeckLoader &_deck)
+// TODO: Does a player need a DeckLoader?
+void Player::setDeck(DeckLoader &_deck)
 {
-    deck = new DeckLoader(_deck);
+    deck = new DeckLoader(this, _deck.getDeckList());
 
     emit deckChanged();
 }

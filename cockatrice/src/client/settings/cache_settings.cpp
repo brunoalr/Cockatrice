@@ -261,6 +261,7 @@ SettingsCache::SettingsCache()
     doubleClickToPlay = settings->value("interface/doubleclicktoplay", true).toBool();
     clickPlaysAllSelected = settings->value("interface/clickPlaysAllSelected", true).toBool();
     playToStack = settings->value("interface/playtostack", true).toBool();
+    doNotDeleteArrowsInSubPhases = settings->value("interface/doNotDeleteArrowsInSubPhases", true).toBool();
     startingHandSize = settings->value("interface/startinghandsize", 7).toInt();
     annotateTokens = settings->value("interface/annotatetokens", false).toBool();
     tabGameSplitterSizes = settings->value("interface/tabgame_splittersizes").toByteArray();
@@ -309,10 +310,15 @@ SettingsCache::SettingsCache()
         settings->value("interface/visualdeckstorageselectionanimation", true).toBool();
     defaultDeckEditorType = settings->value("interface/defaultDeckEditorType", 1).toInt();
     visualDatabaseDisplayFilterToMostRecentSetsEnabled =
-        settings->value("interface/visualdatabasedisplayfiltertomostrecentsetsenabled", true).toBool();
+        settings->value("interface/visualdatabasedisplayfiltertomostrecentsetsenabled", false).toBool();
     visualDatabaseDisplayFilterToMostRecentSetsAmount =
         settings->value("interface/visualdatabasedisplayfiltertomostrecentsetsamount", 10).toInt();
     visualDeckEditorSampleHandSize = settings->value("interface/visualdeckeditorsamplehandsize", 7).toInt();
+    visualDeckEditorCardSize = settings->value("interface/visualdeckeditorcardsize", 100).toInt();
+    visualDatabaseDisplayCardSize = settings->value("interface/visualdatabasedisplaycardsize", 100).toInt();
+    edhrecCardSize = settings->value("interface/edhreccardsize", 100).toInt();
+    archidektPreviewSize = settings->value("interface/archidektpreviewsize", 100).toInt();
+
     horizontalHand = settings->value("hand/horizontal", true).toBool();
     invertVerticalCoordinate = settings->value("table/invert_vertical", false).toBool();
     minPlayersForMultiColumnLayout = settings->value("interface/min_players_multicolumn", 4).toInt();
@@ -664,6 +670,12 @@ void SettingsCache::setPlayToStack(QT_STATE_CHANGED_T _playToStack)
     settings->setValue("interface/playtostack", playToStack);
 }
 
+void SettingsCache::setDoNotDeleteArrowsInSubPhases(QT_STATE_CHANGED_T _doNotDeleteArrowsInSubPhases)
+{
+    doNotDeleteArrowsInSubPhases = static_cast<bool>(_doNotDeleteArrowsInSubPhases);
+    settings->setValue("interface/doNotDeleteArrowsInSubPhases", doNotDeleteArrowsInSubPhases);
+}
+
 void SettingsCache::setStartingHandSize(int _startingHandSize)
 {
     startingHandSize = _startingHandSize;
@@ -854,6 +866,34 @@ void SettingsCache::setVisualDeckStorageSelectionAnimation(QT_STATE_CHANGED_T va
     visualDeckStorageSelectionAnimation = value;
     settings->setValue("interface/visualdeckstorageselectionanimation", visualDeckStorageSelectionAnimation);
     emit visualDeckStorageSelectionAnimationChanged(visualDeckStorageSelectionAnimation);
+}
+
+void SettingsCache::setVisualDeckEditorCardSize(int _visualDeckEditorCardSize)
+{
+    visualDeckEditorCardSize = _visualDeckEditorCardSize;
+    settings->setValue("interface/visualdeckeditorcardsize", visualDeckEditorCardSize);
+    emit visualDeckEditorCardSizeChanged();
+}
+
+void SettingsCache::setVisualDatabaseDisplayCardSize(int _visualDatabaseDisplayCardSize)
+{
+    visualDatabaseDisplayCardSize = _visualDatabaseDisplayCardSize;
+    settings->setValue("interface/visualdatabasedisplaycardsize", visualDatabaseDisplayCardSize);
+    emit visualDatabaseDisplayCardSizeChanged();
+}
+
+void SettingsCache::setEDHRecCardSize(int _edhrecCardSize)
+{
+    edhrecCardSize = _edhrecCardSize;
+    settings->setValue("interface/edhreccardsize", edhrecCardSize);
+    emit edhRecCardSizeChanged();
+}
+
+void SettingsCache::setArchidektPreviewCardSize(int _archidektPreviewCardSize)
+{
+    archidektPreviewSize = _archidektPreviewCardSize;
+    settings->setValue("interface/archidektpreviewsize", archidektPreviewSize);
+    emit archidektPreviewSizeChanged();
 }
 
 void SettingsCache::setDefaultDeckEditorType(int value)

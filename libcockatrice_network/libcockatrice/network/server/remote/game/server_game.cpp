@@ -35,7 +35,6 @@
 #include <google/protobuf/descriptor.h>
 #include <libcockatrice/deck_list/deck_list.h>
 #include <libcockatrice/protocol/pb/context_connection_state_changed.pb.h>
-#include <libcockatrice/protocol/pb/context_deck_select.pb.h>
 #include <libcockatrice/protocol/pb/context_ping_changed.pb.h>
 #include <libcockatrice/protocol/pb/event_delete_arrow.pb.h>
 #include <libcockatrice/protocol/pb/event_game_closed.pb.h>
@@ -50,7 +49,6 @@
 #include <libcockatrice/protocol/pb/event_set_active_phase.pb.h>
 #include <libcockatrice/protocol/pb/event_set_active_player.pb.h>
 #include <libcockatrice/protocol/pb/game_replay.pb.h>
-#include <libcockatrice/protocol/pb/serverinfo_playerping.pb.h>
 
 Server_Game::Server_Game(const ServerInfo_User &_creatorInfo,
                          int _gameId,
@@ -654,6 +652,8 @@ void Server_Game::setActivePlayer(int _activePlayer)
 {
     QMutexLocker locker(&gameMutex);
 
+    removeArrows(0, true);
+
     activePlayer = _activePlayer;
 
     Event_SetActivePlayer event;
@@ -663,28 +663,33 @@ void Server_Game::setActivePlayer(int _activePlayer)
     setActivePhase(0);
 }
 
-void Server_Game::setActivePhase(int _activePhase)
+void Server_Game::setActivePhase(int newPhase)
 {
     QMutexLocker locker(&gameMutex);
 
-    for (auto *player : getPlayers().values()) {
-        QList<Server_Arrow *> toDelete = player->getArrows().values();
-        for (int i = 0; i < toDelete.size(); ++i) {
-            Server_Arrow *a = toDelete[i];
-
-            Event_DeleteArrow event;
-            event.set_arrow_id(a->getId());
-            sendGameEventContainer(prepareGameEvent(event, player->getPlayerId()));
-
-            player->deleteArrow(a->getId());
-        }
-    }
-
-    activePhase = _activePhase;
+    removeArrows(newPhase);
+    activePhase = newPhase;
 
     Event_SetActivePhase event;
     event.set_phase(activePhase);
     sendGameEventContainer(prepareGameEvent(event, -1));
+}
+
+void Server_Game::removeArrows(int newPhase, bool force)
+{
+    QMutexLocker locker(&gameMutex);
+
+    for (auto *anyPlayer : getPlayers().values()) {
+        for (auto *arrowToDelete : anyPlayer->getArrows().values()) { // values creates a copy
+            if (force || arrowToDelete->checkPhaseDeletion(newPhase)) {
+                Event_DeleteArrow event;
+                event.set_arrow_id(arrowToDelete->getId());
+                sendGameEventContainer(prepareGameEvent(event, anyPlayer->getPlayerId()));
+
+                anyPlayer->deleteArrow(arrowToDelete->getId());
+            }
+        }
+    }
 }
 
 void Server_Game::nextTurn()
