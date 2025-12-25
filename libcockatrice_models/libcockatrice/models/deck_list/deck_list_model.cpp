@@ -41,7 +41,7 @@ void DeckListModel::rebuildTree()
     beginResetModel();
     root->clearTree();
 
-    InnerDecklistNode *listRoot = deckList->getRoot();
+    InnerDecklistNode *listRoot = deckList->getTree()->getRoot();
 
     for (int i = 0; i < listRoot->size(); i++) {
         auto *currentZone = dynamic_cast<InnerDecklistNode *>(listRoot->at(i));
@@ -313,7 +313,7 @@ bool DeckListModel::removeRows(int row, int count, const QModelIndex &parent)
     for (int i = 0; i < count; i++) {
         AbstractDecklistNode *toDelete = node->takeAt(row);
         if (auto *temp = dynamic_cast<DecklistModelCardNode *>(toDelete)) {
-            deckList->deleteNode(temp->getDataNode());
+            deckList->getTree()->deleteNode(temp->getDataNode());
         }
         delete toDelete;
     }
@@ -436,7 +436,51 @@ QModelIndex DeckListModel::addCard(const ExactCard &card, const QString &zoneNam
     }
     sort(lastKnownColumn, lastKnownOrder);
     emitRecursiveUpdates(parentIndex);
-    return nodeToIndex(cardNode);
+    auto index = nodeToIndex(cardNode);
+
+    emit cardAddedAt(index);
+
+    return index;
+}
+
+bool DeckListModel::incrementAmountAtIndex(const QModelIndex &idx)
+{
+    return offsetAmountAtIndex(idx, 1);
+}
+
+bool DeckListModel::decrementAmountAtIndex(const QModelIndex &idx)
+{
+    return offsetAmountAtIndex(idx, -1);
+}
+
+bool DeckListModel::offsetAmountAtIndex(const QModelIndex &idx, int offset)
+{
+    if (!idx.isValid()) {
+        return false;
+    }
+
+    auto *node = static_cast<AbstractDecklistNode *>(idx.internalPointer());
+    auto *card = dynamic_cast<DecklistModelCardNode *>(node);
+
+    if (!card) {
+        return false;
+    }
+
+    const QModelIndex numberIndex = idx.siblingAtColumn(DeckListModelColumns::CARD_AMOUNT);
+    const int count = numberIndex.data(Qt::EditRole).toInt();
+    const int newCount = count + offset;
+
+    if (newCount <= 0) {
+        removeRow(idx.row(), idx.parent());
+    } else {
+        setData(numberIndex, newCount, Qt::EditRole);
+    }
+
+    if (offset > 0) {
+        emit cardAddedAt(idx);
+    }
+
+    return true;
 }
 
 int DeckListModel::findSortedInsertRow(InnerDecklistNode *parent, CardInfoPtr cardInfo) const
@@ -559,44 +603,62 @@ void DeckListModel::setDeckList(DeckList *_deck)
         deckList = _deck;
     }
     rebuildTree();
+    emit deckReplaced();
+}
+
+void DeckListModel::forEachCard(const std::function<void(InnerDecklistNode *, DecklistCardNode *)> &func)
+{
+    deckList->forEachCard(func);
+}
+
+static QList<ExactCard> cardNodesToExactCards(QList<const DecklistCardNode *> nodes)
+{
+    QList<ExactCard> cards;
+    for (auto node : nodes) {
+        ExactCard card = CardDatabaseManager::query()->getCard(node->toCardRef());
+        if (card) {
+            for (int k = 0; k < node->getNumber(); ++k) {
+                cards.append(card);
+            }
+        } else {
+            qDebug() << "Card not found in database!";
+        }
+    }
+
+    return cards;
 }
 
 QList<ExactCard> DeckListModel::getCards() const
 {
     auto nodes = deckList->getCardNodes();
-
-    QList<ExactCard> cards;
-    for (auto node : nodes) {
-        ExactCard card = CardDatabaseManager::query()->getCard(node->toCardRef());
-        if (card) {
-            for (int k = 0; k < node->getNumber(); ++k) {
-                cards.append(card);
-            }
-        } else {
-            qDebug() << "Card not found in database!";
-        }
-    }
-
-    return cards;
+    return cardNodesToExactCards(nodes);
 }
 
 QList<ExactCard> DeckListModel::getCardsForZone(const QString &zoneName) const
 {
     auto nodes = deckList->getCardNodes({zoneName});
+    return cardNodesToExactCards(nodes);
+}
 
-    QList<ExactCard> cards;
-    for (auto node : nodes) {
-        ExactCard card = CardDatabaseManager::query()->getCard(node->toCardRef());
-        if (card) {
-            for (int k = 0; k < node->getNumber(); ++k) {
-                cards.append(card);
-            }
-        } else {
-            qDebug() << "Card not found in database!";
-        }
-    }
+QList<QString> DeckListModel::getCardNames() const
+{
+    auto nodes = deckList->getCardNodes();
 
-    return cards;
+    QList<QString> names;
+    std::transform(nodes.cbegin(), nodes.cend(), std::back_inserter(names), [](auto node) { return node->getName(); });
+
+    return names;
+}
+
+QList<CardRef> DeckListModel::getCardRefs() const
+{
+    auto nodes = deckList->getCardNodes();
+
+    QList<CardRef> cardRefs;
+    std::transform(nodes.cbegin(), nodes.cend(), std::back_inserter(cardRefs),
+                   [](auto node) { return node->toCardRef(); });
+
+    return cardRefs;
 }
 
 QList<QString> DeckListModel::getZones() const
@@ -622,7 +684,7 @@ bool DeckListModel::isCardLegalForCurrentFormat(const CardInfoPtr cardInfo)
     return true;
 }
 
-int maxAllowedForLegality(const FormatRules &format, const QString &legality)
+static int maxAllowedForLegality(const FormatRules &format, const QString &legality)
 {
     for (const AllowedCount &c : format.allowedCounts) {
         if (c.label == legality) {
@@ -631,7 +693,6 @@ int maxAllowedForLegality(const FormatRules &format, const QString &legality)
     }
     return -1; // unknown legality → treat as illegal
 }
-
 
 bool DeckListModel::isCardQuantityLegalForCurrentFormat(const CardInfoPtr cardInfo, int quantity)
 {
@@ -668,7 +729,7 @@ bool DeckListModel::isCardQuantityLegalForCurrentFormat(const CardInfoPtr cardIn
 
 void DeckListModel::refreshCardFormatLegalities()
 {
-    InnerDecklistNode *listRoot = deckList->getRoot();
+    InnerDecklistNode *listRoot = deckList->getTree()->getRoot();
 
     for (int i = 0; i < listRoot->size(); i++) {
         auto *currentZone = static_cast<InnerDecklistNode *>(listRoot->at(i));
