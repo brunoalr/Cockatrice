@@ -57,20 +57,19 @@ public:
 public slots:
     void cleanDeck();
     void updateBannerCardComboBox();
-    void setDeck(DeckLoader *_deck);
+    void setDeck(const LoadedDeck &_deck);
     void syncDisplayWidgetsToModel();
     void sortDeckModelToDeckView();
     DeckLoader *getDeckLoader();
-    DeckList *getDeckList();
-    void actIncrement();
-    bool swapCard(const QModelIndex &idx);
+    const DeckList &getDeckList() const;
+    void actAddCard(const ExactCard &card, const QString &zoneName);
+    void actIncrementSelection();
     void actDecrementCard(const ExactCard &card, QString zoneName);
     void actDecrementSelection();
-    void actSwapCard();
+    void actSwapCard(const ExactCard &card, const QString &zoneName);
+    void actSwapSelection();
     void actRemoveCard();
-    void offsetCountAtIndex(const QModelIndex &idx, int offset);
     void initializeFormats();
-    void expandAll();
 
 signals:
     void nameChanged();
@@ -106,11 +105,12 @@ private:
 
     QAction *aRemoveCard, *aIncrement, *aDecrement, *aSwapCard;
 
-    void recursiveExpand(const QModelIndex &index);
     [[nodiscard]] QModelIndexList getSelectedCardNodes() const;
+    void offsetCountAtIndex(const QModelIndex &idx, bool isIncrement);
 
 private slots:
     void decklistCustomMenu(QPoint point);
+    bool swapCard(const QModelIndex &currentIndex);
     void updateCard(QModelIndex, const QModelIndex &current);
     void updateName(const QString &name);
     void updateComments();
@@ -122,6 +122,8 @@ private slots:
     void updateShowBannerCardComboBox(bool visible);
     void updateShowTagsWidget(bool visible);
     void syncBannerCardComboBoxSelectionWithDeck();
+    void recursiveExpand(const QModelIndex &parent);
+    void expandAll();
 };
 
 #endif // DECK_EDITOR_DECK_DOCK_WIDGET_H

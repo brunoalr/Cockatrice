@@ -124,7 +124,7 @@ void AbstractTabDeckEditor::onDeckModified()
  */
 void AbstractTabDeckEditor::onDeckHistorySaveRequested(const QString &modificationReason)
 {
-    historyManager->save(deckDockWidget->getDeckList()->createMemento(modificationReason));
+    historyManager->save(deckDockWidget->getDeckList().createMemento(modificationReason));
 }
 
 /**
@@ -140,23 +140,9 @@ void AbstractTabDeckEditor::onDeckHistoryClearRequested()
  * @param card Card to add.
  * @param zoneName Zone to add the card to.
  */
-void AbstractTabDeckEditor::addCardHelper(const ExactCard &card, QString zoneName)
+void AbstractTabDeckEditor::addCardHelper(const ExactCard &card, const QString &zoneName)
 {
-    if (!card)
-        return;
-
-    if (card.getInfo().getIsToken())
-        zoneName = DECK_ZONE_TOKENS;
-
-    onDeckHistorySaveRequested(QString(tr("Added (%1): %2 (%3) %4"))
-                                   .arg(zoneName, card.getName(), card.getPrinting().getSet()->getCorrectedShortName(),
-                                        card.getPrinting().getProperty("num")));
-
-    QModelIndex newCardIndex = deckDockWidget->deckModel->addCard(card, zoneName);
-    deckDockWidget->expandAll();
-    deckDockWidget->deckView->clearSelection();
-    deckDockWidget->deckView->setCurrentIndex(newCardIndex);
-    setModified(true);
+    deckDockWidget->actAddCard(card, zoneName);
 
     databaseDisplayDockWidget->searchEdit->setSelection(0, databaseDisplayDockWidget->searchEdit->text().length());
 }
@@ -194,44 +180,26 @@ void AbstractTabDeckEditor::actDecrementCardFromSideboard(const ExactCard &card)
 }
 
 /**
- * @brief Swaps a card in a deck zone.
- * @param card Card to swap.
- * @param zoneName Zone to swap in.
- */
-void AbstractTabDeckEditor::actSwapCard(const ExactCard &card, const QString &zoneName)
-{
-    QString providerId = card.getPrinting().getUuid();
-    QString collectorNumber = card.getPrinting().getProperty("num");
-
-    QModelIndex foundCard = deckDockWidget->deckModel->findCard(card.getName(), zoneName, providerId, collectorNumber);
-    if (!foundCard.isValid()) {
-        foundCard = deckDockWidget->deckModel->findCard(card.getName(), zoneName);
-    }
-
-    deckDockWidget->swapCard(foundCard);
-}
-
-/**
  * @brief Opens a deck in this tab.
- * @param deck DeckLoader object (takes ownership).
+ * @param deck The deck
  */
-void AbstractTabDeckEditor::openDeck(DeckLoader *deck)
+void AbstractTabDeckEditor::openDeck(const LoadedDeck &deck)
 {
     setDeck(deck);
 
-    if (!deck->getLastLoadInfo().fileName.isEmpty()) {
-        SettingsCache::instance().recents().updateRecentlyOpenedDeckPaths(deck->getLastLoadInfo().fileName);
+    if (!deck.lastLoadInfo.fileName.isEmpty()) {
+        SettingsCache::instance().recents().updateRecentlyOpenedDeckPaths(deck.lastLoadInfo.fileName);
     }
 }
 
 /**
  * @brief Sets the currently active deck.
- * @param _deck DeckLoader object.
+ * @param _deck The deck
  */
-void AbstractTabDeckEditor::setDeck(DeckLoader *_deck)
+void AbstractTabDeckEditor::setDeck(const LoadedDeck &_deck)
 {
     deckDockWidget->setDeck(_deck);
-    CardPictureLoader::cacheCardPixmaps(CardDatabaseManager::query()->getCards(getDeckList()->getCardRefList()));
+    CardPictureLoader::cacheCardPixmaps(CardDatabaseManager::query()->getCards(getDeckList().getCardRefList()));
     setModified(false);
 
     aDeckDockVisible->setChecked(true);
@@ -245,7 +213,7 @@ DeckLoader *AbstractTabDeckEditor::getDeckLoader() const
 }
 
 /** @brief Returns the currently loaded deck list. */
-DeckList *AbstractTabDeckEditor::getDeckList() const
+const DeckList &AbstractTabDeckEditor::getDeckList() const
 {
     return deckDockWidget->getDeckList();
 }
@@ -265,8 +233,8 @@ void AbstractTabDeckEditor::setModified(bool _modified)
  */
 bool AbstractTabDeckEditor::isBlankNewDeck() const
 {
-    DeckLoader *deck = deckDockWidget->getDeckLoader();
-    return !modified && deck->getDeckList()->isBlankDeck() && deck->hasNotBeenLoaded();
+    const LoadedDeck &loadedDeck = deckDockWidget->getDeckLoader()->getDeck();
+    return !modified && loadedDeck.isEmpty();
 }
 
 /** @brief Creates a new deck. Handles opening in new tab if needed. */
@@ -277,7 +245,7 @@ void AbstractTabDeckEditor::actNewDeck()
         return;
 
     if (deckOpenLocation == NEW_TAB) {
-        emit openDeckEditor(nullptr);
+        emit openDeckEditor(LoadedDeck());
         return;
     }
 
@@ -382,17 +350,15 @@ void AbstractTabDeckEditor::openDeckFromFile(const QString &fileName, DeckOpenLo
 {
     DeckFileFormat::Format fmt = DeckFileFormat::getFormatFromName(fileName);
 
-    auto *l = new DeckLoader(this);
-    if (l->loadFromFile(fileName, fmt, true)) {
+    auto l = DeckLoader(this);
+    if (l.loadFromFile(fileName, fmt, true)) {
         if (deckOpenLocation == NEW_TAB) {
-            emit openDeckEditor(l);
-            l->deleteLater();
+            emit openDeckEditor(l.getDeck());
         } else {
             deckMenu->setSaveStatus(false);
-            openDeck(l);
+            openDeck(l.getDeck());
         }
     } else {
-        l->deleteLater();
         QMessageBox::critical(this, tr("Error"), tr("Could not open deck at %1").arg(fileName));
     }
     deckMenu->setSaveStatus(true);
@@ -405,16 +371,16 @@ void AbstractTabDeckEditor::openDeckFromFile(const QString &fileName, DeckOpenLo
  */
 bool AbstractTabDeckEditor::actSaveDeck()
 {
-    DeckLoader *const deck = getDeckLoader();
-    if (deck->getLastLoadInfo().remoteDeckId != LoadedDeck::LoadInfo::NON_REMOTE_ID) {
-        QString deckString = deck->getDeckList()->writeToString_Native();
+    const LoadedDeck &loadedDeck = getDeckLoader()->getDeck();
+    if (loadedDeck.lastLoadInfo.remoteDeckId != LoadedDeck::LoadInfo::NON_REMOTE_ID) {
+        QString deckString = loadedDeck.deckList.writeToString_Native();
         if (deckString.length() > MAX_FILE_LENGTH) {
             QMessageBox::critical(this, tr("Error"), tr("Could not save remote deck"));
             return false;
         }
 
         Command_DeckUpload cmd;
-        cmd.set_deck_id(static_cast<google::protobuf::uint32>(deck->getLastLoadInfo().remoteDeckId));
+        cmd.set_deck_id(static_cast<google::protobuf::uint32>(loadedDeck.lastLoadInfo.remoteDeckId));
         cmd.set_deck_list(deckString.toStdString());
 
         PendingCommand *pend = AbstractClient::prepareSessionCommand(cmd);
@@ -422,9 +388,11 @@ bool AbstractTabDeckEditor::actSaveDeck()
         tabSupervisor->getClient()->sendCommand(pend);
 
         return true;
-    } else if (deck->getLastLoadInfo().fileName.isEmpty())
+    }
+    if (loadedDeck.lastLoadInfo.fileName.isEmpty())
         return actSaveDeckAs();
-    else if (deck->saveToFile(deck->getLastLoadInfo().fileName, deck->getLastLoadInfo().fileFormat)) {
+
+    if (getDeckLoader()->saveToFile(loadedDeck.lastLoadInfo.fileName, loadedDeck.lastLoadInfo.fileFormat)) {
         setModified(false);
         return true;
     }
@@ -446,7 +414,7 @@ bool AbstractTabDeckEditor::actSaveDeckAs()
     dialog.setAcceptMode(QFileDialog::AcceptSave);
     dialog.setDefaultSuffix("cod");
     dialog.setNameFilters(DeckLoader::FILE_NAME_FILTERS);
-    dialog.selectFile(getDeckList()->getName().trimmed());
+    dialog.selectFile(getDeckList().getName().trimmed());
 
     if (!dialog.exec())
         return false;
@@ -493,9 +461,9 @@ void AbstractTabDeckEditor::actLoadDeckFromClipboard()
         return;
 
     if (deckOpenLocation == NEW_TAB) {
-        emit openDeckEditor(dlg.getDeckList());
+        emit openDeckEditor({.deckList = dlg.getDeckList()});
     } else {
-        setDeck(dlg.getDeckList());
+        setDeck({.deckList = dlg.getDeckList()});
         setModified(true);
     }
 
@@ -508,11 +476,11 @@ void AbstractTabDeckEditor::actLoadDeckFromClipboard()
  */
 void AbstractTabDeckEditor::editDeckInClipboard(bool annotated)
 {
-    DlgEditDeckInClipboard dlg(getDeckLoader(), annotated, this);
+    DlgEditDeckInClipboard dlg(getDeckLoader()->getDeck().deckList, annotated, this);
     if (!dlg.exec())
         return;
 
-    setDeck(dlg.getDeckList());
+    setDeck({dlg.getDeckList(), getDeckLoader()->getDeck().lastLoadInfo});
     setModified(true);
     deckMenu->setSaveStatus(true);
 }
@@ -576,9 +544,9 @@ void AbstractTabDeckEditor::actLoadDeckFromWebsite()
         return;
 
     if (deckOpenLocation == NEW_TAB) {
-        emit openDeckEditor(dlg.getDeck());
+        emit openDeckEditor({.deckList = dlg.getDeck()});
     } else {
-        setDeck(dlg.getDeck());
+        setDeck({.deckList = dlg.getDeck()});
         setModified(true);
     }
 
@@ -591,26 +559,21 @@ void AbstractTabDeckEditor::actLoadDeckFromWebsite()
  */
 void AbstractTabDeckEditor::exportToDecklistWebsite(DeckLoader::DecklistWebsite website)
 {
-    if (DeckLoader *const deck = getDeckLoader()) {
-        QString decklistUrlString = deck->exportDeckToDecklist(getDeckList(), website);
-        // Check to make sure the string isn't empty.
-        if (decklistUrlString.isEmpty()) {
-            // Show an error if the deck is empty, and return.
-            QMessageBox::critical(this, tr("Error"), tr("There are no cards in your deck to be exported"));
-            return;
-        }
-
-        // Encode the string recieved from the model to make sure all characters are encoded.
-        // first we put it into a qurl object
-        QUrl decklistUrl = QUrl(decklistUrlString);
-        // we get the correctly encoded url.
-        decklistUrlString = decklistUrl.toEncoded();
-        // We open the url in the user's default browser
-        QDesktopServices::openUrl(decklistUrlString);
-    } else {
-        // if there's no deck loader object, return an error
-        QMessageBox::critical(this, tr("Error"), tr("No deck was selected to be exported."));
+    QString decklistUrlString = DeckLoader::exportDeckToDecklist(getDeckList(), website);
+    // Check to make sure the string isn't empty.
+    if (decklistUrlString.isEmpty()) {
+        // Show an error if the deck is empty, and return.
+        QMessageBox::critical(this, tr("Error"), tr("There are no cards in your deck to be exported"));
+        return;
     }
+
+    // Encode the string recieved from the model to make sure all characters are encoded.
+    // first we put it into a qurl object
+    QUrl decklistUrl = QUrl(decklistUrlString);
+    // we get the correctly encoded url.
+    decklistUrlString = decklistUrl.toEncoded();
+    // We open the url in the user's default browser
+    QDesktopServices::openUrl(decklistUrlString);
 }
 
 /** @brief Exports deck to www.decklist.org. */

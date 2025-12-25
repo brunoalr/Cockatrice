@@ -151,9 +151,10 @@ void CardAmountWidget::addPrinting(const QString &zone)
     bool replacingProviderless = false;
 
     if (existing.isValid()) {
-        QString providerId = deckModel->data(existing.sibling(existing.row(), 4), Qt::DisplayRole).toString();
+        QString providerId =
+            existing.siblingAtColumn(DeckListModelColumns::CARD_PROVIDER_ID).data(Qt::DisplayRole).toString();
         if (providerId.isEmpty()) {
-            int amount = deckModel->data(existing, Qt::DisplayRole).toInt();
+            int amount = existing.data(Qt::DisplayRole).toInt();
             extraCopies = amount - 1; // One less because we *always* add one
             replacingProviderless = true;
         }
@@ -174,12 +175,12 @@ void CardAmountWidget::addPrinting(const QString &zone)
 
     // Add the card and expand the list UI
     auto newCardIndex = deckModel->addCard(rootCard, zone);
-    recursiveExpand(newCardIndex);
 
     // Check if a card without a providerId already exists in the deckModel and replace it, if so.
-    QString foundProviderId = deckModel->data(existing.sibling(existing.row(), 4), Qt::DisplayRole).toString();
+    QString foundProviderId =
+        existing.siblingAtColumn(DeckListModelColumns::CARD_PROVIDER_ID).data(Qt::DisplayRole).toString();
     if (existing.isValid() && existing != newCardIndex && foundProviderId == "") {
-        auto amount = deckModel->data(existing, Qt::DisplayRole);
+        auto amount = existing.data(Qt::DisplayRole);
         for (int i = 0; i < amount.toInt() - 1; i++) {
             deckModel->addCard(rootCard, zone);
         }
@@ -228,46 +229,6 @@ void CardAmountWidget::removePrintingSideboard()
 }
 
 /**
- * @brief Recursively expands the card in the deck view starting from the given index.
- *
- * @param index The model index of the card to expand.
- */
-void CardAmountWidget::recursiveExpand(const QModelIndex &index)
-{
-    if (index.parent().isValid()) {
-        recursiveExpand(index.parent());
-    }
-    deckView->expand(index);
-}
-
-/**
- * @brief Offsets the card count at the specified index by the given amount.
- *
- * @param idx The model index of the card.
- * @param offset The amount to add or subtract from the card count.
- */
-void CardAmountWidget::offsetCountAtIndex(const QModelIndex &idx, int offset)
-{
-    if (!idx.isValid() || offset == 0) {
-        return;
-    }
-
-    const QModelIndex numberIndex = idx.sibling(idx.row(), 0);
-    const int count = deckModel->data(numberIndex, Qt::EditRole).toInt();
-    const int new_count = count + offset;
-
-    deckView->setCurrentIndex(numberIndex);
-
-    if (new_count <= 0) {
-        deckModel->removeRow(idx.row(), idx.parent());
-    } else {
-        deckModel->setData(numberIndex, new_count, Qt::EditRole);
-    }
-
-    deckEditor->setModified(true);
-}
-
-/**
  * @brief Helper function to decrement the card count for a given zone.
  *
  * @param zone The zone from which to remove the card (DECK_ZONE_MAIN or DECK_ZONE_SIDE).
@@ -286,7 +247,7 @@ void CardAmountWidget::decrementCardHelper(const QString &zone)
     QModelIndex idx = deckModel->findCard(rootCard.getName(), zone, rootCard.getPrinting().getUuid(),
                                           rootCard.getPrinting().getProperty("num"));
 
-    offsetCountAtIndex(idx, -1);
+    deckModel->decrementAmountAtIndex(idx);
     deckEditor->setModified(true);
 }
 
@@ -306,19 +267,12 @@ int CardAmountWidget::countCardsInZone(const QString &deckZone)
         return -1;
     }
 
-    DeckList *decklist = deckModel->getDeckList();
-    if (!decklist) {
-        return -1;
-    }
-
-    QList<const DecklistCardNode *> cardsInDeck = decklist->getCardNodes({deckZone});
+    QList<ExactCard> cards = deckModel->getCardsForZone(deckZone);
 
     int count = 0;
-    for (auto currentCard : cardsInDeck) {
-        for (int k = 0; k < currentCard->getNumber(); ++k) {
-            if (currentCard->getCardProviderId() == rootCard.getPrinting().getProperty("uuid")) {
-                count++;
-            }
+    for (auto currentCard : cards) {
+        if (currentCard.getPrinting().getUuid() == rootCard.getPrinting().getProperty("uuid")) {
+            count++;
         }
     }
 

@@ -167,7 +167,7 @@ jobs:
 
       - name: Restore compiler cache (ccache)
         id: ccache_restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         env:
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         with:
@@ -206,7 +206,7 @@ jobs:
 
       - name: Save compiler cache (ccache)
         if: github.ref == 'refs/heads/master'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ${{env.CACHE}}
           key: ${{ steps.ccache_restore.outputs.cache-primary-key }}
@@ -214,7 +214,7 @@ jobs:
       - name: Upload artifact
         id: upload_artifact
         if: matrix.package != 'skip'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{matrix.distro}}${{matrix.version}}-package
           path: ${{steps.build.outputs.path}}
@@ -539,7 +539,7 @@ jobs:
       - name: Upload artifact
         id: upload_artifact
         if: matrix.make_package
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{matrix.artifact_name}}
           path: ${{steps.build.outputs.path}}
@@ -547,7 +547,7 @@ jobs:
 
       - name: Upload pdb database
         if: matrix.os == 'Windows'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: Windows${{matrix.target}}-debug-pdbs
           path: |
