@@ -9,14 +9,17 @@ if(APPLE AND MACOS_CERTIFICATE_NAME_LEN GREATER 0)
 
     message(STATUS "Signing Interior Dynamically Loaded Libraries for ${app_name}.app")
     execute_process(COMMAND "find" "${FULL_APP_PATH}" "-name" "*.dylib" OUTPUT_VARIABLE INTERIOR_DLLS)
-    string(REPLACE "\n" ";" INTERIOR_DLLS_LIST ${INTERIOR_DLLS})
 
-    foreach(INTERIOR_DLL IN LISTS INTERIOR_DLLS_LIST)
-      execute_process(
-        COMMAND "codesign" "--sign" "$ENV{MACOS_CERTIFICATE_NAME}" "--entitlements" "../.ci/macos.entitlements"
-                "--options" "runtime" "--force" "--deep" "--timestamp" "--verbose" "${INTERIOR_DLL}"
-      )
-    endforeach()
+    if(INTERIOR_DLLS)
+      string(REPLACE "\n" ";" INTERIOR_DLLS_LIST "${INTERIOR_DLLS}")
+
+      foreach(INTERIOR_DLL IN LISTS INTERIOR_DLLS_LIST)
+        execute_process(
+          COMMAND "codesign" "--sign" "$ENV{MACOS_CERTIFICATE_NAME}" "--entitlements" "../.ci/macos.entitlements"
+                  "--options" "runtime" "--force" "--deep" "--timestamp" "--verbose" "${INTERIOR_DLL}"
+        )
+      endforeach()
+    endif()
 
     message(STATUS "Signing Exterior Applications ${app_name}.app")
     execute_process(
