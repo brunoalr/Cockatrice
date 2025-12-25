@@ -202,7 +202,7 @@ public:
  *   affects its hash.
  *
  * Slots:
- * - rebuildTree(): rebuilds the model structure from the underlying DeckLoader.
+ * - rebuildTree(): rebuilds the model structure from the underlying node tree.
  */
 class DeckListModel : public QAbstractItemModel
 {
@@ -210,7 +210,7 @@ class DeckListModel : public QAbstractItemModel
 
 public slots:
     /**
-     * @brief Rebuilds the model tree from the underlying DeckLoader.
+     * @brief Rebuilds the model tree from the underlying node tree.
      *
      * This updates all indices and ensures the model reflects the current
      * state of the deck.
@@ -225,6 +225,18 @@ signals:
      * @brief Emitted whenever the deck hash changes due to modifications in the model.
      */
     void deckHashChanged();
+
+    /**
+     * @brief Emitted whenever a card is added to the deck, regardless of whether it's an entirely new card or an
+     * existing card that got incremented.
+     * @param index The index of the card that got added.
+     */
+    void cardAddedAt(const QModelIndex &index);
+
+    /**
+     * @brief Emitted whenever the deck in the model has been replaced with a new one
+     */
+    void deckReplaced();
 
 public:
     explicit DeckListModel(QObject *parent = nullptr);
@@ -250,13 +262,18 @@ public:
     [[nodiscard]] int rowCount(const QModelIndex &parent) const override;
     [[nodiscard]] int columnCount(const QModelIndex & /*parent*/ = QModelIndex()) const override;
     [[nodiscard]] QVariant data(const QModelIndex &index, int role) const override;
-    void emitBackgroundUpdates(const QModelIndex &parent);
     [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
     [[nodiscard]] QModelIndex index(int row, int column, const QModelIndex &parent) const override;
     [[nodiscard]] QModelIndex parent(const QModelIndex &index) const override;
     [[nodiscard]] Qt::ItemFlags flags(const QModelIndex &index) const override;
     bool setData(const QModelIndex &index, const QVariant &value, int role) override;
     bool removeRows(int row, int count, const QModelIndex &parent) override;
+
+    /**
+     * Recursively emits the dataChanged signal for all child nodes.
+     * @param parent The parent node
+     */
+    void emitBackgroundUpdates(const QModelIndex &parent);
 
     /**
      * @brief Finds a card by name, zone, and optional identifiers.
@@ -290,6 +307,21 @@ public:
     QModelIndex addCard(const ExactCard &card, const QString &zoneName);
 
     /**
+     * @brief Increments the `amount` field of the card node at the index by 1.
+     * @param idx The index of a card node. No-ops if the index is invalid or not a card node
+     * @return Whether the operation was successful
+     */
+    bool incrementAmountAtIndex(const QModelIndex &idx);
+
+    /**
+     * @brief Decrements the `amount` field of the card node at the index by 1.
+     * Removes the node if it causes the amount to fall to 0.
+     * @param idx The index of a card node. No-ops if the index is invalid or not a card node
+     * @return Whether the operation was successful
+     */
+    bool decrementAmountAtIndex(const QModelIndex &idx);
+
+    /**
      * @brief Determines the sorted insertion row for a card.
      * @param parent The parent node where the card will be inserted.
      * @param cardInfo The card info to insert.
@@ -309,9 +341,36 @@ public:
     }
     void setDeckList(DeckList *_deck);
 
+    /**
+     * @brief Apply a function to every card in the deck tree.
+     *
+     * @param func Function taking (zone node, card node).
+     */
+    void forEachCard(const std::function<void(InnerDecklistNode *, DecklistCardNode *)> &func);
+
+    /**
+     * @brief Creates a list consisting of the entries of the model mapped into ExactCards (with each entry looked up
+     * in the card database).
+     * If a card node has number > 1, it will be added that many times to the list.
+     * If an entry's card is not found in the card database, that entry will be left out of the list.
+     * @return An ordered list of ExactCards
+     */
     [[nodiscard]] QList<ExactCard> getCards() const;
     [[nodiscard]] QList<ExactCard> getCardsForZone(const QString &zoneName) const;
+
+    /**
+     * @brief Gets a deduplicated list of all card names that appear in the model
+     */
+    [[nodiscard]] QList<QString> getCardNames() const;
+    /**
+     * @brief Gets a deduplicated list of all CardRefs that appear in the model
+     */
+    [[nodiscard]] QList<CardRef> getCardRefs() const;
+    /**
+     * @brief Gets a list of all zone names that appear in the model
+     */
     [[nodiscard]] QList<QString> getZones() const;
+
     bool isCardLegalForCurrentFormat(CardInfoPtr cardInfo);
     bool isCardQuantityLegalForCurrentFormat(CardInfoPtr cardInfo, int quantity);
     void refreshCardFormatLegalities();
@@ -335,6 +394,9 @@ private:
                                                       const QString &zoneName,
                                                       const QString &providerId = "",
                                                       const QString &cardNumber = "") const;
+
+    bool offsetAmountAtIndex(const QModelIndex &idx, int offset);
+
     void emitRecursiveUpdates(const QModelIndex &index);
     void sortHelper(InnerDecklistNode *node, Qt::SortOrder order);
 
