@@ -267,18 +267,18 @@ public:
     }
     //@}
 
-    [[nodiscard]] QChar getColorChar() const;
+    [[nodiscard]] const QChar getColorChar() const;
 
     /** @name Legacy/Convenience Property Accessors */ //@{
-    [[nodiscard]] QString getCardType() const;
+    [[nodiscard]] const QString getCardType() const;
     void setCardType(const QString &value);
-    [[nodiscard]] QString getCmc() const;
-    [[nodiscard]] QString getColors() const;
+    [[nodiscard]] const QString getCmc() const;
+    [[nodiscard]] const QString getColors() const;
     void setColors(const QString &value);
-    [[nodiscard]] QString getLoyalty() const;
-    [[nodiscard]] QString getMainCardType() const;
-    [[nodiscard]] QString getManaCost() const;
-    [[nodiscard]] QString getPowTough() const;
+    [[nodiscard]] const QString getLoyalty() const;
+    [[nodiscard]] const QString getMainCardType() const;
+    [[nodiscard]] const QString getManaCost() const;
+    [[nodiscard]] const QString getPowTough() const;
     void setPowTough(const QString &value);
     //@}
 
@@ -308,7 +308,7 @@ public:
      * @param _set The set to which the card should be added.
      * @param _info Optional printing information.
      */
-    void addToSet(const CardSetPtr &_set, const PrintingInfo &_info = PrintingInfo());
+    void addToSet(const CardSetPtr &_set, PrintingInfo _info = PrintingInfo());
 
     /**
      * @brief Combines legality properties from a provided map.
