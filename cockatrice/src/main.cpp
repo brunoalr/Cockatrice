@@ -41,6 +41,7 @@
 #include <QTranslator>
 #include <libcockatrice/card/database/card_database_manager.h>
 #include <libcockatrice/rng/rng_sfmt.h>
+#include <memory>
 
 QTranslator *translator, *qtTranslator;
 RNG_Abstract *rng;
@@ -236,12 +237,13 @@ int main(int argc, char *argv[])
         Logger::getInstance().logToFile(true);
     }
 
-    rng = new RNG_SFMT;
-    themeManager = new ThemeManager;
-    soundEngine = new SoundEngine;
+    static auto rngPtr = std::make_unique<RNG_SFMT>();
+    rng = rngPtr.get();
+    themeManager = new ThemeManager(&app);
+    soundEngine = new SoundEngine(&app);
 
-    qtTranslator = new QTranslator;
-    translator = new QTranslator;
+    qtTranslator = new QTranslator(&app);
+    translator = new QTranslator(&app);
     installNewTranslator();
 
     QLocale::setDefault(QLocale::English);
@@ -281,7 +283,6 @@ int main(int argc, char *argv[])
     app.exec();
 
     qCInfo(MainLog) << "Event loop finished, terminating...";
-    delete rng;
     PingPixmapGenerator::clear();
     CountryPixmapGenerator::clear();
     UserLevelPixmapGenerator::clear();
