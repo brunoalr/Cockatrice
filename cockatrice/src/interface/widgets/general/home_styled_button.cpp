@@ -1,7 +1,6 @@
 #include "home_styled_button.h"
 
 #include <QPainter>
-#include <QPainterPath>
 #include <qgraphicseffect.h>
 #include <qstyleoption.h>
 
@@ -76,7 +75,7 @@ QString HomeStyledButton::generateButtonStylesheet(const QPair<QColor, QColor> &
 
 void HomeStyledButton::paintEvent(QPaintEvent *event)
 {
-    Q_UNUSED(event); // Event is just used for update clipping, we redraw the whole widget.
+    Q_UNUSED(event); // Event is used for update clipping, we redraw the whole widget.
     QStyleOptionButton opt;
     initStyleOption(&opt);
     opt.text.clear(); // prevent style from drawing text
@@ -84,7 +83,6 @@ void HomeStyledButton::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     style()->drawControl(QStyle::CE_PushButton, &opt, &painter, this);
 
-    // Draw white text with a black outline
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setRenderHint(QPainter::TextAntialiasing);
 
@@ -92,14 +90,19 @@ void HomeStyledButton::paintEvent(QPaintEvent *event)
     font.setBold(true);
     painter.setFont(font);
 
-    QFontMetrics fm(font);
-    QSize textSize = fm.size(Qt::TextSingleLine, this->text());
-    QPointF center((width() - textSize.width()) / 2.0, (height() + textSize.height() / 2.0) / 2.0);
+    QRect textRect(0, 0, width(), height());
 
-    QPainterPath path;
-    path.addText(center, font, this->text());
+    // Draw text border by offsetting
+    painter.setPen(Qt::black);
+    for (int dx = -1; dx <= 1; ++dx) {
+        for (int dy = -1; dy <= 1; ++dy) {
+            if (dx != 0 || dy != 0) {
+                painter.drawText(textRect.translated(dx, dy), Qt::AlignCenter, this->text());
+            }
+        }
+    }
 
-    painter.setPen(QPen(Qt::black, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    painter.setBrush(Qt::white);
-    painter.drawPath(path);
+    // Draw white text
+    painter.setPen(Qt::white);
+    painter.drawText(textRect, Qt::AlignCenter, this->text());
 }
