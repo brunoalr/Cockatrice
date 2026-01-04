@@ -1,5 +1,6 @@
 #include "home_styled_button.h"
 
+#include "../utility/painting_utils.h"
 #include <QPainter>
 #include <qgraphicseffect.h>
 #include <qstyleoption.h>
@@ -92,17 +93,5 @@ void HomeStyledButton::paintEvent(QPaintEvent *event)
 
     QRect textRect(0, 0, width(), height());
 
-    // Draw text border by offsetting
-    painter.setPen(Qt::black);
-    for (int dx = -1; dx <= 1; ++dx) {
-        for (int dy = -1; dy <= 1; ++dy) {
-            if (dx != 0 || dy != 0) {
-                painter.drawText(textRect.translated(dx, dy), Qt::AlignCenter, this->text());
-            }
-        }
-    }
-
-    // Draw white text
-    painter.setPen(Qt::white);
-    painter.drawText(textRect, Qt::AlignCenter, this->text());
+    drawOutlinedText(painter, textRect, this->text(), Qt::AlignCenter);
 }
