@@ -1,6 +1,7 @@
 #include "deck_preview_tag_display_widget.h"
 
 #include "../../utility/painting_utils.h"
+
 #include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QMouseEvent>

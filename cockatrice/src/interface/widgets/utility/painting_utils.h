@@ -55,4 +55,3 @@ void drawOutlinedText(QPainter &painter,
                       const QColor &textColor = Qt::white);
 
 #endif // PAINTING_UTILS_H
-

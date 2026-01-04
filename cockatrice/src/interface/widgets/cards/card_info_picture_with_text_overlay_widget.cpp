@@ -1,6 +1,7 @@
 #include "card_info_picture_with_text_overlay_widget.h"
 
 #include "../utility/painting_utils.h"
+
 #include <QFontMetrics>
 #include <QPainterPath>
 #include <QStylePainter>

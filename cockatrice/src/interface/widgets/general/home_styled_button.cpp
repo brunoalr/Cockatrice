@@ -1,6 +1,7 @@
 #include "home_styled_button.h"
 
 #include "../utility/painting_utils.h"
+
 #include <QPainter>
 #include <qgraphicseffect.h>
 #include <qstyleoption.h>
