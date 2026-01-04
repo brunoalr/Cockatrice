@@ -38,4 +38,3 @@ void drawOutlinedText(QPainter &painter,
     textOption.setAlignment(alignment);
     drawOutlinedText(painter, textRect, text, textOption, outlineColor, textColor);
 }
-
