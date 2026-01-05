@@ -217,7 +217,12 @@ public slots:
      */
     void rebuildTree();
 
-public slots:
+    /**
+     * @brief Sets the criteria used to group cards in the model.
+     * @param newCriteria The new grouping criteria.
+     */
+    void setActiveGroupCriteria(DeckListModelGroupCriteria::Type newCriteria);
+
     void setActiveFormat(const QString &_format);
 
 signals:
@@ -240,6 +245,7 @@ signals:
 
 public:
     explicit DeckListModel(QObject *parent = nullptr);
+    explicit DeckListModel(QObject *parent, const QSharedPointer<DeckList> &deckList);
     ~DeckListModel() override;
 
     /**
@@ -251,14 +257,8 @@ public:
         return nodeToIndex(root);
     }
 
-    /**
-     * @brief Returns the value of the grouping category for a card based on the current criteria.
-     * @param info Pointer to card information.
-     * @return String representing the value of the current grouping criteria for the card.
-     */
-    [[nodiscard]] QString getGroupCriteriaForCard(CardInfoPtr info) const;
-
-    // Qt model overrides
+    /// @name Qt model overrides
+    ///@{
     [[nodiscard]] int rowCount(const QModelIndex &parent) const override;
     [[nodiscard]] int columnCount(const QModelIndex & /*parent*/ = QModelIndex()) const override;
     [[nodiscard]] QVariant data(const QModelIndex &index, int role) const override;
@@ -268,12 +268,8 @@ public:
     [[nodiscard]] Qt::ItemFlags flags(const QModelIndex &index) const override;
     bool setData(const QModelIndex &index, const QVariant &value, int role) override;
     bool removeRows(int row, int count, const QModelIndex &parent) override;
-
-    /**
-     * Recursively emits the dataChanged signal for all child nodes.
-     * @param parent The parent node
-     */
-    void emitBackgroundUpdates(const QModelIndex &parent);
+    void sort(int column, Qt::SortOrder order) override;
+    ///@}
 
     /**
      * @brief Finds a card by name, zone, and optional identifiers.
@@ -307,39 +303,24 @@ public:
     QModelIndex addCard(const ExactCard &card, const QString &zoneName);
 
     /**
-     * @brief Increments the `amount` field of the card node at the index by 1.
-     * @param idx The index of a card node. No-ops if the index is invalid or not a card node
+     * @brief Changes the `amount` field in the card node at the index by the amount.
+     * Removes the node if it causes the amount to fall to 0 or below.
+     * @param idx The index of a card node. No-ops if the index is invalid or not a card node.
+     * @param offset The amount to change the amount field by.
      * @return Whether the operation was successful
      */
-    bool incrementAmountAtIndex(const QModelIndex &idx);
-
-    /**
-     * @brief Decrements the `amount` field of the card node at the index by 1.
-     * Removes the node if it causes the amount to fall to 0.
-     * @param idx The index of a card node. No-ops if the index is invalid or not a card node
-     * @return Whether the operation was successful
-     */
-    bool decrementAmountAtIndex(const QModelIndex &idx);
-
-    /**
-     * @brief Determines the sorted insertion row for a card.
-     * @param parent The parent node where the card will be inserted.
-     * @param cardInfo The card info to insert.
-     * @return Row index where the card should be inserted to maintain sort order.
-     */
-    int findSortedInsertRow(InnerDecklistNode *parent, CardInfoPtr cardInfo) const;
-
-    void sort(int column, Qt::SortOrder order) override;
+    bool offsetCountAtIndex(const QModelIndex &idx, int offset);
 
     /**
      * @brief Removes all cards and resets the model.
      */
     void cleanList();
-    [[nodiscard]] DeckList *getDeckList() const
+
+    [[nodiscard]] QSharedPointer<DeckList> getDeckList() const
     {
         return deckList;
     }
-    void setDeckList(DeckList *_deck);
+    void setDeckList(const QSharedPointer<DeckList> &_deck);
 
     /**
      * @brief Apply a function to every card in the deck tree.
@@ -349,14 +330,10 @@ public:
     void forEachCard(const std::function<void(InnerDecklistNode *, DecklistCardNode *)> &func);
 
     /**
-     * @brief Creates a list consisting of the entries of the model mapped into ExactCards (with each entry looked up
-     * in the card database).
-     * If a card node has number > 1, it will be added that many times to the list.
-     * If an entry's card is not found in the card database, that entry will be left out of the list.
-     * @return An ordered list of ExactCards
+     * @brief Gets a list of all card nodes in the deck.
      */
-    [[nodiscard]] QList<ExactCard> getCards() const;
-    [[nodiscard]] QList<ExactCard> getCardsForZone(const QString &zoneName) const;
+    [[nodiscard]] QList<const DecklistCardNode *> getCardNodes() const;
+    [[nodiscard]] QList<const DecklistCardNode *> getCardNodesForZone(const QString &zoneName) const;
 
     /**
      * @brief Gets a deduplicated list of all card names that appear in the model
@@ -371,19 +348,9 @@ public:
      */
     [[nodiscard]] QList<QString> getZones() const;
 
-    bool isCardLegalForCurrentFormat(CardInfoPtr cardInfo);
-    bool isCardQuantityLegalForCurrentFormat(CardInfoPtr cardInfo, int quantity);
-    void refreshCardFormatLegalities();
-
-    /**
-     * @brief Sets the criteria used to group cards in the model.
-     * @param newCriteria The new grouping criteria.
-     */
-    void setActiveGroupCriteria(DeckListModelGroupCriteria::Type newCriteria);
-
 private:
-    DeckList *deckList;      /**< Pointer to the deck loader providing the underlying data. */
-    InnerDecklistNode *root; /**< Root node of the model tree. */
+    QSharedPointer<DeckList> deckList; /**< Pointer to the decklist providing the underlying data. */
+    InnerDecklistNode *root;           /**< Root node of the model tree. */
     DeckListModelGroupCriteria::Type activeGroupCriteria = DeckListModelGroupCriteria::MAIN_TYPE;
     int lastKnownColumn;          /**< Last column used for sorting. */
     Qt::SortOrder lastKnownOrder; /**< Last known sort order. */
@@ -395,9 +362,27 @@ private:
                                                       const QString &providerId = "",
                                                       const QString &cardNumber = "") const;
 
-    bool offsetAmountAtIndex(const QModelIndex &idx, int offset);
+    /**
+     * @brief Determines the sorted insertion row for a card.
+     * @param parent The parent node where the card will be inserted.
+     * @param cardInfo The card info to insert.
+     * @return Row index where the card should be inserted to maintain sort order.
+     */
+    int findSortedInsertRow(const InnerDecklistNode *parent, const CardInfoPtr &cardInfo) const;
 
+    /**
+     * @brief Recursively emits the dataChanged signal with role as Qt::BackgroundRole for all indices that are children
+     * of the given node. This is used to update the background color when changing formats.
+     * @param parent The parent node
+     */
+    void emitBackgroundUpdates(const QModelIndex &parent);
+
+    /**
+     * @brief Recursively emits the dataChanged signal for the given node and all parent nodes.
+     * @param index The parent node
+     */
     void emitRecursiveUpdates(const QModelIndex &index);
+
     void sortHelper(InnerDecklistNode *node, Qt::SortOrder order);
 
     template <typename T> T getNode(const QModelIndex &index) const
@@ -406,6 +391,8 @@ private:
             return dynamic_cast<T>(root);
         return dynamic_cast<T>(static_cast<AbstractDecklistNode *>(index.internalPointer()));
     }
+
+    void refreshCardFormatLegalities();
 };
 
 #endif
