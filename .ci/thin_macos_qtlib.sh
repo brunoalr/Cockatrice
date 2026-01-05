@@ -5,8 +5,24 @@
 
 # This script is meant to be used by the ci enironment on macos runners only.
 # It uses the runner's GITHUB_WORKSPACE env variable.
-arch=$(uname -m)
+# 'soc' argument specifies the target system on chip (SoC) architecture, e.g., 'Intel' for x86_64
+# Example usage:
+#   ./thin_macos_qtlib.sh Intel    # Thins binaries to x86_64
+#   ./thin_macos_qtlib.sh Apple    # Thins binaries to arm64
+
+
+soc=$1
 nproc=$(sysctl -n hw.ncpu)
+
+if [[ $soc == 'Intel' ]]; then
+  arch='x86_64'
+elif [[ $soc == 'Apple' ]]; then
+  arch='arm64'
+else
+  echo "Invalid 'soc' argument: $soc"
+  echo "Usage: ./thin_macos_qtlib.sh [Intel|Apple]"
+  exit 1
+fi
 
 function thin() {
   local libfile=$1
