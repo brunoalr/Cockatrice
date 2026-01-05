@@ -414,7 +414,7 @@ jobs:
 
       - name: "[macOS] Create thin Qt libraries"
         if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
-        run: .ci/thin_macos_qtlib.sh
+        run: .ci/thin_macos_qtlib.sh ${{ matrix.soc }}
 
       - name: "[macOS] Cache thin Qt libraries"
         if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
