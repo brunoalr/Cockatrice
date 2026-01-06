@@ -225,6 +225,7 @@ set(cockatrice_SOURCES
     src/interface/widgets/server/user/user_list_widget.cpp
     src/interface/widgets/utility/custom_line_edit.cpp
     src/interface/widgets/utility/get_text_with_max.cpp
+    src/interface/widgets/utility/painting_utils.cpp
     src/interface/widgets/utility/sequence_edit.cpp
     src/interface/widgets/visual_database_display/visual_database_display_color_filter_widget.cpp
     src/interface/widgets/visual_database_display/visual_database_display_filter_save_load_widget.cpp
