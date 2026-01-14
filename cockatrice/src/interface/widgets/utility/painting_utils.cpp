@@ -10,6 +10,8 @@ void drawOutlinedText(QPainter &painter,
                       const QColor &outlineColor,
                       const QColor &textColor)
 {
+    painter.save();
+
     // Draw text border by offsetting
     painter.setPen(outlineColor);
     for (int dx = -1; dx <= 1; ++dx) {
@@ -24,6 +26,8 @@ void drawOutlinedText(QPainter &painter,
     // Draw the main text
     painter.setPen(textColor);
     painter.drawText(textRect, text, textOption);
+
+    painter.restore();
 }
 
 void drawOutlinedText(QPainter &painter,
