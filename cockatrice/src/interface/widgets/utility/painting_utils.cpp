@@ -40,5 +40,6 @@ void drawOutlinedText(QPainter &painter,
     // Convert Qt::Alignment to QTextOption and delegate to the main implementation
     QTextOption textOption;
     textOption.setAlignment(alignment);
+    textOption.setWrapMode(QTextOption::NoWrap);
     drawOutlinedText(painter, textRect, text, textOption, outlineColor, textColor);
 }
