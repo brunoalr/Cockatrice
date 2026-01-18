@@ -321,8 +321,11 @@ void HomeWidget::paintEvent(QPaintEvent *event)
     QString cardName;
     ExactCard card = backgroundSourceCard->getCard();
     if (card) {
-        cardName = card.getCardPtr()->getName() + " (" + card.getPrinting().getSet()->getCorrectedShortName() + ") " +
-                   card.getPrinting().getProperty("num");
+        CardSetPtr set = card.getPrinting().getSet();
+        if (set) {
+            cardName = card.getCardPtr()->getName() + " (" + set->getCorrectedShortName() + ") " +
+                       card.getPrinting().getProperty("num");
+        }
     }
 
     if (!cardName.isEmpty() && SettingsCache::instance().getHomeTabDisplayCardName()) {

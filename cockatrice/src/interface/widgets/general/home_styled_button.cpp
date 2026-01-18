@@ -77,7 +77,7 @@ QString HomeStyledButton::generateButtonStylesheet(const QPair<QColor, QColor> &
 
 void HomeStyledButton::paintEvent(QPaintEvent *event)
 {
-    Q_UNUSED(event);
+    Q_UNUSED(event); // Event is just used for update clipping, we redraw the whole widget.
     QStyleOptionButton opt;
     initStyleOption(&opt);
     opt.text.clear(); // prevent style from drawing text
@@ -85,6 +85,7 @@ void HomeStyledButton::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     style()->drawControl(QStyle::CE_PushButton, &opt, &painter, this);
 
+    // Draw white text with a black outline
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setRenderHint(QPainter::TextAntialiasing);
 

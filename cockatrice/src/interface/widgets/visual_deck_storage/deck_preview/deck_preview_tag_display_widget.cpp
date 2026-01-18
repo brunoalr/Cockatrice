@@ -114,6 +114,7 @@ void DeckPreviewTagDisplayWidget::paintEvent(QPaintEvent *event)
     int margin = 10; // Left and right margins
     QRect textRect(margin, 0, width() - margin * 2, height());
 
+    // Draw the text with a black border for better legibility
     drawOutlinedText(painter, textRect, tagName, Qt::AlignLeft | Qt::AlignVCenter);
 
     QWidget::paintEvent(event);

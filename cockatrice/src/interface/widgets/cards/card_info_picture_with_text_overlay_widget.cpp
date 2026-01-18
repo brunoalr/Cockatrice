@@ -233,6 +233,7 @@ void CardInfoPictureWithTextOverlayWidget::drawOutlinedText(QPainter &painter,
                                                             const QString &text,
                                                             const QTextOption &textOption) const
 {
+    // Draw the outline then the main text
     ::drawOutlinedText(painter, textRect, text, textOption, outlineColor, textColor);
 }
 
