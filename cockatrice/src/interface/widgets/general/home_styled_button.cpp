@@ -77,7 +77,7 @@ QString HomeStyledButton::generateButtonStylesheet(const QPair<QColor, QColor> &
 
 void HomeStyledButton::paintEvent(QPaintEvent *event)
 {
-    Q_UNUSED(event); // Event is used for update clipping, we redraw the whole widget.
+    Q_UNUSED(event);
     QStyleOptionButton opt;
     initStyleOption(&opt);
     opt.text.clear(); // prevent style from drawing text
