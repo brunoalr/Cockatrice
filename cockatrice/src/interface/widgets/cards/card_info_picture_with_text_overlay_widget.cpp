@@ -1,5 +1,7 @@
 #include "card_info_picture_with_text_overlay_widget.h"
 
+#include "../utility/painting_utils.h"
+
 #include <QFontMetrics>
 #include <QPainterPath>
 #include <QStylePainter>
@@ -231,19 +233,8 @@ void CardInfoPictureWithTextOverlayWidget::drawOutlinedText(QPainter &painter,
                                                             const QString &text,
                                                             const QTextOption &textOption) const
 {
-    painter.setPen(outlineColor);
-    for (int dx = -1; dx <= 1; ++dx) {
-        for (int dy = -1; dy <= 1; ++dy) {
-            if (dx != 0 || dy != 0) {
-                QRect shiftedTextRect = textRect.translated(dx, dy);
-                painter.drawText(shiftedTextRect, text, textOption);
-            }
-        }
-    }
-
-    // Draw the main text
-    painter.setPen(textColor);
-    painter.drawText(textRect, text, textOption);
+    // Draw the outline then the main text
+    ::drawOutlinedText(painter, textRect, text, textOption, outlineColor, textColor);
 }
 
 /**

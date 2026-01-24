@@ -1,5 +1,7 @@
 #include "deck_preview_tag_display_widget.h"
 
+#include "../../utility/painting_utils.h"
+
 #include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QMouseEvent>
@@ -113,20 +115,7 @@ void DeckPreviewTagDisplayWidget::paintEvent(QPaintEvent *event)
     QRect textRect(margin, 0, width() - margin * 2, height());
 
     // Draw the text with a black border for better legibility
-    painter.setPen(Qt::black);
-
-    // Draw text border by offsetting
-    for (int dx = -1; dx <= 1; ++dx) {
-        for (int dy = -1; dy <= 1; ++dy) {
-            if (dx != 0 || dy != 0) {
-                painter.drawText(textRect.translated(dx, dy), Qt::AlignLeft | Qt::AlignVCenter, tagName);
-            }
-        }
-    }
-
-    // Draw the actual text
-    painter.setPen(Qt::white);
-    painter.drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter, tagName);
+    drawOutlinedText(painter, textRect, tagName, Qt::AlignLeft | Qt::AlignVCenter);
 
     QWidget::paintEvent(event);
 }
