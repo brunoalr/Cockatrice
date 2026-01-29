@@ -251,7 +251,7 @@ jobs:
         include:
           - os: macOS
             target: 13
-            runner: macos-15-intel
+            runner: macos-15
             soc: Intel
             xcode: "16.4"
             type: Release
@@ -403,7 +403,7 @@ jobs:
 
       - name: Thin Qt libraries (${{ matrix.soc }} macOS)
         if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
-        run: .ci/thin_macos_qtlib.sh
+        run: .ci/thin_macos_qtlib.sh ${{ matrix.soc }}
 
       - name: Cache thin Qt libraries (${{ matrix.soc }} macOS)
         if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
@@ -446,6 +446,7 @@ jobs:
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
           DEVELOPER_DIR: '/Applications/Xcode_${{matrix.xcode}}.app/Contents/Developer'
+          TARGET_MACOS_ARCH: ${{ matrix.soc == 'Intel' && 'x86_64' || '' }}
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
         run: .ci/compile.sh --server --test --vcpkg
 
