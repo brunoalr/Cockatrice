@@ -214,6 +214,7 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef Q_OS_MAC
+
     translationPath = qApp->applicationDirPath() + "/../Resources/translations";
 #elif defined(Q_OS_WIN)
     translationPath = qApp->applicationDirPath() + "/translations";
