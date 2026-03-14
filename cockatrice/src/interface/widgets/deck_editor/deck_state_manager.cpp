@@ -11,8 +11,7 @@ DeckStateManager::DeckStateManager(QObject *parent)
         setModified(true);
         emit historyChanged();
     });
-    connect(deckListModel, &DeckListModel::rowsInserted, this, &DeckStateManager::uniqueCardsChanged);
-    connect(deckListModel, &DeckListModel::rowsRemoved, this, &DeckStateManager::uniqueCardsChanged);
+    connect(deckListModel, &DeckListModel::cardNodesChanged, this, &DeckStateManager::uniqueCardsChanged);
 }
 
 const DeckList &DeckStateManager::getDeckList() const
@@ -176,14 +175,16 @@ QModelIndex DeckStateManager::addCard(const ExactCard &card, const QString &zone
 
     QString zone = card.getInfo().getIsToken() ? DECK_ZONE_TOKENS : zoneName;
 
-    QString reason = tr("Added (%1): %2 (%3) %4")
-                         .arg(zone, card.getName(), card.getPrinting().getSet()->getCorrectedShortName(),
-                              card.getPrinting().getProperty("num"));
+    CardSetPtr set = card.getPrinting().getSet();
+    QString setName = set ? set->getCorrectedShortName() : "";
+
+    QString reason =
+        tr("Added (%1): %2 (%3) %4").arg(zone, card.getName(), setName, card.getPrinting().getProperty("num"));
 
     QModelIndex idx = modifyDeck(reason, [&card, &zone](auto model) { return model->addCard(card, zone); });
 
     if (idx.isValid()) {
-        emit focusIndexChanged(idx);
+        emit focusIndexChanged(idx, true);
     }
 
     return idx;
@@ -202,17 +203,19 @@ QModelIndex DeckStateManager::decrementCard(const ExactCard &card, const QString
         return {};
     }
 
-    bool success = offsetCountAtIndex(idx, false);
+    bool success = offsetCountAtIndex(idx, -1);
 
     if (!success) {
         return {};
     }
 
-    if (idx.isValid()) {
-        emit focusIndexChanged(idx);
+    // old index is no longer safe since rows could have been removed
+    QModelIndex newIdx = deckListModel->findCard(card.getName(), zoneName, providerId, collectorNumber);
+    if (newIdx.isValid()) {
+        emit focusIndexChanged(newIdx, true);
     }
 
-    return idx;
+    return newIdx;
 }
 
 static bool doSwapCard(DeckListModel *model,
@@ -317,6 +320,7 @@ void DeckStateManager::undo(int steps)
     deckListModel->rebuildTree();
 
     emit deckListModel->layoutChanged();
+    emit deckReplaced();
 }
 
 void DeckStateManager::redo(int steps)
@@ -335,6 +339,7 @@ void DeckStateManager::redo(int steps)
     deckListModel->rebuildTree();
 
     emit deckListModel->layoutChanged();
+    emit deckReplaced();
 }
 
 void DeckStateManager::requestHistorySave(const QString &reason)

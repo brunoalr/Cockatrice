@@ -169,9 +169,6 @@ public slots:
     /** @brief Shows the printing selector dock. Pure virtual. */
     virtual void showPrintingSelector() = 0;
 
-    /** @brief Slot for when a dock's top-level state changes. Pure virtual. */
-    virtual void dockTopLevelChanged(bool topLevel) = 0;
-
 signals:
     /** @brief Emitted when a deck should be opened in a new editor tab. */
     void openDeckEditor(const LoadedDeck &deck);
@@ -246,12 +243,6 @@ protected slots:
     /** @brief Handles dock close events. */
     void closeEvent(QCloseEvent *event) override;
 
-    /** @brief Slot triggered when a dock visibility changes. Pure virtual. */
-    virtual void dockVisibleTriggered() = 0;
-
-    /** @brief Slot triggered when a dock floating state changes. Pure virtual. */
-    virtual void dockFloatingTriggered() = 0;
-
 private:
     /** @brief Sets the deck for this tab.
      *  @param _deck The deck object.
@@ -275,6 +266,23 @@ protected:
         NEW_TAB    ///< Open deck in a new tab
     };
 
+    /**
+     * @brief The actions associated with managing a QDockWidget
+     */
+    struct DockActions
+    {
+        QMenu *menu;        ///< The menu containing the actions
+        QAction *aVisible;  ///< The menu action that toggles visibility
+        QAction *aFloating; ///< The menu action that toggles floating
+        QSize defaultSize;  ///< The default size of the dock
+    };
+
+    /**
+     * @brief registers a QDockWidget as a managed dock widget. Creates the associated actions and menu, adds them to
+     * the viewMenu, and connects those actions to the tab's slots.
+     */
+    void registerDockWidget(QMenu *_viewMenu, QDockWidget *widget, const QSize &defaultSize);
+
     /** @brief Confirms deck open action based on settings and modified state.
      *  @param openInSameTabIfBlank Whether to reuse same tab if blank.
      *  @return Selected DeckOpenLocation.
@@ -293,15 +301,11 @@ protected:
     virtual void openDeckFromFile(const QString &fileName, DeckOpenLocation deckOpenLocation);
 
     // UI Menu Elements
-    QMenu *viewMenu, *cardInfoDockMenu, *cardDatabaseDockMenu, *deckDockMenu, *filterDockMenu,
-        *printingSelectorDockMenu;
+    QMenu *viewMenu;
 
     QAction *aResetLayout;
-    QAction *aCardInfoDockVisible, *aCardInfoDockFloating;
-    QAction *aCardDatabaseDockVisible, *aCardDatabaseDockFloating;
-    QAction *aDeckDockVisible, *aDeckDockFloating;
-    QAction *aFilterDockVisible, *aFilterDockFloating;
-    QAction *aPrintingSelectorDockVisible, *aPrintingSelectorDockFloating;
+
+    QMap<QDockWidget *, DockActions> dockToActions;
 };
 
 #endif // TAB_GENERIC_DECK_EDITOR_H

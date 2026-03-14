@@ -202,6 +202,13 @@ jobs:
                   --ccache "$CCACHE_SIZE" $NO_CLIENT
           .ci/name_build.sh
 
+      # Delete used cache to emulate a cache update. See https://github.com/actions/cache/issues/342.
+      - name: Delete old compiler cache (ccache)
+        if: github.ref == 'refs/heads/master' && steps.ccache_restore.outputs.cache-hit && steps.build.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh cache delete --repo ${{ github.repository }} ${{ steps.ccache_restore.outputs.cache-primary-key }}
+
       - name: Save compiler cache (ccache)
         if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v5
@@ -212,10 +219,10 @@ jobs:
       - name: Upload artifact
         id: upload_artifact
         if: matrix.package != 'skip'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
-          name: ${{matrix.distro}}${{matrix.version}}-package
           path: ${{steps.build.outputs.path}}
+          archive: false
           if-no-files-found: error
 
       - name: Upload to release
@@ -225,24 +232,24 @@ jobs:
         env:
           GH_TOKEN: ${{github.token}}
           tag_name: ${{needs.configure.outputs.tag}}
+          asset_name: ${{steps.build.outputs.fullname}}
           asset_path: ${{steps.build.outputs.path}}
-          asset_name: ${{steps.build.outputs.name}}
         run: gh release upload "$tag_name" "$asset_path#$asset_name"
 
       - name: Attest binary provenance
         id: attestation
         if: steps.upload_release.outcome == 'success'
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest@v4
         with:
-          subject-name: ${{steps.build.outputs.name}}
-          subject-digest: sha256:${{ steps.upload_artifact.outputs.artifact-digest }}
+          subject-path: ${{steps.build.outputs.path}}
+          show-summary: false
 
       - name: Verify binary attestation
         if: steps.attestation.outcome == 'success'
         shell: bash
         env:
           GH_TOKEN: ${{github.token}}
-        run: gh attestation verify ${{steps.build.outputs.path}} -R Cockatrice/Cockatrice
+        run: gh attestation verify ${{steps.build.outputs.path}} --repo Cockatrice/Cockatrice
 
   build-vcpkg:
     strategy:
@@ -258,8 +265,7 @@ jobs:
             override_target: 13
             make_package: 1
             package_suffix: "-macOS13_Intel"
-            artifact_name: macOS13_Intel-package
-            qt_version: 6.6.*
+            qt_version: 6.10.*
             qt_arch: clang_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             cmake_generator: Ninja
@@ -273,8 +279,7 @@ jobs:
             type: Release
             make_package: 1
             package_suffix: "-macOS14"
-            artifact_name: macOS14-package
-            qt_version: 6.6.*
+            qt_version: 6.10.*
             qt_arch: clang_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             cmake_generator: Ninja
@@ -288,8 +293,7 @@ jobs:
             type: Release
             make_package: 1
             package_suffix: "-macOS15"
-            artifact_name: macOS15-package
-            qt_version: 6.6.*
+            qt_version: 6.10.*
             qt_arch: clang_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             cmake_generator: Ninja
@@ -301,33 +305,20 @@ jobs:
             soc: Apple
             xcode: "16.4"
             type: Debug
-            qt_version: 6.6.*
+            qt_version: 6.10.*
             qt_arch: clang_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             cmake_generator: Ninja
             use_ccache: 1
 
           - os: Windows
-            target: 7
-            runner: windows-2022
-            type: Release
-            make_package: 1
-            package_suffix: "-Win7"
-            artifact_name: Windows7-installer
-            qt_version: 5.15.*
-            qt_arch: win64_msvc2019_64
-            cmake_generator: "Visual Studio 17 2022"
-            cmake_generator_platform: x64
-
-          - os: Windows
             target: 10
-            runner: windows-2022
+            runner: windows-2025
             type: Release
             make_package: 1
             package_suffix: "-Win10"
-            artifact_name: Windows10-installer
-            qt_version: 6.6.*
-            qt_arch: win64_msvc2019_64
+            qt_version: 6.10.*
+            qt_arch: win64_msvc2022_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             cmake_generator: "Visual Studio 17 2022"
             cmake_generator_platform: x64
@@ -384,7 +375,7 @@ jobs:
       - name: Restore thin Qt ${{ steps.resolve_qt_version.outputs.version }} libraries (${{ matrix.soc }} macOS)
         if: matrix.os == 'macOS'
         id: restore_qt
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/Qt
           key: thin-qt-macos-${{ matrix.soc }}-${{ steps.resolve_qt_version.outputs.version }}
@@ -407,7 +398,7 @@ jobs:
 
       - name: Cache thin Qt libraries (${{ matrix.soc }} macOS)
         if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ${{ github.workspace }}/Qt
           key: thin-qt-macos-${{ matrix.soc }}-${{ steps.resolve_qt_version.outputs.version }}
@@ -420,6 +411,11 @@ jobs:
           arch: ${{matrix.qt_arch}}
           modules: ${{matrix.qt_modules}}
           cache: true
+
+      - name: Install NSIS
+        if: matrix.os == 'Windows'
+        shell: bash
+        run: choco install nsis
 
       - name: Setup vcpkg cache
         id: vcpkg-cache
@@ -450,6 +446,13 @@ jobs:
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
         run: .ci/compile.sh --server --test --vcpkg
 
+      # Delete used cache to emulate a cache update. See https://github.com/actions/cache/issues/342.
+      - name: Delete old compiler cache (ccache)
+        if: github.ref == 'refs/heads/master' && matrix.use_ccache == 1 && steps.ccache_restore.outputs.cache-hit && steps.build.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh cache delete --repo ${{ github.repository }} ${{ steps.ccache_restore.outputs.cache-primary-key }}
+
       - name: Save compiler cache (ccache)
         if: github.ref == 'refs/heads/master' && matrix.use_ccache == 1
         uses: actions/cache/save@v5
@@ -460,7 +463,8 @@ jobs:
           key: ccache-${{matrix.runner}}-${{matrix.soc}}-${{matrix.type}}-${{env.BRANCH_NAME}}
 
       - name: Sign app bundle
-        if: matrix.os == 'macOS' && matrix.make_package && (github.ref == 'refs/heads/master' || needs.configure.outputs.tag != null)
+        if: matrix.os == 'macOS' && matrix.make_package && needs.configure.outputs.tag != null
+        id: sign_macos
         env:
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
           MACOS_CI_KEYCHAIN_PWD: ${{ secrets.PROD_MACOS_CI_KEYCHAIN_PWD }}
@@ -472,7 +476,7 @@ jobs:
           fi
 
       - name: Notarize app bundle
-        if: matrix.os == 'macOS' && matrix.make_package && (github.ref == 'refs/heads/master' || needs.configure.outputs.tag != null)
+        if: steps.sign_macos.outcome == 'success'
         env:
           MACOS_NOTARIZATION_APPLE_ID: ${{ secrets.PROD_MACOS_NOTARIZATION_APPLE_ID }}
           MACOS_NOTARIZATION_TEAM_ID: ${{ secrets.PROD_MACOS_NOTARIZATION_TEAM_ID }}
@@ -504,46 +508,47 @@ jobs:
           fi
 
       - name: Upload artifact
-        id: upload_artifact
         if: matrix.make_package
-        uses: actions/upload-artifact@v6
+        id: upload_artifact
+        uses: actions/upload-artifact@v7
         with:
-          name: ${{matrix.artifact_name}}
           path: ${{steps.build.outputs.path}}
+          archive: false
           if-no-files-found: error
 
-      - name: Upload pdb database
-        if: matrix.os == 'Windows'
-        uses: actions/upload-artifact@v6
+      - name: Upload PDBs (Program Databases)
+        if: matrix.os == 'Windows' && github.ref_type != 'tag'
+        uses: actions/upload-artifact@v7
         with:
-          name: Windows${{matrix.target}}-debug-pdbs
+          name: ${{steps.build.outputs.name}}-PDBs
           path: |
             build/cockatrice/Release/*.pdb
+            build/oracle/Release/*.pdb
             build/servatrice/Release/*.pdb
           if-no-files-found: error
 
       - name: Upload to release
+        if: needs.configure.outputs.tag != null && matrix.make_package == '1'
         id: upload_release
-        if: needs.configure.outputs.tag != null
         shell: bash
         env:
           GH_TOKEN: ${{github.token}}
           tag_name: ${{needs.configure.outputs.tag}}
+          asset_name: ${{steps.build.outputs.fullname}}
           asset_path: ${{steps.build.outputs.path}}
-          asset_name: ${{steps.build.outputs.name}}
         run: gh release upload "$tag_name" "$asset_path#$asset_name"
 
       - name: Attest binary provenance
-        id: attestation
         if: steps.upload_release.outcome == 'success'
-        uses: actions/attest-build-provenance@v3
+        id: attestation
+        uses: actions/attest@v4
         with:
-          subject-name: ${{steps.build.outputs.name}}
-          subject-digest: sha256:${{ steps.upload_artifact.outputs.artifact-digest }}
+          subject-path: ${{steps.build.outputs.path}}
+          show-summary: false
 
       - name: Verify binary attestation
         if: steps.attestation.outcome == 'success'
         shell: bash
         env:
           GH_TOKEN: ${{github.token}}
-        run: gh attestation verify ${{steps.build.outputs.path}} -R Cockatrice/Cockatrice
+        run: gh attestation verify ${{steps.build.outputs.path}} --repo Cockatrice/Cockatrice

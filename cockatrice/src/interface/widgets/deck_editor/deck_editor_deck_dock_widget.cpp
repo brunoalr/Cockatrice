@@ -46,7 +46,6 @@ DeckEditorDeckDockWidget::DeckEditorDeckDockWidget(AbstractTabDeckEditor *parent
     setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable);
 
     installEventFilter(deckEditor);
-    connect(this, &DeckEditorDeckDockWidget::topLevelChanged, deckEditor, &AbstractTabDeckEditor::dockTopLevelChanged);
     createDeckDock();
 }
 
@@ -154,7 +153,7 @@ void DeckEditorDeckDockWidget::createDeckDock()
     bannerCardLabel->setText(tr("Banner Card"));
     bannerCardLabel->setHidden(!SettingsCache::instance().getDeckEditorBannerCardComboBoxVisible());
     bannerCardComboBox = new QComboBox(this);
-    connect(getModel(), &DeckListModel::dataChanged, this, [this]() {
+    connect(getModel(), &DeckListModel::cardNodesChanged, this, [this]() {
         // Delay the update to avoid race conditions
         QTimer::singleShot(100, this, &DeckEditorDeckDockWidget::updateBannerCardComboBox);
     });
@@ -459,12 +458,15 @@ void DeckEditorDeckDockWidget::syncBannerCardComboBoxSelectionWithDeck()
     }
 }
 
-void DeckEditorDeckDockWidget::setSelectedIndex(const QModelIndex &newCardIndex)
+void DeckEditorDeckDockWidget::setSelectedIndex(const QModelIndex &newCardIndex, bool preserveWidgetFocus)
 {
     deckView->clearSelection();
     deckView->setCurrentIndex(newCardIndex);
     recursiveExpand(newCardIndex);
-    deckView->setFocus(Qt::FocusReason::MouseFocusReason);
+
+    if (!preserveWidgetFocus) {
+        deckView->setFocus(Qt::FocusReason::MouseFocusReason);
+    }
 }
 
 void DeckEditorDeckDockWidget::syncDisplayWidgetsToModel()
@@ -711,14 +713,12 @@ void DeckEditorDeckDockWidget::offsetCountAtIndex(const QModelIndex &idx, bool i
 
 void DeckEditorDeckDockWidget::decklistCustomMenu(QPoint point)
 {
-    if (!SettingsCache::instance().getOverrideAllCardArtWithPersonalPreference()) {
-        QMenu menu;
+    QMenu menu;
 
-        QAction *selectPrinting = menu.addAction(tr("Select Printing"));
-        connect(selectPrinting, &QAction::triggered, deckEditor, &AbstractTabDeckEditor::showPrintingSelector);
+    QAction *selectPrinting = menu.addAction(tr("Select Printing"));
+    connect(selectPrinting, &QAction::triggered, deckEditor, &AbstractTabDeckEditor::showPrintingSelector);
 
-        menu.exec(deckView->mapToGlobal(point));
-    }
+    menu.exec(deckView->mapToGlobal(point));
 }
 
 void DeckEditorDeckDockWidget::refreshShortcuts()
