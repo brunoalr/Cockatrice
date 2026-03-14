@@ -15,15 +15,9 @@ set(HEADERS
     libcockatrice/settings/settings_manager.h
 )
 
-if(Qt6_FOUND)
-  qt6_wrap_cpp(MOC_SOURCES ${HEADERS})
-elseif(Qt5_FOUND)
-  qt5_wrap_cpp(MOC_SOURCES ${HEADERS})
-endif()
-
 add_library(
   libcockatrice_settings STATIC
-  ${MOC_SOURCES}
+  ${HEADERS}
   libcockatrice/settings/card_database_settings.cpp
   libcockatrice/settings/card_override_settings.cpp
   libcockatrice/settings/debug_settings.cpp

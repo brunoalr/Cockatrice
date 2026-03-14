@@ -19,15 +19,9 @@ set(HEADERS
     libcockatrice/card/relation/card_relation.h
 )
 
-if(Qt6_FOUND)
-  qt6_wrap_cpp(MOC_SOURCES ${HEADERS})
-elseif(Qt5_FOUND)
-  qt5_wrap_cpp(MOC_SOURCES ${HEADERS})
-endif()
-
 add_library(
   libcockatrice_card STATIC
-  ${MOC_SOURCES}
+  ${HEADERS}
   libcockatrice/card/card_info.cpp
   libcockatrice/card/card_info_comparator.cpp
   libcockatrice/card/database/card_database.cpp
