@@ -13,7 +13,7 @@
 # --dir <dir> sets the name of the build dir, default is "build"
 # --target-macos-version <version> sets the min os version - only used for macOS builds
 # --target-macos-architecture <architecture> sets the architecture - only used for macOS builds
-# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION TARGET_MACOS_ARCH
+# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE CCACHE_VARIANT BUILD_DIR CMAKE_GENERATOR CMAKE_GENERATOR_PLATFORM TARGET_MACOS_VERSION TARGET_MACOS_ARCH
 # (correspond to args: --debug/--release --install --package <package type> --suffix <suffix> --server --test --ccache <ccache_size> --dir <dir>)
 # exitcode: 1 for failure, 3 for invalid arguments
 
@@ -138,10 +138,15 @@ if [[ $MAKE_TEST ]]; then
   flags+=("-DTEST=1")
 fi
 if [[ $USE_CCACHE ]]; then
-  flags+=("-DUSE_CCACHE=1")
-  if [[ $CCACHE_SIZE ]]; then
+  if [[ $CCACHE_VARIANT ]]; then
+    # COMPILER_LAUNCHER only; USE_CCACHE=OFF prevents RULE_LAUNCH_COMPILE (avoids Strawberry ccache on Windows)
+    flags+=("-DUSE_CCACHE=OFF" "-DCMAKE_C_COMPILER_LAUNCHER=$CCACHE_VARIANT" "-DCMAKE_CXX_COMPILER_LAUNCHER=$CCACHE_VARIANT")
+  else
+    flags+=("-DUSE_CCACHE=1")
+  fi
+  if [[ $CCACHE_SIZE && "$CCACHE_VARIANT" != "sccache" ]]; then
     # note, this setting persists after running the script
-    ccache --max-size "$CCACHE_SIZE"
+    "${CCACHE_VARIANT:-ccache}" --max-size "$CCACHE_SIZE"
   fi
 fi
 if [[ $PACKAGE_TYPE ]]; then
@@ -151,16 +156,28 @@ if [[ $USE_VCPKG ]]; then
   flags+=("-DUSE_VCPKG=1")
 fi
 
+cmake_args=()
+if [[ $CMAKE_GENERATOR ]]; then
+  cmake_args+=(-G "$CMAKE_GENERATOR")
+  if [[ $CMAKE_GENERATOR_PLATFORM ]]; then
+    cmake_args+=(-A "$CMAKE_GENERATOR_PLATFORM")
+  fi
+fi
+
 # Add cmake --build flags
 buildflags=(--config "$BUILDTYPE")
 
 function ccachestatsverbose() {
-  # note, verbose only works on newer ccache, discard the error
-  local got
-  if got="$(ccache --show-stats --verbose 2>/dev/null)"; then
-    echo "$got"
+  local launcher="${CCACHE_VARIANT:-ccache}"
+  if [[ $launcher == "sccache" ]]; then
+    sccache -s
   else
-    ccache --show-stats
+    local got
+    if got="$("$launcher" --show-stats --verbose 2>/dev/null)"; then
+      echo "$got"
+    else
+      "$launcher" --show-stats
+    fi
   fi
 }
 
@@ -262,9 +279,8 @@ if [[ $RUNNER_OS == macOS ]]; then
     flags+=(-DCPACK_COMMAND_HDIUTIL="$hdiutil_script")
   fi
 
-elif [[ $RUNNER_OS == Windows ]]; then
+elif [[ $RUNNER_OS == Windows ]] && [[ "$CMAKE_GENERATOR" != *Ninja* ]]; then
   # Enable MTT, see https://devblogs.microsoft.com/cppblog/improved-parallelism-in-msbuild/
-  # and https://devblogs.microsoft.com/cppblog/cpp-build-throughput-investigation-and-tune-up/#multitooltask-mtt
   buildflags+=(-- -p:UseMultiToolTask=true -p:EnableClServerMode=true)
 fi
 
@@ -277,7 +293,7 @@ fi
 echo "::group::Configure cmake"
 cmake --version
 echo "Running cmake with flags: ${flags[*]}"
-cmake .. "${flags[@]}"
+cmake "${cmake_args[@]}" .. "${flags[@]}"
 echo "::endgroup::"
 
 echo "::group::Build project"
