@@ -170,19 +170,46 @@ if(MSVC)
 
   add_compile_definitions(_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING)
 
-  # Visual Studio generator: ccache masquerade (copy ccache as cl.exe + CLToolPath) so cache works without Ninja
+  # Visual Studio generator: compiler cache via CLToolPath (no Ninja). sccache=wrapper; ccache=masquerade as cl.exe
   if(USE_CCACHE AND CMAKE_GENERATOR MATCHES "Visual Studio")
-    find_program(CCACHE_EXE ccache)
-    if(CCACHE_EXE)
-      file(COPY_FILE "${CCACHE_EXE}" "${CMAKE_BINARY_DIR}/cl.exe" ONLY_IF_DIFFERENT)
-      message(STATUS "Using ccache for MSVC via CLToolPath (${CMAKE_BINARY_DIR}/cl.exe)")
-      set(CMAKE_VS_GLOBALS
-        "CLToolExe=cl.exe"
-        "CLToolPath=${CMAKE_BINARY_DIR}"
-        "UseMultiToolTask=true"
-      )
-      if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.25)
-        set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
+    if(CCACHE_VARIANT STREQUAL "sccache")
+      find_program(SCCACHE_EXE sccache)
+      if(SCCACHE_EXE)
+        execute_process(COMMAND cmd /c "where cl" OUTPUT_VARIABLE CL_OUTPUT ERROR_QUIET)
+        string(REGEX MATCH "^[^\r\n]+" CL_PATH "${CL_OUTPUT}")
+        string(STRIP "${CL_PATH}" CL_PATH)
+        if(CL_PATH)
+          configure_file(
+            "${COCKATRICE_CMAKE_PATH}/cl-sccache.cmd.in"
+            "${CMAKE_BINARY_DIR}/cl-sccache.cmd"
+            @ONLY
+          )
+          message(STATUS "Using sccache for MSVC via CLToolPath (${CMAKE_BINARY_DIR}/cl-sccache.cmd -> ${CL_PATH})")
+          set(CMAKE_VS_GLOBALS
+            "CLToolExe=cl-sccache.cmd"
+            "CLToolPath=${CMAKE_BINARY_DIR}"
+            "UseMultiToolTask=true"
+          )
+          if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.25)
+            set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
+          endif()
+        else()
+          message(WARNING "sccache requested but cl.exe not found in PATH; cache disabled")
+        endif()
+      endif()
+    else()
+      find_program(CCACHE_EXE ccache)
+      if(CCACHE_EXE)
+        file(COPY_FILE "${CCACHE_EXE}" "${CMAKE_BINARY_DIR}/cl.exe" ONLY_IF_DIFFERENT)
+        message(STATUS "Using ccache for MSVC via CLToolPath (${CMAKE_BINARY_DIR}/cl.exe)")
+        set(CMAKE_VS_GLOBALS
+          "CLToolExe=cl.exe"
+          "CLToolPath=${CMAKE_BINARY_DIR}"
+          "UseMultiToolTask=true"
+        )
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.25)
+          set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
+        endif()
       endif()
     endif()
   endif()
