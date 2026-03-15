@@ -184,6 +184,7 @@ int main(int argc, char *argv[])
 #else
     const QByteArray configPath = "";
 #endif
+    std::cout << "Hello, world!" << std::endl;
     if (!qEnvironmentVariableIsSet(("QT_LOGGING_CONF"))) {
         // Set the QT_LOGGING_CONF environment variable
         qputenv("QT_LOGGING_CONF", configPath);
