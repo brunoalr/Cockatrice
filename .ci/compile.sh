@@ -128,7 +128,10 @@ if [[ $MAKE_TEST ]]; then
   flags+=("-DTEST=1")
 fi
 if [[ $USE_CCACHE ]]; then
-  if [[ $CCACHE_VARIANT ]]; then
+  if [[ $RUNNER_OS == Windows && "$CMAKE_GENERATOR" == *"Visual Studio"* ]]; then
+    # VS generator does not support COMPILER_LAUNCHER; CMake uses ccache via CLToolPath masquerade (copy as cl.exe)
+    flags+=("-DUSE_CCACHE=1")
+  elif [[ $CCACHE_VARIANT ]]; then
     # COMPILER_LAUNCHER only; USE_CCACHE=OFF prevents RULE_LAUNCH_COMPILE (avoids Strawberry ccache on Windows)
     flags+=("-DUSE_CCACHE=OFF" "-DCMAKE_C_COMPILER_LAUNCHER=$CCACHE_VARIANT" "-DCMAKE_CXX_COMPILER_LAUNCHER=$CCACHE_VARIANT")
   else

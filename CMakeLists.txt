@@ -140,9 +140,15 @@ endif()
 
 # Define proper compilation flags
 if(MSVC)
-  # /Z7 when using compiler launcher (sccache/ccache): avoids C1041 PDB lock with parallel cached compiles
-  # /Zi /FS otherwise for Ninja + /MP parallel builds. Check both launchers since CI sets C and CXX.
+  # /Z7 when using compiler launcher (sccache/ccache) or VS generator + ccache masquerade: avoids C1041 PDB lock
+  # /Zi /FS otherwise for Ninja + /MP parallel builds.
+  set(_use_z7 FALSE)
   if(CMAKE_C_COMPILER_LAUNCHER OR CMAKE_CXX_COMPILER_LAUNCHER)
+    set(_use_z7 TRUE)
+  elseif(USE_CCACHE AND CMAKE_GENERATOR MATCHES "Visual Studio")
+    set(_use_z7 TRUE)
+  endif()
+  if(_use_z7)
     set(_msvc_debug_format " /Z7")
   else()
     set(_msvc_debug_format " /Zi /FS")
@@ -151,7 +157,7 @@ if(MSVC)
   set(CMAKE_CXX_FLAGS "/wd4251 /Zc:__cplusplus /std:c++20 /permissive- /W4 /MP /EHsc${_msvc_debug_format}")
   # Apply same debug format to C (e.g. libcockatrice_rng SFMT.c) so launcher builds avoid PDB lock
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}${_msvc_debug_format}")
-  if(CMAKE_C_COMPILER_LAUNCHER OR CMAKE_CXX_COMPILER_LAUNCHER)
+  if(_use_z7)
     string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
   endif()
   # Visual Studio: Maximum Optimization, Multi-threaded DLL
@@ -163,6 +169,23 @@ if(MSVC)
   set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
 
   add_compile_definitions(_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING)
+
+  # Visual Studio generator: ccache masquerade (copy ccache as cl.exe + CLToolPath) so cache works without Ninja
+  if(USE_CCACHE AND CMAKE_GENERATOR MATCHES "Visual Studio")
+    find_program(CCACHE_EXE ccache)
+    if(CCACHE_EXE)
+      file(COPY_FILE "${CCACHE_EXE}" "${CMAKE_BINARY_DIR}/cl.exe" ONLY_IF_DIFFERENT)
+      message(STATUS "Using ccache for MSVC via CLToolPath (${CMAKE_BINARY_DIR}/cl.exe)")
+      set(CMAKE_VS_GLOBALS
+        "CLToolExe=cl.exe"
+        "CLToolPath=${CMAKE_BINARY_DIR}"
+        "UseMultiToolTask=true"
+      )
+      if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.25)
+        set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
+      endif()
+    endif()
+  endif()
 elseif(CMAKE_COMPILER_IS_GNUCXX)
   # linux/gcc, bsd/gcc, windows/mingw
   include(CheckCXXCompilerFlag)

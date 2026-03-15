@@ -321,7 +321,7 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             cmake_generator: "Visual Studio 17 2022"
             cmake_generator_platform: x64
-            ccache_variant: sccache
+            ccache_variant: ccache
 
     name: ${{matrix.os}} ${{matrix.target}}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
@@ -338,6 +338,7 @@ jobs:
           submodules: recursive
 
       - name: Restore compiler cache (ccache)
+        if: matrix.ccache_variant != ''
         id: ccache_restore
         uses: actions/cache/restore@v5
         with:
@@ -347,6 +348,7 @@ jobs:
             ${{ matrix.ccache_variant }}-${{ matrix.runner }}-${{ matrix.soc || 'Windows' }}-${{ matrix.type }}-master-
 
       - name: Setup ${{ matrix.ccache_variant }}
+        if: matrix.ccache_variant != ''
         uses: hendrikmuhs/ccache-action@v1.2.20
         with:
           key: ${{ matrix.ccache_variant}}-${{ matrix.runner }}-${{ matrix.soc || 'Windows' }}-${{ matrix.type }}-master
@@ -446,13 +448,13 @@ jobs:
 
       # Delete used cache to emulate a cache update. See https://github.com/actions/cache/issues/342.
       - name: Delete old compiler cache (ccache)
-        if: github.ref == 'refs/heads/master' && steps.ccache_restore.outputs.cache-hit && steps.build.outcome == 'success'
+        if: matrix.ccache_variant != '' && github.ref == 'refs/heads/master' && steps.ccache_restore.outputs.cache-hit && steps.build.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh cache delete --repo ${{ github.repository }} ${{ steps.ccache_restore.outputs.cache-primary-key }}
 
       - name: Save compiler cache (ccache)
-        if: github.ref == 'refs/heads/master' && steps.build.outcome == 'success'
+        if: matrix.ccache_variant != '' && github.ref == 'refs/heads/master' && steps.build.outcome == 'success'
         uses: actions/cache/save@v5
         with:
           path: ${{ github.workspace }}/.cache/
