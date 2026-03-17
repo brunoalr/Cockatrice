@@ -157,7 +157,6 @@ jobs:
       # Cache size over the entire repo is 10Gi:
       # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CCACHE_SIZE: 550M
-      cmake_generator_platform: x64
       CMAKE_GENERATOR: 'Ninja'
 
     steps:
