@@ -339,6 +339,14 @@ jobs:
         with:
           submodules: recursive
 
+      # Used only to install sccache
+      - name: Setup sccache (Windows)
+        if: matrix.os == 'Windows' && matrix.ccache_variant == 'sccache'
+        uses: hendrikmuhs/ccache-action@v1.2.20
+        with:
+          variant: sccache
+          save: false # we manage the cache ourselves
+
       # Set relevant environment variables for MSVC, used to ensure ninja + MSVC build correctly together
       - name: Setup MSVC (Windows)
         if: matrix.os == 'Windows'
