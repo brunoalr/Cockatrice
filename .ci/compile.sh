@@ -14,7 +14,7 @@
 # --dir <dir> sets the name of the build dir, default is "build"
 # --cmake-generator <generator> sets CMAKE_GENERATOR as used by cmake
 # --target-macos-version <version> sets the min os version - only used for macOS builds
-# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE CCACHE_EVICTION_AGE BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION
+# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE CCACHE_VARIANT CCACHE_EVICTION_AGE BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION
 # (correspond to args: --debug/--release --install --package <package type> --suffix <suffix> --server --test --ccache <ccache_size> --dir <dir>)
 # exitcode: 1 for failure, 3 for invalid arguments
 
@@ -148,10 +148,18 @@ if [[ $MAKE_TEST ]]; then
   flags+=("-DTEST=1")
 fi
 if [[ $USE_CCACHE ]]; then
-  flags+=("-DUSE_CCACHE=1")
-  if [[ $CCACHE_SIZE ]]; then
-    # note, this setting persists after running the script
-    ccache --max-size "$CCACHE_SIZE"
+  if [[ $CCACHE_VARIANT == 'sccache' ]]; then
+    # sccache only
+	# USE_CCACHE=0 prevents RULE_LAUNCH_COMPILE (avoids Strawberry ccache on Windows), use compiler launcher variables
+	# see https://github.com/mozilla/sccache#usage
+    flags+=("-DUSE_CCACHE=0" "-DCMAKE_C_COMPILER_LAUNCHER=sccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
+  else
+    # ccache only
+    flags+=("-DUSE_CCACHE=1")
+	if [[ $CCACHE_SIZE ]]; then
+      # note, this setting persists after running the script
+      ccache --max-size "$CCACHE_SIZE"
+    fi
   fi
 fi
 if [[ $PACKAGE_TYPE ]]; then
@@ -165,12 +173,16 @@ fi
 buildflags=(--config "$BUILDTYPE")
 
 function ccachestatsverbose() {
-  # note, verbose only works on newer ccache, discard the error
-  local got
-  if got="$(ccache --show-stats --verbose 2>/dev/null)"; then
-    echo "$got"
+  if [[ $CCACHE_VARIANT == 'sccache' ]]; then
+    sccache -s
   else
-    ccache --show-stats
+    # note, verbose only works on newer ccache, discard the error
+    local got
+    if got="$(ccache --show-stats --verbose 2>/dev/null)"; then
+      echo "$got"
+    else
+      ccache --show-stats
+    fi
   fi
 }
 
