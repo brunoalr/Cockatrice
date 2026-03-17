@@ -337,6 +337,10 @@ jobs:
         with:
           submodules: recursive
 
+      # Set relevant environment variables for MSVC, used to ensure ninja + MSVC build correctly together
+      - name: Setup MSVC (Windows)
+        if: matrix.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1.13.0
 
       - name: Setup ccache
         if: matrix.use_ccache == 1 && matrix.os == 'macOS'
@@ -352,10 +356,6 @@ jobs:
           path: ${{env.CCACHE_DIR}}
           key: ccache-${{matrix.runner}}-${{matrix.soc}}-${{matrix.type}}-${{env.BRANCH_NAME}}
           restore-keys: ccache-${{matrix.runner}}-${{matrix.soc}}-${{matrix.type}}-
-
-      - name: Setup MSVC (Windows)
-        if: matrix.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1.13.0
 
       - name: Install aqtinstall
         run: pipx install aqtinstall
