@@ -426,7 +426,6 @@ jobs:
           MAKE_PACKAGE: '${{matrix.make_package}}'
           PACKAGE_SUFFIX: '${{matrix.package_suffix}}'
           CMAKE_GENERATOR: ${{matrix.cmake_generator}}
-          CMAKE_GENERATOR_PLATFORM: ${{matrix.cmake_generator_platform}}
           USE_CCACHE: ${{matrix.use_ccache}}
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
