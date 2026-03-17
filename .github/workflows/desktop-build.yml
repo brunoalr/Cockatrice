@@ -544,7 +544,7 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             soc: Apple
             type: Release
-            use_ccache: 1
+            ccache_variant: ccache
             vcpkg_deployment_target: 14
             vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
             vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
@@ -562,7 +562,7 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             soc: Apple
             type: Release
-            use_ccache: 1
+            ccache_variant: ccache
             vcpkg_deployment_target: 14
             vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
 
@@ -576,7 +576,7 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             soc: Apple
             type: Debug
-            use_ccache: 1
+            ccache_variant: ccache
             vcpkg_deployment_target: 14
             vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
 
@@ -600,6 +600,7 @@ jobs:
             # restoring the warm archives. Renaming would orphan them.
             vcpkg_scope: 'vcpkg/windows10-x64-vs2026/'
             vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
+            ccache_variant: sccache
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: [configure, vcpkg-baseline]
@@ -609,12 +610,15 @@ jobs:
     timeout-minutes: 100
     env:
       CCACHE_DIR: ${{ github.workspace }}/.cache/
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/
       # macOS configurations compile about twice the TUs of a Linux one, so each of these
       # three legs gets a bound above what it has been measured to write. The four macOS
       # legs used to be bounded at 600M from the same quota as the Linux ones; the three
       # pull-request legs now get 700M each while the nightly Intel leg keeps none, and
       # that is what fits (see CCACHE_SIZE in build-linux for the full arithmetic).
       CCACHE_SIZE: 700M
+      # sccache uses the following env var instead of having a CLI parameter
+      SCCACHE_CACHE_SIZE: 600M
       PERSIST_CCACHE: 'true'
 
     # Shared with build-vcpkg-nightly so the two leg sets run the same steps.
@@ -624,22 +628,21 @@ jobs:
         with:
           submodules: recursive
 
-      - name: "[Windows] Add msbuild to PATH"
-        if: matrix.os == 'Windows'
-        uses: microsoft/setup-msbuild@v3
-        with:
-          msbuild-architecture: x64
-
       - name: "[macOS] Setup ccache"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1
+        if: matrix.os == 'macOS'
         run: brew install ccache
 
-      - name: "[macOS] Restore compiler cache (ccache)"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1 && env.PERSIST_CCACHE == 'true'
+      - name: "[Windows] Install sccache"
+        if: matrix.os == 'Windows'
+        shell: bash
+        run: choco install sccache
+
+      - name: "Restore compiler cache (${{ matrix.ccache_variant }})"
+        if: env.PERSIST_CCACHE == 'true'
         id: restore_ccache
         uses: actions/cache/restore@v6
         with:
-          key: ccache-${{ matrix.os }}${{ matrix.override_target }}-${{ matrix.runner }}
+          key: ${{ matrix.ccache_variant }}-${{ matrix.os }}${{ matrix.override_target }}-${{ matrix.runner }}
           path: ${{ env.CCACHE_DIR }}
 
       - name: "[macOS] Install aqtinstall"
@@ -748,6 +751,7 @@ jobs:
         env:
           BUILDTYPE: '${{ matrix.type }}'
           CCACHE_EVICTION_AGE: ${{ matrix.ccache_eviction_age }}
+          CCACHE_VARIANT: ${{ matrix.ccache_variant }}
           CMAKE_GENERATOR: ${{ matrix.cmake_generator }}
           # Tag builds only: artifacts from master pushes and PR branches must not report to
           # Sentry. Forks get no secrets on pull_request, so they keep the mock fallback either way.
@@ -762,7 +766,6 @@ jobs:
           MAKE_PACKAGE: '${{ matrix.make_package }}'
           PACKAGE_SUFFIX: '${{ matrix.package_suffix }}'
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
-          USE_CCACHE: ${{ matrix.use_ccache }}
           # Only pushes to the default branch may write the shared binary cache: the
           # archives a run compiles are only as trustworthy as the code they were
           # built from, and only merged code may populate the scope that master and
@@ -778,7 +781,7 @@ jobs:
           VCPKG_TARGET_MACOS_VERSION: ${{ matrix.vcpkg_deployment_target }}
           # Release legs compile the sentry-native SDK; Debug legs stay SDK-free.
           WITH_CRASH_REPORTING: ${{ matrix.type == 'Release' && 'ON' || '' }}
-        run: .ci/compile.sh --server --test --vcpkg
+        run: .ci/compile.sh --server --test --vcpkg --ccache
 
       - name: "Install sentry-cli"
         if: needs.configure.outputs.tag != null && matrix.make_package == '1'
@@ -964,9 +967,10 @@ jobs:
           retention-days: 1
 
       # Delete used cache to emulate a ccache update. See https://github.com/actions/cache/issues/342
-      - name: "[macOS] Delete remote compiler cache (ccache)"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1 && env.PERSIST_CCACHE == 'true' && github.ref == 'refs/heads/master' && steps.restore_ccache.outputs.cache-hit
+      - name: "Delete remote compiler cache (${{ matrix.ccache_variant }})"
+        if: env.PERSIST_CCACHE == 'true' && github.ref == 'refs/heads/master' && steps.restore_ccache.outputs.cache-hit
         continue-on-error: true
+        shell: bash
         env:
           CACHE_PRIMARY_KEY: ${{ steps.restore_ccache.outputs.cache-primary-key }}
           GH_TOKEN: ${{ github.token }}
@@ -975,8 +979,8 @@ jobs:
             echo "Cache deleted successfully"
           fi
 
-      - name: "[macOS] Cache updated compiler cache (ccache)"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1 && env.PERSIST_CCACHE == 'true' && github.ref == 'refs/heads/master'
+      - name: "Save updated compiler cache (${{ matrix.ccache_variant }})"
+        if: env.PERSIST_CCACHE == 'true' && github.ref == 'refs/heads/master'
         uses: actions/cache/save@v6
         with:
           key: ${{ steps.restore_ccache.outputs.cache-primary-key }}
@@ -1111,7 +1115,7 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             soc: Intel
             type: Release
-            use_ccache: 1
+            ccache_variant: ccache
             vcpkg_scope: 'vcpkg/macos13-x64-xcode26.3/'
             vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
 
