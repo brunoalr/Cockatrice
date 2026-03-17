@@ -131,13 +131,14 @@ if [[ $USE_CCACHE ]]; then
   if [[ $CCACHE_VARIANT == 'sccache' ]]; then
     # sccache only; USE_CCACHE=0 prevents RULE_LAUNCH_COMPILE (avoids Strawberry ccache on Windows), use compiler launcher variables
 	# see https://github.com/mozilla/sccache#usage
-    flags+=("-DUSE_CCACHE=0" "-DCMAKE_C_COMPILER_LAUNCHER=$CCACHE_VARIANT" "-DCMAKE_CXX_COMPILER_LAUNCHER=$CCACHE_VARIANT")
+    flags+=("-DUSE_CCACHE=0" "-DCMAKE_C_COMPILER_LAUNCHER=sccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
   else
+    # ccache only
     flags+=("-DUSE_CCACHE=1")
-  fi
-  if [[ $CCACHE_SIZE ]]; then
-    # note, this setting persists after running the script
-    "${CCACHE_VARIANT:-ccache}" -- --max-size "$CCACHE_SIZE"
+	if [[ $CCACHE_SIZE ]]; then
+      # note, this setting persists after running the script
+      ccache --max-size "$CCACHE_SIZE"
+    fi
   fi
 fi
 if [[ $PACKAGE_TYPE ]]; then
