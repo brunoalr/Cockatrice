@@ -137,7 +137,7 @@ if [[ $USE_CCACHE ]]; then
   fi
   if [[ $CCACHE_SIZE ]]; then
     # note, this setting persists after running the script
-    "${CCACHE_VARIANT:-ccache}" --max-size "$CCACHE_SIZE"
+    "${CCACHE_VARIANT:-ccache}" -- --max-size "$CCACHE_SIZE"
   fi
 fi
 if [[ $PACKAGE_TYPE ]]; then
