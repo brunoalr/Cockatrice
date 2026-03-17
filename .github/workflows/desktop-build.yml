@@ -276,7 +276,7 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtwebsockets qtshadertools
             soc: Intel
             type: Release
-            use_ccache: 1
+            ccache_variant: ccache
             xcode: "26.3"
 
           - os: macOS
@@ -292,7 +292,7 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtwebsockets qtshadertools
             soc: Apple
             type: Release
-            use_ccache: 1
+            ccache_variant: ccache
             xcode: "26.6"
 
           - os: macOS
@@ -308,7 +308,7 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtwebsockets qtshadertools
             soc: Apple
             type: Release
-            use_ccache: 1
+            ccache_variant: ccache
             xcode: "26.6"
 
           - os: macOS
@@ -321,20 +321,20 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtwebsockets qtshadertools
             soc: Apple
             type: Debug
-            use_ccache: 1
+            ccache_variant: ccache
             xcode: "26.6"
 
           - os: Windows
             target: 10
             runner: windows-2025    # https://github.com/actions/runner-images/blob/main/images/windows/Windows2025-VS2026-Readme.md
 
-            cmake_generator: "Visual Studio 18 2026"
-            cmake_generator_platform: x64
+            cmake_generator: Ninja
             make_package: 1
             package_suffix: "-Win10"
             qt_version: 6.11.1
             qt_modules: qtimageformats qtmultimedia qtwebsockets qtshadertools
             type: Release
+            ccache_variant: sccache
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
@@ -342,7 +342,12 @@ jobs:
     timeout-minutes: 100
     env:
       CCACHE_DIR: ${{ github.workspace }}/.cache/
-      CCACHE_SIZE: 600M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/
+      # Cache size over the entire repo is 10Gi:
+      # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
+      CCACHE_SIZE: 600M
+      # sccache uses the following env var instead of having a CLI parameter
+      SCCACHE_CACHE_SIZE: 600M
 
     steps:
       - name: "Checkout"
@@ -350,22 +355,27 @@ jobs:
         with:
           submodules: recursive
 
-      - name: "[Windows] Add msbuild to PATH"
+      # Set relevant environment variables for MSVC, used to ensure ninja + MSVC build correctly together
+      - name: Setup MSVC (Windows)
         if: matrix.os == 'Windows'
-        uses: microsoft/setup-msbuild@v3
+        uses: ilammy/msvc-dev-cmd@v1.13.0
         with:
-          msbuild-architecture: x64
+          arch: x64
 
       - name: "[macOS] Setup ccache"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1
+        if: matrix.os == 'macOS'
         run: brew install ccache
 
-      - name: "[macOS] Restore compiler cache (ccache)"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1
+      - name: "[Windows] Install sccache"
+        if: matrix.os == 'Windows'
+        shell: bash
+        run: choco install sccache
+
+      - name: "Restore compiler cache (${{ matrix.ccache_variant }})"
         id: restore_ccache
         uses: actions/cache/restore@v6
         with:
-          key: ccache-${{ matrix.runner }}_${{ matrix.override_target }}-Xcode${{ matrix.xcode }}
+          key: ${{ matrix.ccache_variant }}-${{ matrix.runner }}_${{ matrix.override_target }}-Xcode${{ matrix.xcode }}
           path: ${{ env.CCACHE_DIR }}
 
       - name: "Install aqtinstall"
@@ -438,8 +448,8 @@ jobs:
         env:
           BUILDTYPE: '${{ matrix.type }}'
           CCACHE_EVICTION_AGE: ${{ matrix.ccache_eviction_age }}
+          CCACHE_VARIANT: ${{ matrix.ccache_variant }}
           CMAKE_GENERATOR: ${{ matrix.cmake_generator }}
-          CMAKE_GENERATOR_PLATFORM: ${{ matrix.cmake_generator_platform }}
           DEVELOPER_DIR: '/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer'
           GITHUB_TOKEN: ${{ github.token }}    # needed for vcpkg dependency graph updates, see VCPKG_FEATURE_FLAGS
           MACOS_CERTIFICATE: ${{ secrets.PROD_MACOS_CERTIFICATE }}
@@ -449,16 +459,16 @@ jobs:
           MAKE_PACKAGE: '${{ matrix.make_package }}'
           PACKAGE_SUFFIX: '${{ matrix.package_suffix }}'
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
-          USE_CCACHE: ${{ matrix.use_ccache }}
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
           VCPKG_DISABLE_METRICS: 1
           VCPKG_FEATURE_FLAGS: dependencygraph
-        run: .ci/compile.sh --server --test --vcpkg
+        run: .ci/compile.sh --server --test --vcpkg --ccache
 
       # Delete used cache to emulate a ccache update. See https://github.com/actions/cache/issues/342
-      - name: "[macOS] Delete remote compiler cache (ccache)"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1 && github.ref == 'refs/heads/master' && steps.restore_ccache.outputs.cache-hit
+      - name: "Delete remote compiler cache (${{ matrix.ccache_variant }})"
+        if: github.ref == 'refs/heads/master' && steps.restore_ccache.outputs.cache-hit
         continue-on-error: true
+        shell: bash
         env:
           CACHE_PRIMARY_KEY: ${{ steps.restore_ccache.outputs.cache-primary-key }}
           GH_TOKEN: ${{ github.token }}
@@ -467,8 +477,8 @@ jobs:
             echo "Cache deleted successfully"
           fi
 
-      - name: "[macOS] Cache updated compiler cache (ccache)"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1 && github.ref == 'refs/heads/master'
+      - name: "Save updated compiler cache (${{ matrix.ccache_variant }})"
+        if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v6
         with:
           key: ${{ steps.restore_ccache.outputs.cache-primary-key }}
@@ -537,9 +547,9 @@ jobs:
           if-no-files-found: error
           name: ${{ steps.build.outputs.name }}-PDBs
           path: |
-            build/cockatrice/Release/*.pdb
-            build/oracle/Release/*.pdb
-            build/servatrice/Release/*.pdb
+            build/cockatrice/**/*.pdb
+            build/oracle/**/*.pdb
+            build/servatrice/**/*.pdb
 
       - name: "Upload to release"
         if: needs.configure.outputs.tag != null && matrix.make_package == '1'
