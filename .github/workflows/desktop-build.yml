@@ -361,7 +361,7 @@ jobs:
         with:
           path: ${{env.CCACHE_DIR}}
           key: ${{matrix.ccache_variant}}-${{matrix.runner}}-${{matrix.os == 'macOS' && matrix.soc || 'Windows'}}-${{matrix.type}}-${{env.BRANCH_NAME}}
-          restore-keys: ${{matrix.ccache_variant}}-${{matrix.runner}}-${{matrix.os == 'macOS' && matrix.soc || 'Windows'}}-${{matrix.soc}}-${{matrix.type}}-
+          restore-keys: ${{matrix.ccache_variant}}-${{matrix.runner}}-${{matrix.os == 'macOS' && matrix.soc || 'Windows'}}-${{matrix.type}}-
 
       - name: Install aqtinstall
         run: pipx install aqtinstall
