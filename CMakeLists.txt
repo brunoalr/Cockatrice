@@ -88,6 +88,18 @@ if(WIN32 OR USE_VCPKG)
   endif()
 endif()
 
+if(WIN32
+   AND USE_VCPKG
+   AND CMAKE_GENERATOR STREQUAL "Ninja"
+)
+  # vcpkg.cmake must be the primary toolchain; MSVC+Ninja toolchain is chainloaded
+  # See https://github.com/MarkSchofield/WindowsToolchain#windowstoolchain-and-vcpkg
+  set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/WindowsToolchain/Windows.MSVC.toolchain.cmake"
+      CACHE FILEPATH "Chainloaded MSVC toolchain file for Ninja generator"
+  )
+endif()
+
 # A project name is needed for CPack
 # Version can be overriden by git tags, see cmake/getversion.cmake
 project("Cockatrice" VERSION 3.1.2)
@@ -156,8 +168,16 @@ endif()
 
 # Define proper compilation flags
 if(MSVC)
-  # Disable Warning C4251, C++20 compatibility, Multi-threaded Builds, Warn Detection, Unwind Semantics, Debug Symbols
-  set(CMAKE_CXX_FLAGS "/wd4251 /Zc:__cplusplus /std:c++20 /permissive- /W4 /MP /EHsc /Zi")
+  # /Z7 when using sccache: avoids C1041 error: PDB lock with parallel cached compiles
+  # /Zi /FS otherwise for Ninja + /MP parallel builds, /FS = Force Synchronous PDB writes
+  # see https://github.com/mozilla/sccache#usage and https://learn.microsoft.com/en-us/cpp/build/reference/z7-zi-zi-debug-information-format?view=msvc-170
+  if(CMAKE_CXX_COMPILER_LAUNCHER STREQUAL "sccache")
+    set(MSVC_DEBUG_FORMAT " /Z7")
+  else()
+    set(MSVC_DEBUG_FORMAT " /Zi /FS")
+  endif()
+  # Disable Warning C4251, C++20 compatibility, Multi-threaded Builds, Warn Detection, Unwind Semantics, Debug Symbols, Debug Format flags (see above)
+  set(CMAKE_CXX_FLAGS "/wd4251 /Zc:__cplusplus /std:c++20 /permissive- /W4 /MP /EHsc ${MSVC_DEBUG_FORMAT}")
   # Visual Studio: Maximum Optimization, Multi-threaded DLL
   set(CMAKE_CXX_FLAGS_RELEASE "/Ox /MD")
   # Visual Studio: No Optimization, Multi-threaded Debug DLL
