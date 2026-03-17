@@ -318,6 +318,8 @@ if(UNIX)
   endif()
 elseif(WIN32)
   set(CPACK_GENERATOR NSIS ${CPACK_GENERATOR})
+  # This a generator-agnostic way to determine if the build is 64-bit or 32-bit.
+  # See https://cmake.org/cmake/help/latest/variable/CMAKE_SIZEOF_VOID_P.html
   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(TRICE_IS_64_BIT 1)
   else()
