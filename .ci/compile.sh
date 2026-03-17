@@ -132,6 +132,7 @@ if [[ $USE_CCACHE ]]; then
     # sccache only; USE_CCACHE=0 prevents RULE_LAUNCH_COMPILE (avoids Strawberry ccache on Windows), use compiler launcher variables
 	# see https://github.com/mozilla/sccache#usage
     flags+=("-DUSE_CCACHE=0" "-DCMAKE_C_COMPILER_LAUNCHER=sccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
+	SCCACHE_CACHE_SIZE="$CCACHE_SIZE"
   else
     # ccache only
     flags+=("-DUSE_CCACHE=1")
