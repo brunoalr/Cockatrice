@@ -208,6 +208,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh cache delete --repo ${{ github.repository }} ${{ steps.ccache_restore.outputs.cache-primary-key }}
+        continue-on-error: true
 
       - name: Save updated compiler cache (ccache)
         if: github.ref == 'refs/heads/master'
@@ -452,6 +453,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh cache delete --repo ${{ github.repository }} ${{ steps.ccache_restore.outputs.cache-primary-key }}
+        continue-on-error: true
 
       - name: Save updated compiler cache (${{ matrix.ccache_variant }})
         if: github.ref == 'refs/heads/master'
