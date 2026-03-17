@@ -12,15 +12,9 @@ set(HEADERS
     token/token_edit_model.h
 )
 
-if(Qt6_FOUND)
-  qt6_wrap_cpp(MOC_SOURCES ${HEADERS})
-elseif(Qt5_FOUND)
-  qt5_wrap_cpp(MOC_SOURCES ${HEADERS})
-endif()
-
 add_library(
   libcockatrice_models_database STATIC
-  ${MOC_SOURCES}
+  ${HEADERS}
   card_database_model.cpp
   card_database_display_model.cpp
   card/card_completer_proxy_model.cpp

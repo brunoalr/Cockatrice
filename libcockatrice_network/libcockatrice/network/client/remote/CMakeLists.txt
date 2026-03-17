@@ -6,13 +6,7 @@ set(HEADERS remote_client.h)
 
 set(SOURCES remote_client.cpp)
 
-if(Qt6_FOUND)
-  qt6_wrap_cpp(MOC_SOURCES ${HEADERS})
-elseif(Qt5_FOUND)
-  qt5_wrap_cpp(MOC_SOURCES ${HEADERS})
-endif()
-
-add_library(libcockatrice_network_client_remote STATIC ${MOC_SOURCES} ${SOURCES})
+add_library(libcockatrice_network_client_remote STATIC ${HEADERS} ${SOURCES})
 
 add_dependencies(libcockatrice_network_client_remote libcockatrice_network_client_abstract libcockatrice_protocol)
 
