@@ -278,7 +278,7 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             soc: Intel
             type: Release
-            use_ccache: 1
+            ccache_variant: ccache
             xcode: "16.4"
 
           - os: macOS
@@ -294,7 +294,7 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             soc: Apple
             type: Release
-            use_ccache: 1
+            ccache_variant: ccache
             xcode: "15.4"
 
           - os: macOS
@@ -310,7 +310,7 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             soc: Apple
             type: Release
-            use_ccache: 1
+            ccache_variant: ccache
             xcode: "16.4"
 
           - os: macOS
@@ -324,7 +324,7 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             soc: Apple
             type: Debug
-            use_ccache: 1
+            ccache_variant: ccache
             xcode: "16.4"
 
           - os: Windows
@@ -338,6 +338,7 @@ jobs:
             qt_arch: win64_msvc2022_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             type: Release
+            ccache_variant: sccache
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
@@ -345,7 +346,12 @@ jobs:
     timeout-minutes: 100
     env:
       CCACHE_DIR: ${{ github.workspace }}/.cache/
-      CCACHE_SIZE: 550M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
+      SCCACHE_DIR: ${{ github.workspace }}/.cache/
+      # Cache size over the entire repo is 10Gi:
+      # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
+      CCACHE_SIZE: 550M
+      # sccache uses the following env var instead of having a CLI parameter
+      SCCACHE_CACHE_SIZE: 550M
 
     steps:
       - name: "Checkout"
@@ -354,19 +360,23 @@ jobs:
           submodules: recursive
 
       - name: "[macOS] Setup ccache"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1
+        if: matrix.os == 'macOS'
         run: brew install ccache
 
-      - name: "[macOS] Restore compiler cache (ccache)"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1
+      - name: "[Windows] Install sccache"
+        if: matrix.os == 'Windows'
+        shell: bash
+        run: choco install sccache
+
+      - name: "Restore compiler cache (${{ matrix.ccache_variant }})"
         id: ccache_restore
         uses: actions/cache/restore@v5
         env:
           BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         with:
-          key: ccache-${{ matrix.runner }}-${{ matrix.soc }}-${{ matrix.type }}-${{ env.BRANCH_NAME }}
+          key: ${{ matrix.ccache_variant }}-${{ matrix.runner }}-${{ matrix.os == 'macOS' && matrix.soc || 'Windows' }}-${{ matrix.type }}-${{ env.BRANCH_NAME }}
           path: ${{ env.CCACHE_DIR }}
-          restore-keys: ccache-${{ matrix.runner }}-${{ matrix.soc }}-${{ matrix.type }}-
+          restore-keys: ${{ matrix.ccache_variant }}-${{ matrix.runner }}-${{ matrix.os == 'macOS' && matrix.soc || 'Windows' }}-${{ matrix.type }}-
 
       - name: "Install aqtinstall"
         run: pipx install aqtinstall
@@ -437,8 +447,8 @@ jobs:
         env:
           BUILDTYPE: '${{ matrix.type }}'
           CCACHE_EVICTION_AGE: ${{ matrix.ccache_eviction_age }}
+          CCACHE_VARIANT: ${{ matrix.ccache_variant }}
           CMAKE_GENERATOR: ${{ matrix.cmake_generator }}
-          CMAKE_GENERATOR_PLATFORM: ${{ matrix.cmake_generator_platform }}
           DEVELOPER_DIR: '/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer'
           MACOS_CERTIFICATE: ${{ secrets.PROD_MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_NAME: ${{ secrets.PROD_MACOS_CERTIFICATE_NAME }}
@@ -447,14 +457,13 @@ jobs:
           MAKE_PACKAGE: '${{ matrix.make_package }}'
           PACKAGE_SUFFIX: '${{ matrix.package_suffix }}'
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
-          USE_CCACHE: ${{ matrix.use_ccache }}
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
           VCPKG_DISABLE_METRICS: 1
-        run: .ci/compile.sh --server --test --vcpkg
+        run: .ci/compile.sh --server --test --vcpkg --ccache
 
       # Delete used cache to emulate a ccache update. See https://github.com/actions/cache/issues/342
-      - name: "[macOS] Delete remote compiler cache (ccache)"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1 && github.ref == 'refs/heads/master' && steps.ccache_restore.outputs.cache-hit
+      - name: "Delete remote compiler cache (${{ matrix.ccache_variant }})"
+        if: github.ref == 'refs/heads/master' && steps.ccache_restore.outputs.cache-hit
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -463,8 +472,8 @@ jobs:
             echo "Cache deleted successfully"
           fi
 
-      - name: "[macOS] Save updated compiler cache (ccache)"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1 && github.ref == 'refs/heads/master'
+      - name: "Save updated compiler cache (${{ matrix.ccache_variant }})"
+        if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v5
         with:
           key: ${{ steps.ccache_restore.outputs.cache-primary-key }}
