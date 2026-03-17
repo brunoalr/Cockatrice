@@ -135,13 +135,20 @@ if(UNIX)
     endif()
   endif()
 elseif(WIN32)
-  set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/rundir/${CMAKE_BUILD_TYPE})
+  set(CMAKE_INSTALL_PREFIX ${PROJECT_BINARY_DIR}/rundir/${CMAKE_BUILD_TYPE})
 endif()
 
 # Define proper compilation flags
 if(MSVC)
+  # /Z7 when using compiler launcher (sccache): avoids C1041 PDB lock with parallel cached compiles
+  # /Zi /FS otherwise for Ninja + /MP parallel builds
+  if(CMAKE_CXX_COMPILER_LAUNCHER)
+    set(_msvc_debug_format " /Z7")
+  else()
+    set(_msvc_debug_format " /Zi /FS")
+  endif()
   # Disable Warning C4251, C++20 compatibility, Multi-threaded Builds, Warn Detection, Unwind Semantics, Debug Symbols
-  set(CMAKE_CXX_FLAGS "/wd4251 /Zc:__cplusplus /std:c++20 /permissive- /W4 /MP /EHsc /Zi")
+  set(CMAKE_CXX_FLAGS "/wd4251 /Zc:__cplusplus /std:c++20 /permissive- /W4 /MP /EHsc${_msvc_debug_format}")
   # Visual Studio: Maximum Optimization, Multi-threaded DLL
   set(CMAKE_CXX_FLAGS_RELEASE "/Ox /MD")
   # Visual Studio: No Optimization, Multi-threaded Debug DLL
@@ -311,7 +318,7 @@ if(UNIX)
   endif()
 elseif(WIN32)
   set(CPACK_GENERATOR NSIS ${CPACK_GENERATOR})
-  if("${CMAKE_GENERATOR_PLATFORM}" MATCHES "(x64)")
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(TRICE_IS_64_BIT 1)
   else()
     set(TRICE_IS_64_BIT 0)
