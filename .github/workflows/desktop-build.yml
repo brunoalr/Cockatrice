@@ -451,7 +451,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh cache delete --repo ${{ github.repository }} ${{ steps.ccache_restore.outputs.cache-primary-key }}
 
-      - name: Save updated compiler cache (ccache)
+      - name: Save updated compiler cache (${{ matrix.ccache_variant }})
         if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v5
         with:
