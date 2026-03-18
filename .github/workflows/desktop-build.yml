@@ -357,6 +357,8 @@ jobs:
       - name: Setup MSVC (Windows)
         if: matrix.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1.13.0
+        with:
+          arch: x64
 
       - name: "[macOS] Setup ccache"
         if: matrix.os == 'macOS' && matrix.use_ccache == 1
