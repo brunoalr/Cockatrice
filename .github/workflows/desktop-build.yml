@@ -321,6 +321,7 @@ jobs:
             qt_arch: win64_msvc2022_64
             qt_modules: qtimageformats qtmultimedia qtwebsockets
             cmake_generator: Ninja
+            toolchain_file: cmake/WindowsToolchain/Windows.MSVC.toolchain.cmake
 
     name: ${{matrix.os}} ${{matrix.target}}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
@@ -336,13 +337,6 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: recursive
-
-      # Set relevant environment variables for MSVC, used to ensure ninja + MSVC build correctly together
-      - name: Setup MSVC (Windows)
-        if: matrix.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1.13.0
-        with:
-          arch: x64
 
       - name: Setup ccache
         if: matrix.use_ccache == 1 && matrix.os == 'macOS'
@@ -431,6 +425,8 @@ jobs:
           USE_CCACHE: ${{matrix.use_ccache}}
           VCPKG_DISABLE_METRICS: 1
           VCPKG_BINARY_SOURCES: 'clear;files,${{ steps.vcpkg-cache.outputs.path }},readwrite'
+          # Set relevant environment variables for MSVC, used to ensure ninja + MSVC build correctly together
+          CMAKE_TOOLCHAIN_FILE: ${{ matrix.toolchain_file }}
           # macOS-specific environment variables, will be ignored on Windows
           MACOS_CERTIFICATE: ${{ secrets.PROD_MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.PROD_MACOS_CERTIFICATE_PWD }}
