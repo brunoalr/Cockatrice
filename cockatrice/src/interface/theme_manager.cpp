@@ -396,6 +396,7 @@ static QString roleBgName(ThemeManager::Role role)
 
         default:
             Q_ASSERT(false);
+            return "ERROR: SHOULD NOT REACH HERE";
     }
 }
 

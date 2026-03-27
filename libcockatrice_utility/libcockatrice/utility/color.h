@@ -54,7 +54,7 @@ inline QColor colorHelper(const QString &name)
         return colorMap[name.toUpper()];
     }
 
-    uint h = qHash(name);
+    const uint h = static_cast<uint>(qHash(name));
     int r = 100 + (h % 120);
     int g = 100 + ((h >> 8) % 120);
     int b = 100 + ((h >> 16) % 120);
