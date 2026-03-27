@@ -89,7 +89,7 @@ int FlowLayout::heightForWidth(const int width) const
         height += rowHeight; // Add height of the last row
         return height;
     } else {
-        int width = 0;
+        int totalWidth = 0;
         int colWidth = 0;
         int colHeight = 0;
 
@@ -99,8 +99,8 @@ int FlowLayout::heightForWidth(const int width) const
             }
 
             int itemHeight = item->sizeHint().height();
-            if (colHeight + itemHeight > width) {
-                width += colWidth;
+            if (colHeight + itemHeight > totalWidth) {
+                totalWidth += colWidth;
                 colHeight = itemHeight;
                 colWidth = item->sizeHint().width();
             } else {
@@ -108,8 +108,8 @@ int FlowLayout::heightForWidth(const int width) const
                 colWidth = qMax(colWidth, item->sizeHint().width());
             }
         }
-        width += colWidth; // Add width of the last column
-        return width;
+        totalWidth += colWidth; // Add width of the last column
+        return totalWidth;
     }
 }
 

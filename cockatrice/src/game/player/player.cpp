@@ -153,10 +153,10 @@ void Player::processPlayerInfo(const ServerInfo_Player &info)
                 // Visibility not currently supported for TableZone
                 zone = addZone(new TableZoneLogic(this, zoneName, true, false, true, this));
             } else {
-                // Zones without coordinats are always treated as non-shufflable
+                // Zones without coordinates are always treated as non-shufflable
                 // PileZones, although supporting alternate hand or stack zones
                 // might make sense in some scenarios.
-                bool contentsKnown;
+                bool contentsKnown = false;
 
                 switch (zoneInfo.type()) {
                     case ServerInfo_Zone::PrivateZone:

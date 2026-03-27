@@ -65,15 +65,15 @@ void ManaCurveConfigDialog::retranslateUi()
     showCatRows->setText(tr("Show per-category rows"));
 }
 
-void ManaCurveConfigDialog::setFromConfig(const ManaCurveConfig &cfg)
+void ManaCurveConfigDialog::setFromConfig(const ManaCurveConfig &config)
 {
-    groupBy->setCurrentText(cfg.groupBy);
+    groupBy->setCurrentText(config.groupBy);
     // restore filters
     for (int i = 0; i < filterList->count(); ++i)
-        filterList->item(i)->setSelected(cfg.filters.contains(filterList->item(i)->text()));
+        filterList->item(i)->setSelected(config.filters.contains(filterList->item(i)->text()));
 
-    showMain->setChecked(cfg.showMain);
-    showCatRows->setChecked(cfg.showCategoryRows);
+    showMain->setChecked(config.showMain);
+    showCatRows->setChecked(config.showCategoryRows);
 }
 
 void ManaCurveConfigDialog::accept()

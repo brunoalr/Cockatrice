@@ -83,9 +83,8 @@ QList<PrintingInfo> PrintingSelectorCardSortingWidget::sortSets(const SetToPrint
     QList<CardSetPtr> sortedSets;
 
     for (const auto &printingInfos : setMap) {
-        for (const auto &set : printingInfos) {
-            sortedSets << set.getSet();
-            break;
+        if (!printingInfos.isEmpty()) {
+            sortedSets << printingInfos.constFirst().getSet();
         }
     }
 

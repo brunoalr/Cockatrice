@@ -246,8 +246,8 @@ void ResizablePanel::dropEvent(QDropEvent *event)
     autoScrollTimer->stop();
 
     if (event->mimeData()->hasFormat("application/x-resizablepanel")) {
-        QByteArray data = event->mimeData()->data("application/x-resizablepanel");
-        quintptr ptr = *reinterpret_cast<const quintptr *>(data.constData());
+        QByteArray eventData = event->mimeData()->data("application/x-resizablepanel");
+        quintptr ptr = *reinterpret_cast<const quintptr *>(eventData.constData());
         ResizablePanel *draggedPanel = reinterpret_cast<ResizablePanel *>(ptr);
 
         if (draggedPanel && draggedPanel != this) {
@@ -299,8 +299,8 @@ void ResizablePanel::startDrag()
     QMimeData *mimeData = new QMimeData;
 
     quintptr ptr = reinterpret_cast<quintptr>(this);
-    QByteArray data(reinterpret_cast<const char *>(&ptr), sizeof(ptr));
-    mimeData->setData("application/x-resizablepanel", data);
+    QByteArray stringData(reinterpret_cast<const char *>(&ptr), sizeof(ptr));
+    mimeData->setData("application/x-resizablepanel", stringData);
 
     drag->setMimeData(mimeData);
 
