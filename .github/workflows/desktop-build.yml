@@ -356,6 +356,10 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Disable Windows Defender
+        if: matrix.os == 'Windows'
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+
       - name: Add msbuild to PATH
         if: matrix.os == 'Windows'
         id: add-msbuild
