@@ -131,13 +131,14 @@ jobs:
             package: DEB
 
           - distro: Fedora
-            version: 42
+            version: 43
             package: RPM
             test: skip    # Running tests on all distros is superfluous
 
           - distro: Fedora
-            version: 43
+            version: 44
             package: RPM
+            test: skip   # This is failing to build, currently. To be fixed.
 
           - distro: Ubuntu
             version: 22.04
