@@ -19,10 +19,10 @@ DeckPreviewTagDialog::DeckPreviewTagDialog(const QStringList &knownTags,
 {
     resize(400, 500);
 
-    QStringList defaultTags = SettingsCache::instance().getVisualDeckStorageDefaultTagsList();
+    QStringList cachedDefaultTags = SettingsCache::instance().getVisualDeckStorageDefaultTagsList();
 
     // Merge knownTags with defaultTags, ensuring no duplicates
-    QStringList combinedTags = defaultTags + knownTags + activeTags;
+    QStringList combinedTags = cachedDefaultTags + knownTags + activeTags;
     combinedTags.removeDuplicates();
 
     // Main layout
@@ -54,7 +54,7 @@ DeckPreviewTagDialog::DeckPreviewTagDialog(const QStringList &knownTags,
     }
 
     // Add tag input layout
-    auto *addTagLayout = new QHBoxLayout();
+    auto *newAddTagLayout = new QHBoxLayout();
     newTagInput = new QLineEdit(this);
     addTagButton = new QPushButton(this);
     editButton = new QPushButton(this);
@@ -68,10 +68,10 @@ DeckPreviewTagDialog::DeckPreviewTagDialog(const QStringList &knownTags,
             editor->activateWindow();
         });
     });
-    addTagLayout->addWidget(newTagInput);
-    addTagLayout->addWidget(addTagButton);
-    addTagLayout->addWidget(editButton);
-    mainLayout->addLayout(addTagLayout);
+    newAddTagLayout->addWidget(newTagInput);
+    newAddTagLayout->addWidget(addTagButton);
+    newAddTagLayout->addWidget(editButton);
+    mainLayout->addLayout(newAddTagLayout);
 
     connect(addTagButton, &QPushButton::clicked, this, &DeckPreviewTagDialog::addTag);
     connect(newTagInput, &QLineEdit::textChanged, this,
@@ -114,8 +114,8 @@ void DeckPreviewTagDialog::refreshTagList()
     tagListView->clear();
 
     // Get the updated list of tags from SettingsCache
-    QStringList defaultTags = SettingsCache::instance().getVisualDeckStorageDefaultTagsList();
-    QStringList combinedTags = defaultTags + knownTags_ + activeTags;
+    QStringList cachedDefaultTags = SettingsCache::instance().getVisualDeckStorageDefaultTagsList();
+    QStringList combinedTags = cachedDefaultTags + knownTags_ + activeTags;
     combinedTags.removeDuplicates();
 
     // Re-populate the tag list view
