@@ -130,6 +130,11 @@ public:
     /** @brief Notifies listeners that enabled sets changed. */
     void notifyEnabledSetsChanged();
 
+    ICardSetPriorityController *getPriorityController()
+    {
+        return setPriorityController;
+    };
+
 public slots:
     /**
      * @brief Adds a card to the database.

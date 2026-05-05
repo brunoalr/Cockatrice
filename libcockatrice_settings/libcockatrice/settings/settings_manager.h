@@ -23,14 +23,16 @@ public:
 
     QVariant getValue(const QString &name) const;
     QVariant getValue(const QString &name, const QString &group, const QString &subGroup = QString()) const;
+    void batchWrite(std::function<void(QSettings &)> batchWriteFunction);
 
     void sync();
 
 protected:
+    QString settingPath;
     QString defaultGroup;
     QString defaultSubGroup;
 
-    mutable QSettings settings;
+    QSettings getSettings() const;
 
     void setValue(const QVariant &value, const QString &name);
 
