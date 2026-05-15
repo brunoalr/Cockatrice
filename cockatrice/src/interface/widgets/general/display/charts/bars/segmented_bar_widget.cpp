@@ -60,18 +60,18 @@ void SegmentedBarWidget::paintEvent(QPaintEvent *)
             QPainterPath path;
             int radius = 6;
 
-            int x = r.x();
-            int y = r.y();
-            int w = r.width();
-            int h = r.height();
+            int rectX = r.x();
+            int rectY = r.y();
+            int rectW = r.width();
+            int rectH = r.height();
 
-            path.moveTo(x, y + h);
-            path.lineTo(x, y + radius);
-            path.quadTo(x, y, x + radius, y);
-            path.lineTo(x + w - radius, y);
-            path.quadTo(x + w, y, x + w, y + radius);
-            path.lineTo(x + w, y + h);
-            path.lineTo(x, y + h);
+            path.moveTo(rectX, rectY + rectH);
+            path.lineTo(rectX, rectY + radius);
+            path.quadTo(rectX, rectY, rectX + radius, rectY);
+            path.lineTo(rectX + rectW - radius, rectY);
+            path.quadTo(rectX + rectW, rectY, rectX + rectW, rectY + radius);
+            path.lineTo(rectX + rectW, rectY + rectH);
+            path.lineTo(rectX, rectY + rectH);
             path.closeSubpath();
 
             p.drawPath(path);

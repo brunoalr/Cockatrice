@@ -549,9 +549,9 @@ void Server_Game::removeParticipant(Server_AbstractParticipant *participant, Eve
 
     if (playerHost) {
         int newHostId = -1;
-        for (auto *otherPlayer : getPlayers().values()) {
-            newHostId = otherPlayer->getPlayerId();
-            break;
+        const auto players = getPlayers();
+        if (!players.isEmpty()) {
+            newHostId = players.first()->getPlayerId();
         }
         if (newHostId != -1) {
             hostId = newHostId;
