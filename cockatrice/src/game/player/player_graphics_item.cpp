@@ -1,20 +1,22 @@
 #include "player_graphics_item.h"
 
+#include "../../game_graphics/zones/hand_zone.h"
+#include "../../game_graphics/zones/pile_zone.h"
+#include "../../game_graphics/zones/stack_zone.h"
+#include "../../game_graphics/zones/table_zone.h"
 #include "../../interface/widgets/tabs/tab_game.h"
 #include "../board/abstract_card_item.h"
 #include "../hand_counter.h"
-#include "../zones/hand_zone.h"
-#include "../zones/pile_zone.h"
-#include "../zones/stack_zone.h"
-#include "../zones/table_zone.h"
 
-PlayerGraphicsItem::PlayerGraphicsItem(Player *_player) : player(_player)
+PlayerGraphicsItem::PlayerGraphicsItem(PlayerLogic *_player) : player(_player)
 {
     connect(&SettingsCache::instance(), &SettingsCache::horizontalHandChanged, this,
             &PlayerGraphicsItem::rearrangeZones);
     connect(&SettingsCache::instance(), &SettingsCache::handJustificationChanged, this,
             &PlayerGraphicsItem::rearrangeZones);
-    connect(player, &Player::rearrangeCounters, this, &PlayerGraphicsItem::rearrangeCounters);
+    connect(player, &PlayerLogic::rearrangeCounters, this, &PlayerGraphicsItem::rearrangeCounters);
+    connect(player, &PlayerLogic::concededChanged, this, [this](int, bool c) { setVisible(!c); });
+    connect(player, &PlayerLogic::zoneIdChanged, this, [this](int id) { playerArea->setPlayerZoneId(id); });
 
     playerArea = new PlayerArea(this);
 
@@ -158,11 +160,11 @@ void PlayerGraphicsItem::rearrangeZones()
     if (SettingsCache::instance().getHorizontalHand()) {
         if (mirrored) {
             if (player->getHandZone()->contentsKnown()) {
-                player->getPlayerInfo()->setHandVisible(true);
+                handVisible = true;
                 handZoneGraphicsItem->setPos(base);
                 base += QPointF(0, handZoneGraphicsItem->boundingRect().height());
             } else {
-                player->getPlayerInfo()->setHandVisible(false);
+                handVisible = false;
             }
 
             stackZoneGraphicsItem->setPos(base);
@@ -176,16 +178,16 @@ void PlayerGraphicsItem::rearrangeZones()
             base += QPointF(0, tableZoneGraphicsItem->boundingRect().height());
 
             if (player->getHandZone()->contentsKnown()) {
-                player->getPlayerInfo()->setHandVisible(true);
+                handVisible = true;
                 handZoneGraphicsItem->setPos(base);
             } else {
-                player->getPlayerInfo()->setHandVisible(false);
+                handVisible = false;
             }
         }
         handZoneGraphicsItem->setWidth(tableZoneGraphicsItem->getWidth() +
                                        stackZoneGraphicsItem->boundingRect().width());
     } else {
-        player->getPlayerInfo()->setHandVisible(true);
+        handVisible = true;
 
         handZoneGraphicsItem->setPos(base);
         base += QPointF(handZoneGraphicsItem->boundingRect().width(), 0);
@@ -195,7 +197,7 @@ void PlayerGraphicsItem::rearrangeZones()
 
         tableZoneGraphicsItem->setPos(base);
     }
-    handZoneGraphicsItem->setVisible(player->getPlayerInfo()->getHandVisible());
+    handZoneGraphicsItem->setVisible(handVisible);
     handZoneGraphicsItem->updateOrientation();
     tableZoneGraphicsItem->reorganizeCards();
     updateBoundingRect();
@@ -207,8 +209,7 @@ void PlayerGraphicsItem::updateBoundingRect()
     prepareGeometryChange();
     qreal width = CardDimensions::HEIGHT_F + 15 + counterAreaWidth + stackZoneGraphicsItem->boundingRect().width();
     if (SettingsCache::instance().getHorizontalHand()) {
-        qreal handHeight =
-            player->getPlayerInfo()->getHandVisible() ? handZoneGraphicsItem->boundingRect().height() : 0;
+        qreal handHeight = handVisible ? handZoneGraphicsItem->boundingRect().height() : 0;
         bRect = QRectF(0, 0, width + tableZoneGraphicsItem->boundingRect().width(),
                        tableZoneGraphicsItem->boundingRect().height() + handHeight);
     } else {

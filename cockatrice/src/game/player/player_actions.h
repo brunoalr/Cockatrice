@@ -10,13 +10,12 @@
 #include "../dialogs/dlg_create_token.h"
 #include "../dialogs/dlg_move_top_cards_until.h"
 #include "event_processing_options.h"
-#include "player.h"
+#include "player_logic.h"
 
 #include <QMenu>
 #include <QObject>
 #include <libcockatrice/card/relation/card_relation_type.h>
 #include <libcockatrice/filters/filter_string.h>
-#include <libcockatrice/protocol/pb/card_attributes.pb.h>
 
 namespace google
 {
@@ -30,16 +29,10 @@ class CardItem;
 class Command_MoveCard;
 class GameEventContext;
 class PendingCommand;
-class Player;
+class PlayerLogic;
 class PlayerActions : public QObject
 {
     Q_OBJECT
-
-signals:
-    void logSetTapped(Player *player, CardItem *card, bool tapped);
-    void logSetAnnotation(Player *player, CardItem *card, QString newAnnotation);
-    void logSetDoesntUntap(Player *player, CardItem *card, bool doesntUntap);
-    void logSetPT(Player *player, CardItem *card, QString newPT);
 
 public:
     enum CardsToReveal
@@ -47,20 +40,13 @@ public:
         RANDOM_CARD_FROM_ZONE = -2
     };
 
-    explicit PlayerActions(Player *player);
+    explicit PlayerActions(PlayerLogic *player);
 
     void sendGameCommand(PendingCommand *pend);
     void sendGameCommand(const google::protobuf::Message &command);
 
     PendingCommand *prepareGameCommand(const ::google::protobuf::Message &cmd);
     PendingCommand *prepareGameCommand(const QList<const ::google::protobuf::Message *> &cmdList);
-
-    void setCardAttrHelper(const GameEventContext &context,
-                           CardItem *card,
-                           CardAttribute attribute,
-                           const QString &avalue,
-                           bool allCards,
-                           EventProcessingOptions options);
 
     void moveOneCardUntil(CardItem *card);
     void stopMoveTopCardsUntil();
@@ -142,7 +128,9 @@ public slots:
     void actCreateAllRelatedCards();
 
     void actMoveCardXCardsFromTop();
-    void actCardCounterTrigger();
+    void actRemoveCardCounter(int counterId);
+    void actAddCardCounter(int counterId);
+    void actSetCardCounter(int counterId);
     void actAttach();
     void actUnattach();
     void actDrawArrow();
@@ -157,6 +145,9 @@ public slots:
     void actDecPT();
     void actFlowP();
     void actFlowT();
+
+    void actReduceLifeByPower();
+
     void actSetAnnotation();
     void actReveal(QAction *action);
     void actRevealHand(int revealToPlayerId);
@@ -168,7 +159,7 @@ public slots:
     void cardMenuAction();
 
 private:
-    Player *player;
+    PlayerLogic *player;
 
     int defaultNumberTopCards = 1;
     int defaultNumberTopCardsToPlaceBelow = 1;
@@ -198,7 +189,7 @@ private:
     void cmdSetTopCard(Command_MoveCard &cmd);
     void cmdSetBottomCard(Command_MoveCard &cmd);
 
-    QVariantList parsePT(const QString &pt);
+    void offsetCardCounter(int counterId, int offset);
 };
 
 #endif // COCKATRICE_PLAYER_ACTIONS_H

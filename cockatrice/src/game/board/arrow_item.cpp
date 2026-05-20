@@ -2,11 +2,11 @@
 #include "arrow_item.h"
 
 #include "../../client/settings/cache_settings.h"
-#include "../player/player.h"
+#include "../../game_graphics/zones/card_zone.h"
 #include "../player/player_actions.h"
+#include "../player/player_logic.h"
 #include "../player/player_target.h"
 #include "../z_values.h"
-#include "../zones/card_zone.h"
 #include "card_item.h"
 
 #include <QDebug>
@@ -21,19 +21,26 @@
 #include <libcockatrice/utility/color.h>
 #include <libcockatrice/utility/zone_names.h>
 
-ArrowItem::ArrowItem(Player *_player, int _id, ArrowTarget *_startItem, ArrowTarget *_targetItem, const QColor &_color)
+ArrowItem::ArrowItem(PlayerLogic *_player,
+                     int _id,
+                     ArrowTarget *_startItem,
+                     ArrowTarget *_targetItem,
+                     const QColor &_color)
     : QGraphicsItem(), player(_player), id(_id), startItem(_startItem), targetItem(_targetItem), targetLocked(false),
       color(_color), fullColor(true)
 {
     setZValue(ZValues::ARROWS);
 
-    if (startItem)
+    if (startItem) {
         startItem->addArrowFrom(this);
-    if (targetItem)
+    }
+    if (targetItem) {
         targetItem->addArrowTo(this);
+    }
 
-    if (startItem && targetItem)
+    if (startItem && targetItem) {
         updatePath();
+    }
 }
 
 ArrowItem::~ArrowItem()
@@ -59,8 +66,9 @@ void ArrowItem::delArrow()
 
 void ArrowItem::updatePath()
 {
-    if (!targetItem)
+    if (!targetItem) {
         return;
+    }
 
     QPointF endPoint = targetItem->mapToScene(
         QPointF(targetItem->boundingRect().width() / 2, targetItem->boundingRect().height() / 2));
@@ -75,8 +83,9 @@ void ArrowItem::updatePath(const QPointF &endPoint)
         headWidth / qPow(2, 0.5); // aka headWidth / sqrt (2) but this produces a compile error with MSVC++
     const double phi = 15;
 
-    if (!startItem)
+    if (!startItem) {
         return;
+    }
 
     QPointF startPoint =
         startItem->mapToScene(QPointF(startItem->boundingRect().width() / 2, startItem->boundingRect().height() / 2));
@@ -84,9 +93,9 @@ void ArrowItem::updatePath(const QPointF &endPoint)
     qreal lineLength = line.length();
 
     prepareGeometryChange();
-    if (lineLength < 30)
+    if (lineLength < 30) {
         path = QPainterPath();
-    else {
+    } else {
         QPointF c(lineLength / 2, qTan(phi * M_PI / 180) * lineLength);
 
         QPainterPath centerLine;
@@ -123,10 +132,11 @@ void ArrowItem::updatePath(const QPointF &endPoint)
 void ArrowItem::paint(QPainter *painter, const QStyleOptionGraphicsItem * /*option*/, QWidget * /*widget*/)
 {
     QColor paintColor(color);
-    if (fullColor)
+    if (fullColor) {
         paintColor.setAlpha(200);
-    else
+    } else {
         paintColor.setAlpha(150);
+    }
     painter->setBrush(paintColor);
     painter->drawPath(path);
 }
@@ -154,7 +164,7 @@ void ArrowItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
     }
 }
 
-ArrowDragItem::ArrowDragItem(Player *_owner, ArrowTarget *_startItem, const QColor &_color, int _deleteInPhase)
+ArrowDragItem::ArrowDragItem(PlayerLogic *_owner, ArrowTarget *_startItem, const QColor &_color, int _deleteInPhase)
     : ArrowItem(_owner, -1, _startItem, 0, _color), deleteInPhase(_deleteInPhase)
 {
 }
@@ -168,8 +178,9 @@ void ArrowDragItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
     // This ensures that if a mouse move event happens after a call to delArrow(),
     // the event will be discarded as it would create some stray pointers.
-    if (targetLocked || !startItem)
+    if (targetLocked || !startItem) {
         return;
+    }
 
     QPointF endPos = event->scenePos();
 
@@ -213,8 +224,9 @@ void ArrowDragItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
 void ArrowDragItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-    if (!startItem)
+    if (!startItem) {
         return;
+    }
 
     if (targetItem && (targetItem != startItem)) {
         CardZoneLogic *startZone = static_cast<CardItem *>(startItem)->getZone();
@@ -246,10 +258,11 @@ void ArrowDragItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
             bool playToStack = SettingsCache::instance().getPlayToStack();
             if (ci && ((!playToStack && ci->getUiAttributes().tableRow == 3) ||
                        (playToStack && ci->getUiAttributes().tableRow != 0 &&
-                        startCard->getZone()->getName() != ZoneNames::STACK)))
+                        startCard->getZone()->getName() != ZoneNames::STACK))) {
                 cmd.set_start_zone(ZoneNames::STACK);
-            else
+            } else {
                 cmd.set_start_zone(playToStack ? ZoneNames::STACK : ZoneNames::TABLE);
+            }
         }
 
         if (deleteInPhase != 0) {
@@ -277,8 +290,9 @@ void ArrowAttachItem::addChildArrow(ArrowAttachItem *childArrow)
 
 void ArrowAttachItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
-    if (targetLocked || !startItem)
+    if (targetLocked || !startItem) {
         return;
+    }
 
     QPointF endPos = event->scenePos();
 
@@ -343,8 +357,9 @@ void ArrowAttachItem::attachCards(CardItem *startCard, const CardItem *targetCar
 
 void ArrowAttachItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 {
-    if (!startItem)
+    if (!startItem) {
         return;
+    }
 
     // Attaching could move startItem under the current cursor position, causing all children to retarget to it right
     // before they are processed. Prevent that.

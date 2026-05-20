@@ -1,16 +1,16 @@
 #include "player_menu.h"
 
+#include "../../../game_graphics/zones/hand_zone.h"
+#include "../../../game_graphics/zones/pile_zone.h"
+#include "../../../game_graphics/zones/table_zone.h"
 #include "../../../interface/widgets/tabs/tab_game.h"
 #include "../../board/card_item.h"
-#include "../../zones/hand_zone.h"
-#include "../../zones/pile_zone.h"
-#include "../../zones/table_zone.h"
 #include "card_menu.h"
 #include "hand_menu.h"
 
 #include <libcockatrice/protocol/pb/command_reveal_cards.pb.h>
 
-PlayerMenu::PlayerMenu(Player *_player) : QObject(_player), player(_player)
+PlayerMenu::PlayerMenu(PlayerLogic *_player) : QObject(_player), player(_player)
 {
     playerMenu = new TearOffMenu();
 

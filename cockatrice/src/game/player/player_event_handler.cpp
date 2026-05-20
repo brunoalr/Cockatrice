@@ -1,12 +1,12 @@
 #include "player_event_handler.h"
 
+#include "../../game_graphics/zones/view_zone.h"
 #include "../../interface/widgets/tabs/tab_game.h"
 #include "../board/arrow_item.h"
 #include "../board/card_item.h"
 #include "../board/card_list.h"
-#include "../zones/view_zone.h"
-#include "player.h"
 #include "player_actions.h"
+#include "player_logic.h"
 
 #include <libcockatrice/protocol/pb/command_set_card_attr.pb.h>
 #include <libcockatrice/protocol/pb/context_move_card.pb.h>
@@ -22,6 +22,7 @@
 #include <libcockatrice/protocol/pb/event_draw_cards.pb.h>
 #include <libcockatrice/protocol/pb/event_dump_zone.pb.h>
 #include <libcockatrice/protocol/pb/event_flip_card.pb.h>
+#include <libcockatrice/protocol/pb/event_game_log_notice.pb.h>
 #include <libcockatrice/protocol/pb/event_game_say.pb.h>
 #include <libcockatrice/protocol/pb/event_move_card.pb.h>
 #include <libcockatrice/protocol/pb/event_reveal_cards.pb.h>
@@ -32,7 +33,7 @@
 #include <libcockatrice/protocol/pb/event_shuffle.pb.h>
 #include <libcockatrice/utility/zone_names.h>
 
-PlayerEventHandler::PlayerEventHandler(Player *_player) : QObject(_player), player(_player)
+PlayerEventHandler::PlayerEventHandler(PlayerLogic *_player) : QObject(_player), player(_player)
 {
 }
 
@@ -149,8 +150,8 @@ void PlayerEventHandler::eventSetCardAttr(const Event_SetCardAttr &event,
     if (!event.has_card_id()) {
         const CardList &cards = zone->getCards();
         for (int i = 0; i < cards.size(); ++i) {
-            player->getPlayerActions()->setCardAttrHelper(context, cards.at(i), event.attribute(),
-                                                          QString::fromStdString(event.attr_value()), true, options);
+            setCardAttrHelper(context, cards.at(i), event.attribute(), QString::fromStdString(event.attr_value()), true,
+                              options);
         }
         if (event.attribute() == AttrTapped) {
             emit logSetTapped(player, nullptr, event.attr_value() == "1");
@@ -161,8 +162,62 @@ void PlayerEventHandler::eventSetCardAttr(const Event_SetCardAttr &event,
             qWarning() << "PlayerEventHandler::eventSetCardAttr: card id=" << event.card_id() << "not found";
             return;
         }
-        player->getPlayerActions()->setCardAttrHelper(context, card, event.attribute(),
-                                                      QString::fromStdString(event.attr_value()), false, options);
+        setCardAttrHelper(context, card, event.attribute(), QString::fromStdString(event.attr_value()), false, options);
+    }
+}
+
+void PlayerEventHandler::setCardAttrHelper(const GameEventContext &context,
+                                           CardItem *card,
+                                           CardAttribute attribute,
+                                           const QString &avalue,
+                                           bool allCards,
+                                           EventProcessingOptions options)
+{
+    if (card == nullptr) {
+        return;
+    }
+
+    bool moveCardContext = context.HasExtension(Context_MoveCard::ext);
+    switch (attribute) {
+        case AttrTapped: {
+            bool tapped = avalue == "1";
+            if (!(!tapped && card->getDoesntUntap() && allCards)) {
+                if (!allCards) {
+                    emit logSetTapped(player, card, tapped);
+                }
+                bool canAnimate = !options.testFlag(SKIP_TAP_ANIMATION) && !moveCardContext;
+                card->setTapped(tapped, canAnimate);
+            }
+            break;
+        }
+        case AttrAttacking: {
+            card->setAttacking(avalue == "1");
+            break;
+        }
+        case AttrFaceDown: {
+            card->setFaceDown(avalue == "1");
+            break;
+        }
+        case AttrColor: {
+            card->setColor(avalue);
+            break;
+        }
+        case AttrAnnotation: {
+            emit logSetAnnotation(player, card, avalue);
+            card->setAnnotation(avalue);
+            break;
+        }
+        case AttrDoesntUntap: {
+            bool value = (avalue == "1");
+            emit logSetDoesntUntap(player, card, value);
+            card->setDoesntUntap(value);
+            break;
+        }
+        case AttrPT: {
+            emit logSetPT(player, card, avalue);
+            card->setPT(avalue);
+            break;
+        }
     }
 }
 
@@ -207,7 +262,7 @@ void PlayerEventHandler::eventDelCounter(const Event_DelCounter &event)
 
 void PlayerEventHandler::eventDumpZone(const Event_DumpZone &event)
 {
-    Player *zoneOwner = player->getGame()->getPlayerManager()->getPlayers().value(event.zone_owner_id(), 0);
+    PlayerLogic *zoneOwner = player->getGame()->getPlayerManager()->getPlayers().value(event.zone_owner_id(), 0);
     if (!zoneOwner) {
         return;
     }
@@ -220,13 +275,13 @@ void PlayerEventHandler::eventDumpZone(const Event_DumpZone &event)
 
 void PlayerEventHandler::eventMoveCard(const Event_MoveCard &event, const GameEventContext &context)
 {
-    Player *startPlayer = player->getGame()->getPlayerManager()->getPlayers().value(event.start_player_id());
+    PlayerLogic *startPlayer = player->getGame()->getPlayerManager()->getPlayers().value(event.start_player_id());
     if (!startPlayer) {
         return;
     }
     QString startZoneString = QString::fromStdString(event.start_zone());
     CardZoneLogic *startZone = startPlayer->getZones().value(startZoneString, 0);
-    Player *targetPlayer = player->getGame()->getPlayerManager()->getPlayers().value(event.target_player_id());
+    PlayerLogic *targetPlayer = player->getGame()->getPlayerManager()->getPlayers().value(event.target_player_id());
     if (!targetPlayer) {
         return;
     }
@@ -299,9 +354,9 @@ void PlayerEventHandler::eventMoveCard(const Event_MoveCard &event, const GameEv
 
     // Look at all arrows from and to the card.
     // If the card was moved to another zone, delete the arrows, otherwise update them.
-    QMapIterator<int, Player *> playerIterator(player->getGame()->getPlayerManager()->getPlayers());
+    QMapIterator<int, PlayerLogic *> playerIterator(player->getGame()->getPlayerManager()->getPlayers());
     while (playerIterator.hasNext()) {
-        Player *p = playerIterator.next().value();
+        PlayerLogic *p = playerIterator.next().value();
 
         QList<ArrowItem *> arrowsToDelete;
         QMapIterator<int, ArrowItem *> arrowIterator(p->getArrows());
@@ -374,8 +429,8 @@ void PlayerEventHandler::eventDestroyCard(const Event_DestroyCard &event)
 
 void PlayerEventHandler::eventAttachCard(const Event_AttachCard &event)
 {
-    const QMap<int, Player *> &playerList = player->getGame()->getPlayerManager()->getPlayers();
-    Player *targetPlayer = nullptr;
+    const QMap<int, PlayerLogic *> &playerList = player->getGame()->getPlayerManager()->getPlayers();
+    PlayerLogic *targetPlayer = nullptr;
     CardZoneLogic *targetZone = nullptr;
     CardItem *targetCard = nullptr;
     if (event.has_target_player_id()) {
@@ -452,7 +507,7 @@ void PlayerEventHandler::eventRevealCards(const Event_RevealCards &event, EventP
     if (!zone) {
         return;
     }
-    Player *otherPlayer = nullptr;
+    PlayerLogic *otherPlayer = nullptr;
     if (event.has_other_player_id()) {
         otherPlayer = player->getGame()->getPlayerManager()->getPlayers().value(event.other_player_id());
         if (!otherPlayer) {
@@ -527,6 +582,18 @@ void PlayerEventHandler::eventChangeZoneProperties(const Event_ChangeZonePropert
     }
 }
 
+void PlayerEventHandler::eventGameLogNotice(const Event_GameLogNotice &event)
+{
+    Event_GameLogNotice::NoticeType type = event.notice_type();
+    switch (type) {
+        case Event_GameLogNotice::UNDO_DRAW_FAILED:
+            emit logUndoDrawFailed(player);
+            break;
+        default:
+            qWarning() << "Received Event_GameLogNotice with unknown noticeType: " << type;
+    }
+}
+
 void PlayerEventHandler::processGameEvent(GameEvent::GameEventType type,
                                           const GameEvent &event,
                                           const GameEventContext &context,
@@ -589,6 +656,9 @@ void PlayerEventHandler::processGameEvent(GameEvent::GameEventType type,
             break;
         case GameEvent::CHANGE_ZONE_PROPERTIES:
             eventChangeZoneProperties(event.GetExtension(Event_ChangeZoneProperties::ext));
+            break;
+        case GameEvent::GAME_LOG_NOTICE:
+            eventGameLogNotice(event.GetExtension(Event_GameLogNotice::ext));
             break;
         default: {
             qWarning() << "unhandled game event" << type;

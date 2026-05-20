@@ -1,14 +1,14 @@
 #include "player_actions.h"
 
+#include "../../game_graphics/zones/hand_zone.h"
+#include "../../game_graphics/zones/table_zone.h"
 #include "../../interface/widgets/tabs/tab_game.h"
 #include "../../interface/widgets/utility/get_text_with_max.h"
 #include "../board/card_item.h"
 #include "../client/settings/card_counter_settings.h"
 #include "../dialogs/dlg_move_top_cards_until.h"
 #include "../dialogs/dlg_roll_dice.h"
-#include "../zones/hand_zone.h"
-#include "../zones/logic/view_zone_logic.h"
-#include "../zones/table_zone.h"
+#include "../zones/view_zone_logic.h"
 #include "card_menu_action_type.h"
 
 #include <libcockatrice/card/database/card_database_manager.h>
@@ -19,6 +19,7 @@
 #include <libcockatrice/protocol/pb/command_draw_cards.pb.h>
 #include <libcockatrice/protocol/pb/command_flip_card.pb.h>
 #include <libcockatrice/protocol/pb/command_game_say.pb.h>
+#include <libcockatrice/protocol/pb/command_inc_counter.pb.h>
 #include <libcockatrice/protocol/pb/command_move_card.pb.h>
 #include <libcockatrice/protocol/pb/command_mulligan.pb.h>
 #include <libcockatrice/protocol/pb/command_reveal_cards.pb.h>
@@ -35,7 +36,7 @@
 // milliseconds in between triggers of the move top cards until action
 static constexpr int MOVE_TOP_CARD_UNTIL_INTERVAL = 100;
 
-PlayerActions::PlayerActions(Player *_player)
+PlayerActions::PlayerActions(PlayerLogic *_player)
     : QObject(_player), player(_player), lastTokenTableRow(0), movingCardsUntil(false)
 {
     moveTopCardTimer = new QTimer(this);
@@ -84,8 +85,9 @@ void PlayerActions::playCard(CardItem *card, bool faceDown)
             cardToMove->set_pt(info.getPowTough().toStdString());
         }
         cardToMove->set_tapped(!faceDown && info.getUiAttributes().cipt);
-        if (tableRow != 3)
+        if (tableRow != 3) {
             cmd.set_target_zone(ZoneNames::TABLE);
+        }
         cmd.set_x(gridPoint.x());
         cmd.set_y(gridPoint.y());
     }
@@ -1067,7 +1069,14 @@ bool PlayerActions::createRelatedFromRelation(const CardItem *sourceCard, const 
             createCard(sourceCard, dbName, CardRelationType::DoesNotAttach, persistent);
         }
     } else {
-        auto attachType = cardRelation->getAttachType();
+        CardRelationType attachType;
+        // do not attempt to attach to another player's cards, this causes the card to attempt to attach to the same
+        // cardid on the local player's field instead, which is an entirely different card!
+        if (player->getPlayerInfo()->getLocalOrJudge()) {
+            attachType = cardRelation->getAttachType();
+        } else {
+            attachType = CardRelationType::DoesNotAttach;
+        }
 
         // move card onto table first if attaching from some other zone
         // we only do this for AttachTo because cross-zone TransformInto is already handled server-side
@@ -1157,61 +1166,6 @@ void PlayerActions::actSayMessage()
     sendGameCommand(cmd);
 }
 
-void PlayerActions::setCardAttrHelper(const GameEventContext &context,
-                                      CardItem *card,
-                                      CardAttribute attribute,
-                                      const QString &avalue,
-                                      bool allCards,
-                                      EventProcessingOptions options)
-{
-    if (card == nullptr) {
-        return;
-    }
-
-    bool moveCardContext = context.HasExtension(Context_MoveCard::ext);
-    switch (attribute) {
-        case AttrTapped: {
-            bool tapped = avalue == "1";
-            if (!(!tapped && card->getDoesntUntap() && allCards)) {
-                if (!allCards) {
-                    emit logSetTapped(player, card, tapped);
-                }
-                bool canAnimate = !options.testFlag(SKIP_TAP_ANIMATION) && !moveCardContext;
-                card->setTapped(tapped, canAnimate);
-            }
-            break;
-        }
-        case AttrAttacking: {
-            card->setAttacking(avalue == "1");
-            break;
-        }
-        case AttrFaceDown: {
-            card->setFaceDown(avalue == "1");
-            break;
-        }
-        case AttrColor: {
-            card->setColor(avalue);
-            break;
-        }
-        case AttrAnnotation: {
-            emit logSetAnnotation(player, card, avalue);
-            card->setAnnotation(avalue);
-            break;
-        }
-        case AttrDoesntUntap: {
-            bool value = (avalue == "1");
-            emit logSetDoesntUntap(player, card, value);
-            card->setDoesntUntap(value);
-            break;
-        }
-        case AttrPT: {
-            emit logSetPT(player, card, avalue);
-            card->setPT(avalue);
-            break;
-        }
-    }
-}
-
 void PlayerActions::actMoveCardXCardsFromTop()
 {
     int deckSize = player->getDeckZone()->getCards().size() + 1; // add the card to move to the deck
@@ -1228,14 +1182,9 @@ void PlayerActions::actMoveCardXCardsFromTop()
 
     defaultNumberTopCardsToPlaceBelow = number;
 
-    QList<QGraphicsItem *> sel = player->getGameScene()->selectedItems();
-    if (sel.isEmpty()) {
+    QList<CardItem *> cardList = player->getGameScene()->selectedCards();
+    if (cardList.isEmpty()) {
         return;
-    }
-
-    QList<CardItem *> cardList;
-    while (!sel.isEmpty()) {
-        cardList.append(qgraphicsitem_cast<CardItem *>(sel.takeFirst()));
     }
 
     QList<const ::google::protobuf::Message *> commandList;
@@ -1269,10 +1218,9 @@ void PlayerActions::actIncPT(int deltaP, int deltaT)
     int playerid = player->getPlayerInfo()->getId();
 
     QList<const ::google::protobuf::Message *> commandList;
-    for (const auto &item : player->getGameScene()->selectedItems()) {
-        auto *card = static_cast<CardItem *>(item);
+    for (auto card : player->getGameScene()->selectedCards()) {
         QString pt = card->getPT();
-        const auto ptList = parsePT(pt);
+        const auto ptList = CardItem::parsePT(pt);
         QString newpt;
         if (ptList.isEmpty()) {
             newpt = QString::number(deltaP) + (deltaT ? "/" + QString::number(deltaT) : "");
@@ -1302,8 +1250,7 @@ void PlayerActions::actResetPT()
 {
     int playerid = player->getPlayerInfo()->getId();
     QList<const ::google::protobuf::Message *> commandList;
-    for (const auto &item : player->getGameScene()->selectedItems()) {
-        auto *card = static_cast<CardItem *>(item);
+    for (auto card : player->getGameScene()->selectedCards()) {
         QString ptString;
         if (!card->getFaceDown()) { // leave the pt empty if the card is face down
             ExactCard ec = card->getCard();
@@ -1332,45 +1279,13 @@ void PlayerActions::actResetPT()
     }
 }
 
-QVariantList PlayerActions::parsePT(const QString &pt)
-{
-    QVariantList ptList = QVariantList();
-    if (!pt.isEmpty()) {
-        int sep = pt.indexOf('/');
-        if (sep == 0) {
-            ptList.append(QVariant(pt.mid(1))); // cut off starting '/' and take full string
-        } else {
-            int start = 0;
-            for (;;) {
-                QString item = pt.mid(start, sep - start);
-                if (item.isEmpty()) {
-                    ptList.append(QVariant(QString()));
-                } else if (item[0] == '+') {
-                    ptList.append(QVariant(item.mid(1).toInt())); // add as int
-                } else if (item[0] == '-') {
-                    ptList.append(QVariant(item.toInt())); // add as int
-                } else {
-                    ptList.append(QVariant(item)); // add as qstring
-                }
-                if (sep == -1) {
-                    break;
-                }
-                start = sep + 1;
-                sep = pt.indexOf('/', start);
-            }
-        }
-    }
-    return ptList;
-}
-
 void PlayerActions::actSetPT()
 {
     QString oldPT;
     int playerid = player->getPlayerInfo()->getId();
 
-    auto sel = player->getGameScene()->selectedItems();
-    for (const auto &item : sel) {
-        auto *card = static_cast<CardItem *>(item);
+    auto cards = player->getGameScene()->selectedCards();
+    for (auto card : cards) {
         if (!card->getPT().isEmpty()) {
             oldPT = card->getPT();
         }
@@ -1384,16 +1299,15 @@ void PlayerActions::actSetPT()
         return;
     }
 
-    const auto ptList = parsePT(pt);
+    const auto ptList = CardItem::parsePT(pt);
     bool empty = ptList.isEmpty();
 
     QList<const ::google::protobuf::Message *> commandList;
-    for (const auto &item : sel) {
-        auto *card = static_cast<CardItem *>(item);
+    for (auto card : cards) {
         auto *cmd = new Command_SetCardAttr;
         QString newpt = QString();
         if (!empty) {
-            const auto oldpt = parsePT(card->getPT());
+            const auto oldpt = CardItem::parsePT(card->getPT());
             int ptIter = 0;
             for (const auto &_item : ptList) {
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
@@ -1473,6 +1387,32 @@ void PlayerActions::actFlowT()
     actIncPT(-1, 1);
 }
 
+void PlayerActions::actReduceLifeByPower()
+{
+    // find life counter
+    auto lifeCounter = player->getLifeCounter();
+    if (!lifeCounter) {
+        return;
+    }
+
+    // calculate total power
+    auto cards = player->getGameScene()->selectedCards();
+    int total = 0;
+    for (auto card : cards) {
+        QVariantList parsed = CardItem::parsePT(card->getPT());
+        if (!parsed.isEmpty()) {
+            int power = parsed.first().toInt(); // toInt will default to 0 if it's not an int
+            total += qMax(power, 0);
+        }
+    }
+
+    // send cmd
+    Command_IncCounter cmd;
+    cmd.set_counter_id(lifeCounter->getId());
+    cmd.set_delta(-total);
+    sendGameCommand(prepareGameCommand(cmd));
+}
+
 void AnnotationDialog::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Return && event->modifiers() & Qt::ControlModifier) {
@@ -1486,9 +1426,8 @@ void AnnotationDialog::keyPressEvent(QKeyEvent *event)
 void PlayerActions::actSetAnnotation()
 {
     QString oldAnnotation;
-    auto sel = player->getGameScene()->selectedItems();
-    for (const auto &item : sel) {
-        auto *card = static_cast<CardItem *>(item);
+    auto cards = player->getGameScene()->selectedCards();
+    for (auto card : cards) {
         if (!card->getAnnotation().isEmpty()) {
             oldAnnotation = card->getAnnotation();
         }
@@ -1508,8 +1447,7 @@ void PlayerActions::actSetAnnotation()
     QString annotation = dialog->textValue().left(MAX_NAME_LENGTH);
 
     QList<const ::google::protobuf::Message *> commandList;
-    for (const auto &item : sel) {
-        auto *card = static_cast<CardItem *>(item);
+    for (auto card : cards) {
         auto *cmd = new Command_SetCardAttr;
         cmd->set_zone(card->getZone()->getName().toStdString());
         cmd->set_card_id(card->getId());
@@ -1533,9 +1471,7 @@ void PlayerActions::actAttach()
 void PlayerActions::actUnattach()
 {
     QList<const ::google::protobuf::Message *> commandList;
-    for (QGraphicsItem *item : player->getGameScene()->selectedItems()) {
-        auto *card = static_cast<CardItem *>(item);
-
+    for (auto card : player->getGameScene()->selectedCards()) {
         if (!card->getAttachedTo()) {
             continue;
         }
@@ -1548,80 +1484,73 @@ void PlayerActions::actUnattach()
     sendGameCommand(prepareGameCommand(commandList));
 }
 
-void PlayerActions::actCardCounterTrigger()
+void PlayerActions::actAddCardCounter(int counterId)
 {
-    auto *action = static_cast<QAction *>(sender());
-    int counterId = action->data().toInt() / 1000;
+    offsetCardCounter(counterId, 1);
+}
+
+void PlayerActions::actRemoveCardCounter(int counterId)
+{
+    offsetCardCounter(counterId, -1);
+}
+
+void PlayerActions::offsetCardCounter(int counterId, int offset)
+{
     QList<const ::google::protobuf::Message *> commandList;
-    switch (action->data().toInt() % 1000) {
-        case 9: { // increment counter
-            for (const auto &item : player->getGameScene()->selectedItems()) {
-                auto *card = static_cast<CardItem *>(item);
-                if (card->getCounters().value(counterId, 0) < MAX_COUNTERS_ON_CARD) {
-                    auto *cmd = new Command_SetCardCounter;
-                    cmd->set_zone(card->getZone()->getName().toStdString());
-                    cmd->set_card_id(card->getId());
-                    cmd->set_counter_id(counterId);
-                    cmd->set_counter_value(card->getCounters().value(counterId, 0) + 1);
-                    commandList.append(cmd);
-                }
-            }
-            break;
+    for (auto card : player->getGameScene()->selectedCards()) {
+        int oldValue = card->getCounters().value(counterId, 0);
+        int newValue = oldValue + offset;
+
+        if (newValue >= 0 && newValue <= MAX_COUNTERS_ON_CARD) {
+            auto *cmd = new Command_SetCardCounter;
+            cmd->set_zone(card->getZone()->getName().toStdString());
+            cmd->set_card_id(card->getId());
+            cmd->set_counter_id(counterId);
+            cmd->set_counter_value(newValue);
+            commandList.append(cmd);
         }
-        case 10: { // decrement counter
-            for (const auto &item : player->getGameScene()->selectedItems()) {
-                auto *card = static_cast<CardItem *>(item);
-                if (card->getCounters().value(counterId, 0)) {
-                    auto *cmd = new Command_SetCardCounter;
-                    cmd->set_zone(card->getZone()->getName().toStdString());
-                    cmd->set_card_id(card->getId());
-                    cmd->set_counter_id(counterId);
-                    cmd->set_counter_value(card->getCounters().value(counterId, 0) - 1);
-                    commandList.append(cmd);
-                }
-            }
-            break;
-        }
-        case 11: { // set counter with dialog
-            player->setDialogSemaphore(true);
-
-            // If a single card is selected, we show the old value in the dialog. Otherwise, we show "x"
-            QList<QGraphicsItem *> sel = player->getGameScene()->selectedItems();
-            QString oldValueForDlg = "x";
-            if (sel.size() == 1) {
-                auto *card = dynamic_cast<CardItem *>(sel.first());
-                oldValueForDlg = QString::number(card->getCounters().value(counterId, 0));
-            }
-
-            auto &cardCounterSettings = SettingsCache::instance().cardCounters();
-            QString counterName = cardCounterSettings.displayName(counterId);
-
-            AbstractCounterDialog dialog(counterName, oldValueForDlg, player->getGame()->getTab());
-            int ok = dialog.exec();
-
-            player->setDialogSemaphore(false);
-            if (player->clearCardsToDelete() || !ok) {
-                return;
-            }
-
-            for (const auto &item : sel) {
-                auto *card = dynamic_cast<CardItem *>(item);
-
-                int oldValue = card->getCounters().value(counterId, 0);
-                Expression exp(oldValue);
-                int number = static_cast<int>(exp.parse(dialog.textValue()));
-
-                auto *cmd = new Command_SetCardCounter;
-                cmd->set_zone(card->getZone()->getName().toStdString());
-                cmd->set_card_id(card->getId());
-                cmd->set_counter_id(counterId);
-                cmd->set_counter_value(number);
-                commandList.append(cmd);
-            }
-            break;
-        }
-        default:;
     }
+
+    sendGameCommand(prepareGameCommand(commandList));
+}
+
+void PlayerActions::actSetCardCounter(int counterId)
+{
+    player->setDialogSemaphore(true);
+
+    // If a single card is selected, we show the old value in the dialog. Otherwise, we show "x"
+    QList<CardItem *> sel = player->getGameScene()->selectedCards();
+    QString oldValueForDlg = "x";
+    if (sel.size() == 1) {
+        auto *card = sel.first();
+        oldValueForDlg = QString::number(card->getCounters().value(counterId, 0));
+    }
+
+    auto &cardCounterSettings = SettingsCache::instance().cardCounters();
+    QString counterName = cardCounterSettings.displayName(counterId);
+
+    AbstractCounterDialog dialog(counterName, oldValueForDlg, player->getGame()->getTab());
+    int ok = dialog.exec();
+
+    player->setDialogSemaphore(false);
+    if (player->clearCardsToDelete() || !ok) {
+        return;
+    }
+
+    QList<const ::google::protobuf::Message *> commandList;
+    for (auto card : sel) {
+        int oldValue = card->getCounters().value(counterId, 0);
+        Expression exp(oldValue);
+        int number = static_cast<int>(exp.parse(dialog.textValue()));
+
+        auto *cmd = new Command_SetCardCounter;
+        cmd->set_zone(card->getZone()->getName().toStdString());
+        cmd->set_card_id(card->getId());
+        cmd->set_counter_id(counterId);
+        cmd->set_counter_value(number);
+        commandList.append(cmd);
+    }
+
     sendGameCommand(prepareGameCommand(commandList));
 }
 
@@ -1639,11 +1568,7 @@ static bool isUnwritableRevealZone(CardZoneLogic *zone)
 
 void PlayerActions::playSelectedCards(const bool faceDown)
 {
-    QList<CardItem *> selectedCards;
-    for (const auto &item : player->getGameScene()->selectedItems()) {
-        auto *card = static_cast<CardItem *>(item);
-        selectedCards.append(card);
-    }
+    QList<CardItem *> selectedCards = player->getGameScene()->selectedCards();
 
     // CardIds will get shuffled downwards when cards leave the deck.
     // We need to iterate through the cards in reverse order so cardIds don't get changed out from under us as we play
@@ -1670,7 +1595,7 @@ void PlayerActions::actPlayFacedown()
 
 void PlayerActions::actHide()
 {
-    for (const auto &item : player->getGameScene()->selectedItems()) {
+    for (const auto &item : player->getGameScene()->selectedCards()) {
         auto *card = static_cast<CardItem *>(item);
         if (card && isUnwritableRevealZone(card->getZone())) {
             card->getZone()->removeCard(card);
@@ -1687,9 +1612,7 @@ void PlayerActions::actReveal(QAction *action)
         cmd.set_player_id(otherPlayerId);
     }
 
-    QList<QGraphicsItem *> sel = player->getGameScene()->selectedItems();
-    while (!sel.isEmpty()) {
-        const auto *card = qgraphicsitem_cast<CardItem *>(sel.takeFirst());
+    for (auto card : player->getGameScene()->selectedCards()) {
         if (!cmd.has_zone_name()) {
             cmd.set_zone_name(card->getZone()->getName().toStdString());
         }
@@ -1774,11 +1697,7 @@ void PlayerActions::actRevealRandomGraveyardCard(int revealToPlayerId)
 void PlayerActions::cardMenuAction()
 {
     auto *a = dynamic_cast<QAction *>(sender());
-    QList<QGraphicsItem *> sel = player->getGameScene()->selectedItems();
-    QList<CardItem *> cardList;
-    while (!sel.isEmpty()) {
-        cardList.append(qgraphicsitem_cast<CardItem *>(sel.takeFirst()));
-    }
+    QList<CardItem *> cardList = player->getGameScene()->selectedCards();
 
     QList<const ::google::protobuf::Message *> commandList;
     if (a->data().toInt() <= (int)cmClone) {
@@ -1851,7 +1770,7 @@ void PlayerActions::cardMenuAction()
             return;
         }
 
-        Player *startPlayer = zone->getPlayer();
+        PlayerLogic *startPlayer = zone->getPlayer();
         if (!startPlayer) {
             return;
         }

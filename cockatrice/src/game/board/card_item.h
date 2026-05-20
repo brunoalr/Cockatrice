@@ -7,8 +7,9 @@
 #ifndef CARDITEM_H
 #define CARDITEM_H
 
-#include "../zones/logic/card_zone_logic.h"
+#include "../zones/card_zone_logic.h"
 #include "abstract_card_item.h"
+#include "card_state.h"
 
 #include <libcockatrice/network/server/remote/game/server_card.h>
 
@@ -16,7 +17,7 @@ class CardDatabase;
 class CardDragItem;
 class CardZone;
 class ServerInfo_Card;
-class Player;
+class PlayerLogic;
 class QAction;
 class QColor;
 
@@ -27,16 +28,10 @@ class CardItem : public AbstractCardItem
 {
     Q_OBJECT
 private:
-    CardZoneLogic *zone;
-    bool attacking;
-    QMap<int, int> counters;
-    QString annotation;
-    QString pt;
-    bool destroyOnZoneChange;
-    bool doesntUntap;
+    CardState *state;
+
     QPoint gridPoint;
     CardDragItem *dragItem;
-    CardItem *attachedTo;
     QList<CardItem *> attachedCards;
 
     void prepareDelete();
@@ -53,7 +48,7 @@ public:
     {
         return Type;
     }
-    explicit CardItem(Player *_owner,
+    explicit CardItem(PlayerLogic *_owner,
                       QGraphicsItem *parent = nullptr,
                       const CardRef &cardRef = {},
                       int _cardid = -1,
@@ -62,7 +57,7 @@ public:
     void retranslateUi();
     [[nodiscard]] CardZoneLogic *getZone() const
     {
-        return zone;
+        return state->getZone();
     }
     void setZone(CardZoneLogic *_zone);
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
@@ -78,50 +73,50 @@ public:
     {
         return gridPoint;
     }
-    [[nodiscard]] Player *getOwner() const
+    [[nodiscard]] PlayerLogic *getOwner() const
     {
         return owner;
     }
-    void setOwner(Player *_owner)
+    void setOwner(PlayerLogic *_owner)
     {
         owner = _owner;
     }
     [[nodiscard]] bool getAttacking() const
     {
-        return attacking;
+        return state->getAttacking();
     }
     void setAttacking(bool _attacking);
     [[nodiscard]] const QMap<int, int> &getCounters() const
     {
-        return counters;
+        return state->getCounters();
     }
     void setCounter(int _id, int _value);
     [[nodiscard]] QString getAnnotation() const
     {
-        return annotation;
+        return state->getAnnotation();
     }
     void setAnnotation(const QString &_annotation);
     [[nodiscard]] bool getDoesntUntap() const
     {
-        return doesntUntap;
+        return state->getDoesntUntap();
     }
     void setDoesntUntap(bool _doesntUntap);
     [[nodiscard]] QString getPT() const
     {
-        return pt;
+        return state->getPT();
     }
     void setPT(const QString &_pt);
     [[nodiscard]] bool getDestroyOnZoneChange() const
     {
-        return destroyOnZoneChange;
+        return state->getDestroyOnZoneChange();
     }
     void setDestroyOnZoneChange(bool _destroy)
     {
-        destroyOnZoneChange = _destroy;
+        state->setDestroyOnZoneChange(_destroy);
     }
     [[nodiscard]] CardItem *getAttachedTo() const
     {
-        return attachedTo;
+        return state->getAttachedTo();
     }
     void setAttachedTo(CardItem *_attachedTo);
     void addAttachedCard(CardItem *card)
@@ -145,6 +140,26 @@ public:
     void drawArrow(const QColor &arrowColor);
     void drawAttachArrow();
     void playCard(bool faceDown);
+
+    /**
+     * @brief Parses a string representing a p/t in order to extract the values from it.
+     *
+     * If the string contains '/', the string will be split at the '/' and each side will be parsed separately,
+     * which means the result list will have two elements.
+     *
+     * If '/' is not found, then the entire string is parsed together, which means the result list will
+     * have a single element.
+     *
+     * If either side of the split is empty, there will also only be a single element in the result list.
+     *
+     * This function will attempt to parse each substring as an int first, handling plus and minus prefixes.
+     * If successful, it will put the parsed value into the QVariant as an int.
+     * If failed, it will just put the substring into the QVariant as a QString.
+     *
+     * @param pt The p/t string
+     * @return A QVariantList that can contain one or two elements, where each QVariant can be either int or QString
+     */
+    static QVariantList parsePT(const QString &pt);
 
 protected:
     void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
