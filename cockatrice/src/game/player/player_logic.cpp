@@ -74,7 +74,7 @@ PlayerLogic::~PlayerLogic()
 
 void PlayerLogic::clear()
 {
-    clearArrows();
+    emit arrowsClearedLocally();
 
     QMapIterator<QString, CardZoneLogic *> i(zones);
     while (i.hasNext()) {
@@ -115,7 +115,7 @@ void PlayerLogic::processPlayerInfo(const ServerInfo_Player &info)
                                       /* HandZone */
                                       ZoneNames::HAND};
     clearCounters();
-    clearArrows();
+    emit arrowsClearedLocally();
 
     QMutableMapIterator<QString, CardZoneLogic *> zoneIt(zones);
     while (zoneIt.hasNext()) {
@@ -231,7 +231,8 @@ void PlayerLogic::processCardAttachment(const ServerInfo_Player &info)
 
     const int arrowListSize = info.arrow_list_size();
     for (int i = 0; i < arrowListSize; ++i) {
-        addArrow(info.arrow_list(i));
+        emit arrowCreateRequested(QSharedPointer<ArrowData>::create(
+            ArrowData::fromProto(info.arrow_list(i), getPlayerInfo()->getId(), getPlayerInfo()->getLocal())));
     }
 }
 
@@ -258,170 +259,50 @@ void PlayerLogic::setDeck(const DeckList &_deck)
     emit deckChanged();
 }
 
-AbstractCounter *PlayerLogic::addCounter(const ServerInfo_Counter &counter)
+CounterState *PlayerLogic::addCounter(const ServerInfo_Counter &counter)
 {
     return addCounter(counter.id(), QString::fromStdString(counter.name()),
                       convertColorToQColor(counter.counter_color()), counter.radius(), counter.count());
 }
 
-AbstractCounter *PlayerLogic::addCounter(int counterId, const QString &name, QColor color, int radius, int value)
+CounterState *PlayerLogic::addCounter(int id, const QString &name, const QColor &color, int radius, int value)
 {
-    if (counters.contains(counterId)) {
+    if (counters.contains(id)) {
         return nullptr;
     }
-
-    AbstractCounter *ctr;
-    if (name == "life") {
-        ctr = getGraphicsItem()->getPlayerTarget()->addCounter(counterId, name, value);
-    } else {
-        ctr = new GeneralCounter(this, counterId, name, color, radius, value, true, graphicsItem);
-    }
-    counters.insert(counterId, ctr);
-
-    if (playerMenu->getCountersMenu() && ctr->getMenu()) {
-        playerMenu->getCountersMenu()->addMenu(ctr->getMenu());
-    }
-    if (playerMenu->getShortcutsActive()) {
-        ctr->setShortcutsActive();
-    }
-    emit rearrangeCounters();
-    return ctr;
+    auto *state = new CounterState(id, name, color, radius, value, this);
+    counters.insert(id, state);
+    emit counterAdded(state);
+    return state;
 }
 
-void PlayerLogic::delCounter(int counterId)
+void PlayerLogic::delCounter(int id)
 {
-    AbstractCounter *ctr = counters.value(counterId, 0);
-    if (!ctr) {
+    auto *state = counters.take(id);
+    if (!state) {
         return;
     }
-
-    ctr->delCounter();
-    counters.remove(counterId);
-    emit rearrangeCounters();
+    emit counterRemoved(id);
+    state->deleteLater();
 }
 
 void PlayerLogic::clearCounters()
 {
-    QMapIterator<int, AbstractCounter *> counterIterator(counters);
-    while (counterIterator.hasNext()) {
-        counterIterator.next().value()->delCounter();
+    for (int id : counters.keys()) {
+        emit counterRemoved(id);
     }
+    qDeleteAll(counters);
     counters.clear();
 }
 
-void PlayerLogic::incrementAllCardCounters()
+CounterState *PlayerLogic::getLifeCounter() const
 {
-    auto cardsToUpdate = getGameScene()->selectedCards();
-    if (cardsToUpdate.isEmpty()) {
-        // If no cards selected, update all cards on table
-        cardsToUpdate = static_cast<QList<CardItem *>>(getTableZone()->getCards());
-    }
-
-    QList<const ::google::protobuf::Message *> commandList;
-
-    for (const auto *card : cardsToUpdate) {
-        const auto &cardCounters = card->getCounters();
-
-        QMapIterator<int, int> counterIterator(cardCounters);
-        while (counterIterator.hasNext()) {
-            counterIterator.next();
-            int counterId = counterIterator.key();
-            int currentValue = counterIterator.value();
-            if (currentValue >= MAX_COUNTERS_ON_CARD) {
-                continue;
-            }
-
-            auto cmd = std::make_unique<Command_SetCardCounter>();
-            cmd->set_zone(card->getZone()->getName().toStdString());
-            cmd->set_card_id(card->getId());
-            cmd->set_counter_id(counterId);
-            cmd->set_counter_value(currentValue + 1);
-            commandList.append(cmd.release());
-        }
-    }
-
-    if (!commandList.isEmpty()) {
-        playerActions->sendGameCommand(playerActions->prepareGameCommand(commandList));
-    }
-}
-
-AbstractCounter *PlayerLogic::getLifeCounter() const
-{
-    for (auto counter : counters.values()) {
-        if (counter->getName() == "life") {
-            return counter;
+    for (auto *s : counters.values()) {
+        if (s->getName() == "life") {
+            return s;
         }
     }
     return nullptr;
-}
-
-ArrowItem *PlayerLogic::addArrow(const ServerInfo_Arrow &arrow)
-{
-    const QMap<int, PlayerLogic *> &playerList = game->getPlayerManager()->getPlayers();
-    PlayerLogic *startPlayer = playerList.value(arrow.start_player_id(), 0);
-    PlayerLogic *targetPlayer = playerList.value(arrow.target_player_id(), 0);
-    if (!startPlayer || !targetPlayer) {
-        return nullptr;
-    }
-
-    CardZoneLogic *startZone = startPlayer->getZones().value(QString::fromStdString(arrow.start_zone()), 0);
-    CardZoneLogic *targetZone = nullptr;
-    if (arrow.has_target_zone()) {
-        targetZone = targetPlayer->getZones().value(QString::fromStdString(arrow.target_zone()), 0);
-    }
-    if (!startZone || (!targetZone && arrow.has_target_zone())) {
-        return nullptr;
-    }
-
-    CardItem *startCard = startZone->getCard(arrow.start_card_id());
-    CardItem *targetCard = nullptr;
-    if (targetZone) {
-        targetCard = targetZone->getCard(arrow.target_card_id());
-    }
-    if (!startCard || (!targetCard && arrow.has_target_card_id())) {
-        return nullptr;
-    }
-
-    if (targetCard) {
-        return addArrow(arrow.id(), startCard, targetCard, convertColorToQColor(arrow.arrow_color()));
-    } else {
-        return addArrow(arrow.id(), startCard, targetPlayer->getGraphicsItem()->getPlayerTarget(),
-                        convertColorToQColor(arrow.arrow_color()));
-    }
-}
-
-ArrowItem *PlayerLogic::addArrow(int arrowId, CardItem *startCard, ArrowTarget *targetItem, const QColor &color)
-{
-    auto *arrow = new ArrowItem(this, arrowId, startCard, targetItem, color);
-    arrows.insert(arrowId, arrow);
-
-    getGameScene()->addItem(arrow);
-    return arrow;
-}
-
-void PlayerLogic::delArrow(int arrowId)
-{
-    ArrowItem *arr = arrows.value(arrowId, 0);
-    if (!arr) {
-        return;
-    }
-    arr->delArrow();
-}
-
-void PlayerLogic::removeArrow(ArrowItem *arrow)
-{
-    if (arrow->getId() != -1) {
-        arrows.remove(arrow->getId());
-    }
-}
-
-void PlayerLogic::clearArrows()
-{
-    QMapIterator<int, ArrowItem *> arrowIterator(arrows);
-    while (arrowIterator.hasNext()) {
-        arrowIterator.next().value()->delArrow();
-    }
-    arrows.clear();
 }
 
 bool PlayerLogic::clearCardsToDelete()

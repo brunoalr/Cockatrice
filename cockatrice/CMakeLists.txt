@@ -56,9 +56,11 @@ set(cockatrice_SOURCES
     src/filters/filter_tree_model.cpp
     src/filters/syntax_help.cpp
     src/game/abstract_game.cpp
+    src/game/arrow_registry.cpp
     src/game/board/abstract_card_drag_item.cpp
     src/game/board/abstract_card_item.cpp
     src/game/board/abstract_counter.cpp
+    src/game/board/arrow_data.cpp
     src/game/board/arrow_item.cpp
     src/game/board/arrow_target.cpp
     src/game/board/card_drag_item.cpp
@@ -66,6 +68,7 @@ set(cockatrice_SOURCES
     src/game/board/card_list.cpp
     src/game/board/card_state.cpp
     src/game/board/counter_general.cpp
+    src/game/board/counter_state.cpp
     src/game/board/translate_counter_name.cpp
     src/game/deckview/deck_view.cpp
     src/game/deckview/deck_view_container.cpp
@@ -179,6 +182,7 @@ set(cockatrice_SOURCES
     src/interface/widgets/deck_analytics/analyzer_modules/mana_distribution/mana_distribution_single_display_widget.cpp
     src/interface/widgets/deck_analytics/analyzer_modules/mana_curve/mana_curve_total_widget.cpp
     src/interface/widgets/deck_analytics/analyzer_modules/mana_curve/mana_curve_category_widget.cpp
+    src/interface/widgets/deck_editor/card_database_view.cpp
     src/interface/widgets/deck_editor/deck_list_history_manager_widget.cpp
     src/interface/widgets/deck_editor/deck_editor_card_database_dock_widget.cpp
     src/interface/widgets/deck_editor/deck_editor_card_info_dock_widget.cpp

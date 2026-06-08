@@ -2,8 +2,8 @@
  * @file player_actions.h
  *  @ingroup GameLogicActions
  * @ingroup GameLogicPlayers
- * @brief TODO: Document this.
  */
+//! \todo Document this file.
 
 #ifndef COCKATRICE_PLAYER_ACTIONS_H
 #define COCKATRICE_PLAYER_ACTIONS_H
@@ -131,6 +131,7 @@ public slots:
     void actRemoveCardCounter(int counterId);
     void actAddCardCounter(int counterId);
     void actSetCardCounter(int counterId);
+    void actIncrementAllCardCounters();
     void actAttach();
     void actUnattach();
     void actDrawArrow();

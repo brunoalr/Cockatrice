@@ -1,8 +1,8 @@
 /**
  * @file game_event_handler.h
  * @ingroup GameLogic
- * @brief TODO: Document this.
  */
+//! \todo Document this file.
 
 #ifndef COCKATRICE_GAME_EVENT_HANDLER_H
 #define COCKATRICE_GAME_EVENT_HANDLER_H
@@ -60,7 +60,8 @@ public:
     void handleActivePhaseChanged(int phase);
     void handleGameLeft();
     void handleChatMessageSent(const QString &chatMessage);
-    void handleArrowDeletion(int arrowId);
+    void handleArrowDeletion(int creatorId, int arrowId);
+    void handleArrowDeletionFinished(const Response &response, int creatorId, int arrowId);
 
     void eventSpectatorSay(const Event_GameSay &event, int eventPlayerId, const GameEventContext &context);
     void eventSpectatorLeave(const Event_Leave &event, int eventPlayerId, const GameEventContext &context);
@@ -112,6 +113,7 @@ signals:
     void containerProcessingStarted(GameEventContext context);
     void setContextJudgeName(QString judgeName);
     void containerProcessingDone();
+    void arrowDeleted(int creatorId, int arrowId);
     void logSpectatorSay(ServerInfo_User userInfo, QString message);
     void logSpectatorLeave(QString name, QString reason);
     void logGameStart();

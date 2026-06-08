@@ -1,6 +1,9 @@
 #ifndef GAMESCENE_H
 #define GAMESCENE_H
 
+#include "arrow_registry.h"
+#include "board/arrow_data.h"
+#include "board/arrow_item.h"
 #include "zones/card_zone_logic.h"
 
 #include <QGraphicsScene>
@@ -41,8 +44,9 @@ private:
     static const int playerAreaSpacing = 5; ///< Space between player areas
 
     PhasesToolbar *phasesToolbar;                       ///< Toolbar showing game phases
-    QList<PlayerGraphicsItem *> players;                ///< All player graphics items
+    QMap<int, PlayerGraphicsItem *> playerViews;        ///< ID lookup for player graphics items
     QList<QList<PlayerGraphicsItem *>> playersByColumn; ///< Players organized by column
+    ArrowRegistry arrowRegistry;                        ///< ID registry for arrow graphics items
     QList<ZoneViewWidget *> zoneViews;                  ///< Active zone view widgets
     QSize viewSize;                                     ///< Current view size
     QPointer<CardItem> hoveredCard;                     ///< Currently hovered card
@@ -56,10 +60,12 @@ private:
      */
     void updateHover(const QPointF &scenePos);
 
-    /// Activates hover state and escapes the card from its clip container so hover scaling is visible beyond zone
-    /// bounds.
+    /**
+     * @brief Activates hover state and escapes the card from its clip container
+     * so hover scaling is visible beyond zone bounds.
+     */
     void beginCardHover(CardItem *card);
-    /// Deactivates hover state and restores the card to its clip container.
+    /** @brief Deactivates hover state and restores the card to its clip container. */
     void endCardHover(CardItem *card);
 
 public:
@@ -70,13 +76,13 @@ public:
      */
     explicit GameScene(PhasesToolbar *_phasesToolbar, QObject *parent = nullptr);
 
-    /** Destructor, cleans up timer and zone views. */
+    /** @brief Destructor, cleans up timer and zone views. */
     ~GameScene() override;
 
-    /** Updates UI text for all zone views. */
+    /** @brief Updates UI text for all zone views. */
     void retranslateUi();
 
-    /** Gets all selected CardItems */
+    /** @brief Gets all selected CardItems. */
     QList<CardItem *> selectedCards() const;
 
     /**
@@ -97,7 +103,7 @@ public:
      */
     void adjustPlayerRotation(int rotationAdjustment);
 
-    /** Recomputes the layout of players and the scene size. */
+    /** @brief Recomputes the layout of players and the scene size. */
     void rearrange();
 
     /**
@@ -157,56 +163,68 @@ public:
      */
     void resizeColumnsAndPlayers(const QList<qreal> &minWidthByColumn, qreal newWidth);
 
-    /** Finds the topmost card zone under the cursor. */
+    /** @brief Finds the topmost card zone under the cursor. */
     static CardZone *findTopmostZone(const QList<QGraphicsItem *> &items);
 
-    /** Finds the topmost card in a given zone, considering attachments and Z-order. */
+    /** @brief Finds the topmost card in a given zone, considering attachments and Z-order. */
     static CardItem *findTopmostCardInZone(const QList<QGraphicsItem *> &items, CardZone *zone);
 
-    /** Updates hovered card highlighting. */
+    /** @brief Updates hovered card highlighting. */
     void updateHoveredCard(CardItem *newCard);
 
-    /** Registers a card for animation updates. */
+    /** @brief Registers a card for animation updates. */
     void registerAnimationItem(AbstractCardItem *card);
 
-    /** Unregisters a card from animation updates. */
+    /** @brief Unregisters a card from animation updates. */
     void unregisterAnimationItem(AbstractCardItem *card);
     void startRubberBand(const QPointF &selectionOrigin);
     void resizeRubberBand(const QPointF &cursorPoint, int selectedCount);
     void stopRubberBand();
 
 public slots:
-    /** Toggles a zone view for a player. */
+    /** @brief Toggles a zone view for a player. */
     void toggleZoneView(PlayerLogic *player, const QString &zoneName, int numberCards, bool isReversed = false);
 
-    /** Adds a revealed zone view (for shown cards). */
+    /** @brief Adds a revealed zone view (for shown cards). */
     void addRevealedZoneView(PlayerLogic *player,
                              CardZoneLogic *zone,
                              const QList<const ServerInfo_Card *> &cardList,
                              bool withWritePermission);
 
-    /** Removes a zone view widget from the scene. */
+    /** @brief Removes a zone view widget from the scene. */
     void removeZoneView(ZoneViewWidget *item);
 
-    /** Closes all zone views. */
+    /** @brief Closes all zone views. */
     void clearViews();
 
-    /** Closes the most recently added zone view. */
+    /** @brief Closes the most recently added zone view. */
     void closeMostRecentZoneView();
     QTransform getViewTransform() const;
     QTransform getViewportTransform() const;
 
+    /// Directly modifies the scene
+    void addArrow(QSharedPointer<ArrowData> data);
+    void deleteArrow(int playerId, int arrowId);
+    void clearArrowsForPlayer(int playerId);
+    void clearArrowsForPlayerLocally(int playerId);
+
+    /// Queues up arrow deletion but doesn't directly modify the scene
+    void requestArrowDeletion(int playerId, int arrowId);
+
+    void onCardZoneChanged(CardItem *card, bool sameZone);
+
 protected:
-    /** Handles hover updates. */
+    /** @brief Handles hover updates. */
     bool event(QEvent *event) override;
 
-    /** Handles animation timer updates. */
+    /** @brief Handles animation timer updates. */
     void timerEvent(QTimerEvent *event) override;
 
 signals:
     void sigStartRubberBand(const QPointF &selectionOrigin);
     void sigResizeRubberBand(const QPointF &cursorPoint, int selectedCount);
     void sigStopRubberBand();
+    void arrowDeletionRequested(int creatorId, int arrowId);
 };
 
 #endif

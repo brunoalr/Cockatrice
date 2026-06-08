@@ -1,8 +1,8 @@
 /**
  * @file card_info_picture_widget.h
  * @ingroup CardWidgets
- * @brief TODO: Document this.
  */
+//! \todo Document this file.
 
 #ifndef CARD_INFO_PICTURE_H
 #define CARD_INFO_PICTURE_H
@@ -43,7 +43,7 @@ signals:
     void hoveredOnCard(const ExactCard &hoveredCard);
     void cardScaleFactorChanged(int _scale);
     void cardChanged(const ExactCard &card);
-    void cardClicked(QMouseEvent *event);
+    void cardClicked(QMouseEvent *event, const ExactCard &card);
 
 protected:
     void resizeEvent(QResizeEvent *event) override;

@@ -213,11 +213,25 @@ void GameEventHandler::handleChatMessageSent(const QString &chatMessage)
     sendGameCommand(cmd);
 }
 
-void GameEventHandler::handleArrowDeletion(int arrowId)
+void GameEventHandler::handleArrowDeletion(int creatorId, int arrowId)
 {
     Command_DeleteArrow cmd;
     cmd.set_arrow_id(arrowId);
-    sendGameCommand(cmd);
+
+    auto preparedCommand = prepareGameCommand(cmd);
+
+    connect(preparedCommand, &PendingCommand::finished, this, [creatorId, arrowId, this](const Response &response) {
+        handleArrowDeletionFinished(response, creatorId, arrowId);
+    });
+
+    sendGameCommand(preparedCommand);
+}
+
+void GameEventHandler::handleArrowDeletionFinished(const Response &response, int creatorId, int arrowId)
+{
+    if (response.response_code() == Response::RespNameNotFound) {
+        emit arrowDeleted(creatorId, arrowId);
+    }
 }
 
 void GameEventHandler::eventSpectatorSay(const Event_GameSay &event,

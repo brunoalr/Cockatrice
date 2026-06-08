@@ -3,7 +3,7 @@
 # This script will run clang-format on all modified, non-3rd-party C++/Header files.
 # Optionally runs cmake-format on all modified cmake files.
 # Optionally runs shellcheck on all modified shell files.
-# Uses clang-format cmake-format git diff find shellcheck
+# Uses clang-format, cmake-format, git, diff, find and shellcheck
 # Never, ever, should this receive a path with a newline in it. Don't bother proofing it for that.
 
 set -o pipefail
@@ -103,11 +103,11 @@ OPTIONS:
         Do not check any source files for clang-format.
 
     --print-version
-        Print the version of clang-format being used before continuing.
+        Print the lint tool version being used before continuing.
 
     --shell
-        Use shellcheck to lint shell files. Not available in the default inline
-        mode.
+        Use shellcheck to lint shell files.
+        Not available in the default inline mode.
 
     -t, --test
         Do not edit files in place. Set exit code to 1 if changes are required.
@@ -216,13 +216,23 @@ if [[ $do_shell ]] && ! hash shellcheck 2>/dev/null; then
   exit 3
 fi
 
+# Bash 3.2 (macOS default) lacks mapfile; read newline-delimited input into the named array.
+read_lines_into_array() {
+  local _array_name=$1
+  local _line
+  eval "$_array_name=()"
+  while IFS= read -r _line || [[ -n $_line ]]; do
+    eval "$_array_name+=(\"\$_line\")"
+  done
+}
+
 if [[ $branch ]]; then
   # get all dirty files through git
   if ! base=$(git merge-base "$branch" HEAD); then
     echo "could not find git merge base" >&2
     exit 2 # input error
   fi
-  mapfile -t basenames < <(git diff --diff-filter=d --name-only "$base")
+  read_lines_into_array basenames < <(git diff --diff-filter=d --name-only "$base")
   names=()
   for ex in "${exts[@]}"; do
     for path in "${include[@]}"; do
@@ -264,13 +274,13 @@ else
     exts_o+=(-o -name "*\\.$ext")
   done
   unset "exts_o[0]" # remove first -o
-  mapfile -t names < <(find "${include[@]}" -type f "${exts_o[@]}")
+  read_lines_into_array names < <(find "${include[@]}" -type f "${exts_o[@]}")
   if [[ $do_cmake ]]; then
-    mapfile -t cmake_names < <(find . -maxdepth 2 -type f -name "$cmakefile" -o -path "./${cmakedir/.}")
+    read_lines_into_array cmake_names < <(find . -maxdepth 2 -type f -name "$cmakefile" -o -path "./${cmakedir/.}")
     cmake_names+=("${cmakeinclude[@]}")
   fi
   if [[ $do_shell ]]; then
-    mapfile -t shell_names < <(find . -maxdepth 5 -type f -name "$scripts")
+    read_lines_into_array shell_names < <(find . -maxdepth 5 -type f -name "$scripts")
   fi
 fi
 

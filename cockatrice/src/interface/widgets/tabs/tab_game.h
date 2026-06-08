@@ -3,8 +3,8 @@
  * @ingroup Tabs
  * @ingroup GameWidgets
  * @ingroup Lobby
- * @brief TODO: Document this.
  */
+//! \todo Document this file.
 
 #ifndef TAB_GAME_H
 #define TAB_GAME_H
@@ -137,7 +137,6 @@ signals:
     void gameLeft();
     void chatMessageSent(QString chatMessage);
     void turnAdvanced();
-    void arrowDeletionRequested(int arrowId);
 
 private slots:
     void adminLockChanged(bool lock);

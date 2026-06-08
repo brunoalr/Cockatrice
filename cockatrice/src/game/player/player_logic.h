@@ -1,14 +1,14 @@
 /**
  * @file player.h
  * @ingroup GameLogicPlayers
- * @brief TODO: Document this.
  */
+//! \todo Document this file.
 
 #ifndef PLAYER_H
 #define PLAYER_H
 
-#include "../../game_graphics/board/abstract_graphics_item.h"
 #include "../../interface/widgets/menus/tearoff_menu.h"
+#include "../board/arrow_data.h"
 #include "../interface/deck_loader/loaded_deck.h"
 #include "../zones/hand_zone_logic.h"
 #include "../zones/pile_zone_logic.h"
@@ -39,7 +39,6 @@ class Message;
 }
 } // namespace google
 class AbstractCardItem;
-class AbstractCounter;
 class AbstractGame;
 class ArrowItem;
 class ArrowTarget;
@@ -70,6 +69,8 @@ signals:
     void openDeckEditor(const LoadedDeck &deck);
     void deckChanged();
     void newCardAdded(AbstractCardItem *card);
+    void counterAdded(CounterState *state);
+    void counterRemoved(int counterId);
     void rearrangeCounters();
     void activeChanged(bool active);
     void zoneIdChanged(int zoneId);
@@ -77,6 +78,10 @@ signals:
     void clearCustomZonesMenu();
     void addViewCustomZoneActionToCustomZoneMenu(QString zoneName);
     void resetTopCardMenuActions();
+    void arrowCreateRequested(QSharedPointer<ArrowData> data);
+    void arrowDeleteRequested(int creatorId, int arrowId);
+    void arrowDeleted(int creatorId, int arrowId);
+    void arrowsClearedLocally(); // fires on clear() and processPlayerInfo
 
 public slots:
     void setActive(bool _active);
@@ -189,13 +194,12 @@ public:
         return qobject_cast<HandZoneLogic *>(zones.value(ZoneNames::HAND));
     }
 
-    AbstractCounter *addCounter(const ServerInfo_Counter &counter);
-    AbstractCounter *addCounter(int counterId, const QString &name, QColor color, int radius, int value);
+    CounterState *addCounter(const ServerInfo_Counter &counter);
+    CounterState *addCounter(int id, const QString &name, const QColor &color, int radius, int value);
     void delCounter(int counterId);
     void clearCounters();
-    void incrementAllCardCounters();
 
-    QMap<int, AbstractCounter *> getCounters()
+    QMap<int, CounterState *> getCounters() const
     {
         return counters;
     }
@@ -203,18 +207,7 @@ public:
     /**
      * Gets the counter that represents the life total.
      */
-    AbstractCounter *getLifeCounter() const;
-
-    ArrowItem *addArrow(const ServerInfo_Arrow &arrow);
-    ArrowItem *addArrow(int arrowId, CardItem *startCard, ArrowTarget *targetItem, const QColor &color);
-    void delArrow(int arrowId);
-    void removeArrow(ArrowItem *arrow);
-    void clearArrows();
-
-    const QMap<int, ArrowItem *> &getArrows() const
-    {
-        return arrows;
-    }
+    CounterState *getLifeCounter() const;
 
     void setConceded(bool _conceded);
     bool getConceded() const
@@ -251,13 +244,10 @@ private:
 
     int zoneId;
     QMap<QString, CardZoneLogic *> zones;
-    QMap<int, AbstractCounter *> counters;
-    QMap<int, ArrowItem *> arrows;
+    QMap<int, CounterState *> counters;
 
     bool dialogSemaphore;
     QList<CardItem *> cardsToDelete;
-
-    // void eventConnectionStateChanged(const Event_ConnectionStateChanged &event);
 };
 
 class AnnotationDialog : public QInputDialog

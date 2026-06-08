@@ -1,8 +1,8 @@
 /**
  * @file card_item.h
  * @ingroup GameGraphicsCards
- * @brief TODO: Document this.
  */
+//! \todo Document this file.
 
 #ifndef CARDITEM_H
 #define CARDITEM_H
@@ -12,6 +12,7 @@
 #include "card_state.h"
 
 #include <libcockatrice/network/server/remote/game/server_card.h>
+#include <libcockatrice/utility/trice_limits.h>
 
 class CardDatabase;
 class CardDragItem;
@@ -21,7 +22,6 @@ class PlayerLogic;
 class QAction;
 class QColor;
 
-const int MAX_COUNTERS_ON_CARD = 999;
 const int ROTATION_DEGREES_PER_FRAME = 10;
 
 class CardItem : public AbstractCardItem
@@ -55,6 +55,10 @@ public:
                       CardZoneLogic *_zone = nullptr);
 
     void retranslateUi();
+    [[nodiscard]] CardState *getState() const
+    {
+        return state;
+    }
     [[nodiscard]] CardZoneLogic *getZone() const
     {
         return state->getZone();

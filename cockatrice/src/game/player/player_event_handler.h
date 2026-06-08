@@ -1,8 +1,8 @@
 /**
  * @file player_event_handler.h
  * @ingroup GameLogicPlayers
- * @brief TODO: Document this.
  */
+//! \todo Document this file.
 
 #ifndef COCKATRICE_PLAYER_EVENT_HANDLER_H
 #define COCKATRICE_PLAYER_EVENT_HANDLER_H
@@ -82,6 +82,7 @@ signals:
                         bool isLentToAnotherPlayer = false);
     void logAlwaysRevealTopCard(PlayerLogic *player, CardZoneLogic *zone, bool reveal);
     void logAlwaysLookAtTopCard(PlayerLogic *player, CardZoneLogic *zone, bool reveal);
+    void cardZoneChanged(CardItem *card, bool sameZone);
 
 public:
     PlayerEventHandler(PlayerLogic *player);

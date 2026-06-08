@@ -1,8 +1,8 @@
 /**
  * @file visual_database_display_name_filter_widget.h
  * @ingroup VisualCardDatabaseWidgets
- * @brief TODO: Document this.
  */
+//! \todo Document this file.
 
 #ifndef VISUAL_DATABASE_DISPLAY_NAME_FILTER_WIDGET_H
 #define VISUAL_DATABASE_DISPLAY_NAME_FILTER_WIDGET_H
@@ -21,8 +21,8 @@ class VisualDatabaseDisplayNameFilterWidget : public QWidget
     Q_OBJECT
 public:
     explicit VisualDatabaseDisplayNameFilterWidget(QWidget *parent,
-                                                   AbstractTabDeckEditor *deckEditor,
-                                                   FilterTreeModel *filterModel);
+                                                   FilterTreeModel *filterModel,
+                                                   DeckListModel *deckListModel = nullptr);
 
     void createNameFilter(const QString &name);
     void removeNameFilter(const QString &name);
@@ -34,8 +34,8 @@ public slots:
     void retranslateUi();
 
 private:
-    AbstractTabDeckEditor *deckEditor;
     FilterTreeModel *filterModel;
+    DeckListModel *deckListModel;
     QVBoxLayout *layout;
     QLineEdit *searchBox;
     FlowWidget *flowWidget;
