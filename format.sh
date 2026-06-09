@@ -216,23 +216,13 @@ if [[ $do_shell ]] && ! hash shellcheck 2>/dev/null; then
   exit 3
 fi
 
-# Bash 3.2 (macOS default) lacks mapfile; read newline-delimited input into the named array.
-read_lines_into_array() {
-  local _array_name=$1
-  local _line
-  eval "$_array_name=()"
-  while IFS= read -r _line || [[ -n $_line ]]; do
-    eval "$_array_name+=(\"\$_line\")"
-  done
-}
-
 if [[ $branch ]]; then
   # get all dirty files through git
   if ! base=$(git merge-base "$branch" HEAD); then
     echo "could not find git merge base" >&2
     exit 2 # input error
   fi
-  read_lines_into_array basenames < <(git diff --diff-filter=d --name-only "$base")
+  mapfile -t basenames < <(git diff --diff-filter=d --name-only "$base")
   names=()
   for ex in "${exts[@]}"; do
     for path in "${include[@]}"; do
@@ -274,13 +264,13 @@ else
     exts_o+=(-o -name "*\\.$ext")
   done
   unset "exts_o[0]" # remove first -o
-  read_lines_into_array names < <(find "${include[@]}" -type f "${exts_o[@]}")
+  mapfile -t names < <(find "${include[@]}" -type f "${exts_o[@]}")
   if [[ $do_cmake ]]; then
-    read_lines_into_array cmake_names < <(find . -maxdepth 2 -type f -name "$cmakefile" -o -path "./${cmakedir/.}")
+    mapfile -t cmake_names < <(find . -maxdepth 2 -type f -name "$cmakefile" -o -path "./${cmakedir/.}")
     cmake_names+=("${cmakeinclude[@]}")
   fi
   if [[ $do_shell ]]; then
-    read_lines_into_array shell_names < <(find . -maxdepth 5 -type f -name "$scripts")
+    mapfile -t shell_names < <(find . -maxdepth 5 -type f -name "$scripts")
   fi
 fi
 
