@@ -471,6 +471,7 @@ jobs:
       - name: "Delete remote compiler cache (${{ matrix.ccache_variant }})"
         if: github.ref == 'refs/heads/master' && steps.ccache_restore.outputs.cache-hit
         continue-on-error: true
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
