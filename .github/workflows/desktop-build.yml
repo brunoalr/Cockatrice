@@ -330,7 +330,6 @@ jobs:
           - os: Windows
             target: 10
             runner: windows-2025
-            
             cmake_generator: Ninja
             make_package: 1
             package_suffix: "-Win10"
