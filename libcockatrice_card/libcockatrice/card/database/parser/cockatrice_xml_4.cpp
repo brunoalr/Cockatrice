@@ -203,7 +203,7 @@ void CockatriceXml4Parser::loadSetsFromXml(QXmlStreamReader &xml)
         if (xmlName == "set") {
             QString shortName, longName, setType;
             QDate releaseDate;
-            short priority;
+            short priority = 0;
             while (!xml.atEnd()) {
                 if (xml.readNext() == QXmlStreamReader::EndElement) {
                     break;

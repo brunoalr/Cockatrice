@@ -148,12 +148,12 @@ void VisualDatabaseDisplayColorFilterWidget::removeFilter(QChar color)
 
 void VisualDatabaseDisplayColorFilterWidget::updateFilterMode()
 {
-    const QVariant data = modeComboBox->currentData();
-    if (!data.isValid()) {
+    const QVariant comboBoxData = modeComboBox->currentData();
+    if (!comboBoxData.isValid()) {
         return;
     }
 
-    currentMode = data.value<FilterMode>();
+    currentMode = comboBoxData.value<FilterMode>();
 
     filterModel->blockSignals(true);
     filterModel->filterTree()->blockSignals(true);

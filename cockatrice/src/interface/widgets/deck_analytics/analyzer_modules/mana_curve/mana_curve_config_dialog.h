@@ -18,7 +18,7 @@ class ManaCurveConfigDialog : public QDialog
 public:
     explicit ManaCurveConfigDialog(DeckListStatisticsAnalyzer *analyzer, QWidget *parent = nullptr);
     void retranslateUi();
-    void setFromConfig(const ManaCurveConfig &cfg);
+    void setFromConfig(const ManaCurveConfig &config);
 
     ManaCurveConfig result() const
     {
