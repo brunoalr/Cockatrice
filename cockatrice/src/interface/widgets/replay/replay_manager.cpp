@@ -1,6 +1,8 @@
 #include "replay_manager.h"
 
+#include "../../../client/settings/shortcuts_settings.h"
 #include "../interface/widgets/tabs/tab_game.h"
+#include "replay_quick_settings_widget.h"
 
 #include <QHBoxLayout>
 #include <QToolButton>
@@ -78,13 +80,19 @@ ReplayManager::ReplayManager(TabGame *parent, GameReplay *_replay)
     replayFastForwardButton->setIconSize(QSize(32, 32));
     replayFastForwardButton->setIcon(QPixmap("theme:replay/fastforward"));
     replayFastForwardButton->setCheckable(true);
-    connect(replayFastForwardButton, &QToolButton::toggled, this, &ReplayManager::replayFastForwardButtonToggled);
+    connect(replayFastForwardButton, &QToolButton::toggled, this, &ReplayManager::updateTimeScaleFactor);
+
+    settingsWidget = new ReplayQuickSettingsWidget(this);
+    settingsWidget->setFixedSize(QSize(32, 32));
+    connect(settingsWidget, &ReplayQuickSettingsWidget::fastForwardSpeedChanged, this,
+            [this] { updateTimeScaleFactor(replayFastForwardButton->isChecked()); });
 
     // putting everything together
     auto replayControlLayout = new QHBoxLayout;
     replayControlLayout->addWidget(timelineWidget, 10);
     replayControlLayout->addWidget(replayPlayButton);
     replayControlLayout->addWidget(replayFastForwardButton);
+    replayControlLayout->addWidget(settingsWidget);
 
     setObjectName("replayControlWidget");
     setLayout(replayControlLayout);
@@ -115,9 +123,10 @@ void ReplayManager::replayPlayButtonToggled(bool checked)
     }
 }
 
-void ReplayManager::replayFastForwardButtonToggled(bool checked)
+void ReplayManager::updateTimeScaleFactor(bool isFastForward)
 {
-    timelineWidget->setTimeScaleFactor(checked ? ReplayTimelineWidget::FAST_FORWARD_SCALE_FACTOR : 1.0);
+    qreal factor = isFastForward ? SettingsCache::instance().interface().getFastForwardSpeed() : 1.0;
+    timelineWidget->setTimeScaleFactor(factor);
 }
 
 /**
