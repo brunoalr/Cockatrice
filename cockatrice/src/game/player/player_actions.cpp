@@ -69,7 +69,7 @@ void PlayerActions::playCard(CardItem *card, bool faceDown)
     const CardInfo &info = exactCard.getInfo();
 
     int tableRow = info.getUiAttributes().tableRow;
-    bool playToStack = SettingsCache::instance().interface().getPlayToStack();
+    bool playToStack = SettingsCache::instance().userInterface().getPlayToStack();
     QString currentZone = card->getZone()->getName();
     if (!faceDown && currentZone == ZoneNames::STACK && tableRow == 3) {
         cmd.set_target_zone(ZoneNames::GRAVE);
@@ -312,7 +312,7 @@ void PlayerActions::actDrawCard()
 
 void PlayerActions::actRequestMulliganDialog()
 {
-    int startSize = SettingsCache::instance().interface().getStartingHandSize();
+    int startSize = SettingsCache::instance().userInterface().getStartingHandSize();
     int handSize = player->getHandZone()->getCards().size();
     int deckSize = player->getDeckZone()->getCards().size() + handSize;
 
@@ -328,7 +328,7 @@ void PlayerActions::actMulligan(int number)
     }
 
     doMulligan(number);
-    SettingsCache::instance().interface().setStartingHandSize(number);
+    SettingsCache::instance().userInterface().setStartingHandSize(number);
 }
 
 void PlayerActions::actMulliganSameSize()
@@ -932,13 +932,13 @@ void PlayerActions::setLastTokenInfo(CardInfoPtr cardInfo)
         return;
     }
 
-    lastTokenInfo = {.name = cardInfo->getName(),
-                     .color = cardInfo->getColors().isEmpty() ? QString() : cardInfo->getColors().left(1).toLower(),
-                     .pt = cardInfo->getPowTough(),
-                     .annotation = SettingsCache::instance().interface().getAnnotateTokens() ? cardInfo->getText() : "",
-                     .destroy = true,
-                     .providerId =
-                         SettingsCache::instance().cardOverrides().getCardPreferenceOverride(cardInfo->getName())};
+    lastTokenInfo = {
+        .name = cardInfo->getName(),
+        .color = cardInfo->getColors().isEmpty() ? QString() : cardInfo->getColors().left(1).toLower(),
+        .pt = cardInfo->getPowTough(),
+        .annotation = SettingsCache::instance().userInterface().getAnnotateTokens() ? cardInfo->getText() : "",
+        .destroy = true,
+        .providerId = SettingsCache::instance().cardOverrides().getCardPreferenceOverride(cardInfo->getName())};
 
     lastTokenTableRow = TableZone::tableRowToGridY(cardInfo->getUiAttributes().tableRow);
 
@@ -1171,7 +1171,7 @@ void PlayerActions::createCard(const CardItem *sourceCard,
     }
 
     cmd.set_pt(cardInfo->getPowTough().toStdString());
-    if (SettingsCache::instance().interface().getAnnotateTokens()) {
+    if (SettingsCache::instance().userInterface().getAnnotateTokens()) {
         cmd.set_annotation(cardInfo->getText().toStdString());
     } else {
         cmd.set_annotation("");
@@ -1354,11 +1354,7 @@ void PlayerActions::actSetPT(QList<CardItem *> selectedCards, const QString &pt)
             const auto oldpt = CardItem::parsePT(card->getPT());
             int ptIter = 0;
             for (const auto &_item : ptList) {
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
                 if (_item.typeId() == QMetaType::Type::Int) {
-#else
-                if (_item.type() == QVariant::Int) {
-#endif
                     int oldItem = ptIter < oldpt.size() ? oldpt.at(ptIter).toInt() : 0;
                     newpt += '/' + QString::number(oldItem + _item.toInt());
                 } else {

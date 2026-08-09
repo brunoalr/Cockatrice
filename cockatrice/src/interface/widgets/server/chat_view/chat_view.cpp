@@ -13,6 +13,7 @@
 #include <QDesktopServices>
 #include <QMouseEvent>
 #include <QScrollBar>
+#include <libcockatrice/card/database/card_database_manager.h>
 #include <libcockatrice/network/server/remote/user_level.h>
 #include <libcockatrice/settings/chat_settings.h>
 
@@ -62,12 +63,14 @@ void ChatView::adjustColorsToPalette()
         serverMessageColor = QColor(0xFF, 0x73, 0x83);
         otherUserColor = otherUserColor.lighter(150);
         linkColor = QColor(71, 158, 252);
+        unresolvedCardTagColor = QColor(0xFF, 0xA5, 0x00);
     } else {
         document()->setDefaultStyleSheet(R"(
             a { text-decoration: none; color: blue; }
             .blue { color: blue }
         )");
         linkColor = palette().link().color();
+        unresolvedCardTagColor = QColor(0xA0, 0x52, 0x2D);
     }
 
     QTimer::singleShot(0, this, &ChatView::refreshBlockColors);
@@ -173,13 +176,22 @@ void ChatView::appendHtmlServerMessage(const QString &html, bool optionalIsBold,
 void ChatView::appendCardTag(QTextCursor &cursor, const QString &cardName)
 {
     QTextCharFormat oldFormat = cursor.charFormat();
-    QTextCharFormat anchorFormat = oldFormat;
-    anchorFormat.setForeground(linkColor);
-    anchorFormat.setAnchor(true);
-    anchorFormat.setAnchorHref("card://" + cardName);
-    anchorFormat.setFontItalic(true);
+    QTextCharFormat cardFormat = oldFormat;
+    cardFormat.setFontItalic(true);
 
-    cursor.setCharFormat(anchorFormat);
+    if (!CardDatabaseManager::query()->lookupCardByName(cardName)) {
+        cardFormat.setForeground(unresolvedCardTagColor);
+        cursor.setCharFormat(cardFormat);
+        cursor.insertText(cardName);
+        cursor.setCharFormat(oldFormat);
+        return;
+    }
+
+    cardFormat.setForeground(linkColor);
+    cardFormat.setAnchor(true);
+    cardFormat.setAnchorHref("card://" + cardName);
+
+    cursor.setCharFormat(cardFormat);
     cursor.insertText(cardName);
     cursor.setCharFormat(oldFormat);
 }
@@ -580,11 +592,7 @@ void ChatView::redactMessages(const QString &userName, int amount)
     }
 }
 
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 void ChatView::enterEvent(QEnterEvent * /*event*/)
-#else
-void ChatView::enterEvent(QEvent * /*event*/)
-#endif
 {
     setMouseTracking(true);
 }
@@ -641,12 +649,9 @@ void ChatView::mousePressEvent(QMouseEvent *event)
 {
     switch (hoveredItemType) {
         case HoveredCard: {
-            if ((event->button() == Qt::MiddleButton) || (event->button() == Qt::LeftButton))
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+            if ((event->button() == Qt::MiddleButton) || (event->button() == Qt::LeftButton)) {
                 emit showCardInfoPopup(event->globalPosition().toPoint(), {hoveredContent});
-#else
-                emit showCardInfoPopup(event->globalPos(), {hoveredContent});
-#endif
+            }
             break;
         }
         case HoveredUser: {
@@ -656,11 +661,7 @@ void ChatView::mousePressEvent(QMouseEvent *event)
                 switch (event->button()) {
                     case Qt::RightButton: {
                         UserLevelFlags userLevel(hoveredContent.left(delimiterIndex).toInt());
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
                         userContextMenu->showContextMenu(event->globalPosition().toPoint(), userName, userLevel, this);
-#else
-                        userContextMenu->showContextMenu(event->globalPos(), userName, userLevel, this);
-#endif
                         break;
                     }
                     case Qt::LeftButton: {
