@@ -327,6 +327,7 @@ jobs:
             target: 10
             runner: windows-2025    # https://github.com/actions/runner-images/blob/main/images/windows/Windows2025-VS2026-Readme.md
 
+            ccache_eviction_age: 7d
             cmake_generator: Ninja
             make_package: 1
             package_suffix: "-Win10"
