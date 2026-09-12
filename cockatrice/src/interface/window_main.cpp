@@ -44,6 +44,7 @@
 #include "intents/intent_open_server_room_by_name.h"
 #include "intents/url_parser.h"
 #include "logger.h"
+#include "pixel_map_generator.h"
 #include "version_string.h"
 #include "widgets/dialogs/dlg_connect.h"
 #include "widgets/server/handle_public_servers.h"
@@ -91,8 +92,8 @@
 #include <libcockatrice/settings/updates_settings.h>
 
 #define GITHUB_PAGES_URL "https://cockatrice.github.io"
-#define GITHUB_CONTRIBUTORS_URL "https://github.com/Cockatrice/Cockatrice/graphs/contributors?type=c"
-#define GITHUB_CONTRIBUTE_URL "https://github.com/Cockatrice/Cockatrice#cockatrice"
+#define GITHUB_CONTRIBUTORS_URL "https://github.com/Cockatrice/Cockatrice/graphs/contributors"
+#define GITHUB_CONTRIBUTE_URL "https://github.com/Cockatrice/Cockatrice#"
 #define GITHUB_TRANSIFEX_TRANSLATORS_URL "https://github.com/Cockatrice/Cockatrice/wiki/Translator-Hall-of-Fame"
 #define GITHUB_TRANSLATOR_FAQ_URL "https://github.com/Cockatrice/Cockatrice/wiki/Translation-FAQ"
 #define GITHUB_ISSUES_URL "https://github.com/Cockatrice/Cockatrice/issues"
@@ -271,7 +272,8 @@ void MainWindow::actAbout()
                 GITHUB_TROUBLESHOOTING_URL + "'>" + tr("Troubleshooting") + "</a><br>" + "<a href='" + GITHUB_FAQ_URL +
                 "'>" + tr("F.A.Q.") + "</a><br>"),
         QMessageBox::Ok, this);
-    mb.setIconPixmap(QPixmap("theme:cockatrice").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    mb.setIconPixmap(
+        themePixmap(QStringLiteral("cockatrice")).scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     mb.setTextInteractionFlags(Qt::TextBrowserInteraction);
     mb.exec();
 }
@@ -323,7 +325,7 @@ void MainWindow::retranslateUi()
     aRegister->setText(tr("&Register to server..."));
     aForgotPassword->setText(tr("&Restore password..."));
     aSettings->setText(tr("&Settings..."));
-    aSettings->setIcon(QPixmap("theme:icons/settings"));
+    aSettings->setIcon(themePixmap(QStringLiteral("icons/settings")));
     aExit->setText(tr("&Exit"));
 
 #if defined(__APPLE__) /* For OSX */
@@ -817,7 +819,7 @@ void MainWindow::createTrayIcon()
 
     trayIcon = new QSystemTrayIcon(this);
     trayIcon->setContextMenu(trayIconMenu);
-    trayIcon->setIcon(QPixmap("theme:cockatrice"));
+    trayIcon->setIcon(themePixmap(QStringLiteral("cockatrice")));
     trayIcon->show();
 }
 
@@ -1048,7 +1050,7 @@ void MainWindow::createCardUpdateProcess(bool background)
 
     if (dir.exists(binaryName)) {
         updaterCmd = dir.absoluteFilePath(binaryName);
-    } else { // try and find the directory oracle is stored in the build directory
+    } else { // try and find the directory Oracle is stored in the build directory
         QDir findLocalDir(dir);
         findLocalDir.cdUp();
         findLocalDir.cd(getCardUpdaterBinaryName());
