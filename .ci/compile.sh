@@ -15,7 +15,7 @@
 # --cmake-generator <generator> sets CMAKE_GENERATOR as used by cmake
 # --target-macos-version <version> sets the min os version - only used for macOS builds
 # --target-macos-architecture <architecture> sets the architecture - only used for macOS builds
-# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE CCACHE_VARIANT CCACHE_EVICTION_AGE BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION TARGET_MACOS_ARCH
+# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE CCACHE_VARIANT CCACHE_EVICTION_AGE SCCACHE_DIR BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION TARGET_MACOS_ARCH
 # (correspond to args: --debug/--release --install --package <package type> --suffix <suffix> --server --test --ccache <ccache_size> --dir <dir>)
 # exitcode: 1 for failure, 3 for invalid arguments
 
@@ -328,7 +328,15 @@ echo "::endgroup::"
 if [[ $USE_CCACHE ]]; then
   if [[ $CCACHE_EVICTION_AGE ]]; then
     echo "::group::evict ccache files older than $CCACHE_EVICTION_AGE"
-    ccache --evict-older-than "$CCACHE_EVICTION_AGE"
+    if [[ $CCACHE_VARIANT == 'sccache' ]]; then
+      if [[ $CCACHE_EVICTION_AGE != *d ]]; then
+        echo "::error file=$0::sccache eviction expects an age in days, got $CCACHE_EVICTION_AGE"
+        exit 3
+      fi
+      find "${SCCACHE_DIR:?}" -type f -mtime "+${CCACHE_EVICTION_AGE%d}" -delete
+    else
+      ccache --evict-older-than "$CCACHE_EVICTION_AGE"
+    fi
     echo "::endgroup::"
   fi
   echo "::group::Show ccache stats again"
