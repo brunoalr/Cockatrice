@@ -158,6 +158,7 @@ if [[ $MAKE_TEST ]]; then
   flags+=("-DTEST=1")
 fi
 if [[ $USE_CCACHE ]]; then
+  flags+=("-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON")
   if [[ $CCACHE_VARIANT == 'sccache' ]]; then
     # sccache only
 	# USE_CCACHE=0 prevents RULE_LAUNCH_COMPILE (avoids Strawberry ccache on Windows), use compiler launcher variables
