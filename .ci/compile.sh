@@ -199,6 +199,7 @@ if [[ ${MAKE_COVERAGE:-} == "1" ]]; then
   flags+=("-DENABLE_COVERAGE=ON")
 fi
 if [[ ${USE_CCACHE:-} == "1" ]]; then
+  flags+=("-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON")
   flags+=("-DUSE_CCACHE=1")
   if [[ $RUNNER_OS == Windows ]]; then
     # Every runner image build reinstalls MSVC with new mtimes, which misses the whole cache under the default mtime check
