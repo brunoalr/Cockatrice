@@ -447,6 +447,8 @@ jobs:
             target: 10
             runner: windows-2025    # https://github.com/actions/runner-images/blob/main/images/windows/Windows2025-VS2026-Readme.md
 
+            ccache_eviction_age: 30d
+
             # Ninja builds the whole dependency graph at once instead of one
             # MSBuild node at a time, runs the compiler itself, and matches the
             # Linux and macOS legs. Its median build phase measured ~17 min
