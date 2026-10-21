@@ -18,6 +18,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QSettings>
 #include <QVariant>
 #include <QWindow>
