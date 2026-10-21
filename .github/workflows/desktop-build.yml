@@ -149,14 +149,21 @@ jobs:
 
           - distro: Ubuntu
             version: 26.04
-
-            package: DEB
+            variant: san    # separate image and ccache, same distro
 
             # The one leg that runs the suite under AddressSanitizer and
             # UndefinedBehaviorSanitizer. Debian 13 and Fedora 44 keep covering the
             # uninstrumented suite, so nothing is lost by instrumenting this one.
+            # Its own leg so it builds in parallel with the release package below,
+            # and so the instrumented objects get a ccache of their own.
             sanitize: yes
-            ccache_size: 1G    # instrumented debug + release objects overflow 800M
+            package: skip
+
+          - distro: Ubuntu
+            version: 26.04
+
+            package: DEB
+            test: skip    # the san leg above runs the suite for this distro
 
           - distro: Ubuntu
             version: 26.04
@@ -179,7 +186,7 @@ jobs:
     env:
       CACHE: ${{ github.workspace }}/.cache/${{ matrix.distro }}${{ matrix.version }}${{ matrix.variant }}    # directory for caching docker image and ccache
       CCACHE_EVICTION_AGE: 7d
-      CCACHE_SIZE: ${{ matrix.ccache_size || '800M' }}    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
+      CCACHE_SIZE: 800M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CMAKE_GENERATOR: 'Ninja'
       NAME: ${{ matrix.distro }}${{ matrix.version }}
       IMAGE_SUFFIX: ${{ matrix.variant }}
