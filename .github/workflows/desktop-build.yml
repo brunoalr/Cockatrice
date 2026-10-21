@@ -127,8 +127,14 @@ jobs:
 
           - distro: Debian
             version: 13
+            variant: test    # debug build and test suite, separate image and ccache
+            package: skip
+
+          - distro: Debian
+            version: 13
 
             package: DEB
+            test: skip    # the test leg above runs the suite for this distro
 
           - distro: Fedora
             version: 43
@@ -138,8 +144,14 @@ jobs:
 
           - distro: Fedora
             version: 44
+            variant: test    # debug build and test suite, separate image and ccache
+            package: skip
+
+          - distro: Fedora
+            version: 44
 
             package: RPM
+            test: skip    # the test leg above runs the suite for this distro
 
           - distro: Ubuntu
             version: 24.04
