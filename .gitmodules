@@ -4,6 +4,3 @@
 [submodule "doxygen-awesome-css"]
 	path = doc/doxygen/theme
 	url = https://github.com/jothepro/doxygen-awesome-css.git
-[submodule "cmake/WindowsToolchain"]
-	path = cmake/WindowsToolchain
-	url = https://github.com/MarkSchofield/WindowsToolchain.git
