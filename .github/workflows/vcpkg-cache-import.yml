@@ -60,13 +60,14 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # The runner exports ACTIONS_CACHE_MODE only to JavaScript and container actions,
+      # never to run: steps, so the check has to run inside one.
       - name: "Assert write access"
-        shell: bash
-        run: |
-          if [[ $ACTIONS_CACHE_MODE != *write* ]]; then
-            echo "::error::expected a write-capable cache, got '$ACTIONS_CACHE_MODE'"
-            exit 1
-          fi
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const mode = process.env.ACTIONS_CACHE_MODE ?? '';
+            if (!mode.includes('write')) core.setFailed(`expected a write-capable cache, got '${mode}'`);
 
       - name: "List cache entries"
         id: scan
