@@ -219,7 +219,6 @@ jobs:
     timeout-minutes: 70
     env:
       CACHE: ${{ github.workspace }}/.cache/${{ matrix.distro }}${{ matrix.version }}${{ matrix.variant }}    # directory for caching docker image and ccache
-      CCACHE_EVICTION_AGE: 7d
       # The bound is sized against the repository's 10 GB cache quota
       # (https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy),
       # not against what one leg would like. The quota currently holds about 1.1 GB of
@@ -288,7 +287,7 @@ jobs:
         run: |
           source .ci/docker.sh
           args=()
-          [[ $GITHUB_REF == "refs/heads/master" ]] && args+=(--evict-ccache "$CCACHE_EVICTION_AGE")
+          [[ $GITHUB_REF == "refs/heads/master" ]] && args+=(--evict-ccache)
           args+=(--ccache "$CCACHE_SIZE")
           args+=(--cmake-generator "$CMAKE_GENERATOR")
 
@@ -347,7 +346,7 @@ jobs:
           args=()
           [[ $server_only == yes ]] && args+=(--no-client)
           [[ $RUN_TESTS == true ]] && args+=(--test)
-          [[ $GITHUB_REF == "refs/heads/master" ]] && args+=(--evict-ccache "$CCACHE_EVICTION_AGE")
+          [[ $GITHUB_REF == "refs/heads/master" ]] && args+=(--evict-ccache)
           args+=(--ccache "$CCACHE_SIZE")
           args+=(--cmake-generator "$CMAKE_GENERATOR")
           args+=(--suffix "$SUFFIX")
@@ -519,7 +518,6 @@ jobs:
     timeout-minutes: 70
     env:
       CACHE: ${{ github.workspace }}/.cache/${{ matrix.distro }}${{ matrix.version }}${{ matrix.variant }}    # directory for caching docker image and ccache
-      CCACHE_EVICTION_AGE: 7d
       # These legs do not keep a compiler cache: they run once a day (and on tags) and gate
       # nothing, so their share of the 10 GB quota goes to the pull-request legs instead.
       # A cold nightly build costs minutes on a runner nobody waits for; a cold pull request
@@ -546,7 +544,6 @@ jobs:
             target: 14    # EOL 2026-09-14
             runner: xcode-27    # https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md
 
-            ccache_eviction_age: 7d
             cmake_generator: Ninja
             make_package: 1
             override_target: 14
@@ -564,7 +561,6 @@ jobs:
             target: 15    # EOL 2027-??
             runner: xcode-27    # https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md
 
-            ccache_eviction_age: 7d
             cmake_generator: Ninja
             make_package: 1
             override_target: 15
@@ -581,7 +577,6 @@ jobs:
             target: 27
             runner: xcode-27    # https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md
 
-            ccache_eviction_age: 7d
             cmake_generator: Ninja
             qt_version: 6.11.*
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
@@ -594,8 +589,6 @@ jobs:
           - os: Windows
             target: 10
             runner: windows-2025    # https://github.com/actions/runner-images/blob/main/images/windows/Windows2025-VS2026-Readme.md
-
-            ccache_eviction_age: 30d
 
             # Ninja builds the whole dependency graph at once instead of one
             # MSBuild node at a time, runs the compiler itself, and matches the
@@ -763,7 +756,7 @@ jobs:
         shell: bash
         env:
           BUILDTYPE: '${{ matrix.type }}'
-          CCACHE_EVICTION_AGE: ${{ matrix.ccache_eviction_age }}
+          CCACHE_EVICT_UNUSED: 1
           CCACHE_VARIANT: ${{ matrix.ccache_variant }}
           CMAKE_GENERATOR: ${{ matrix.cmake_generator }}
           # Tag builds only: artifacts from master pushes and PR branches must not report to
@@ -1119,7 +1112,6 @@ jobs:
             target: 13    # EOL 2025-09-15
             runner: xcode-27    # arm64 runner; x86_64 is cross-compiled, see TARGET_MACOS_ARCH
 
-            ccache_eviction_age: 7d
             cmake_generator: Ninja
             make_package: 1
             override_target: 13
