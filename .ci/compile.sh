@@ -434,8 +434,8 @@ if [[ $USE_CCACHE ]]; then
     echo "::group::evict compiler cache entries unused for ${unused_for}s"
     if [[ $CCACHE_VARIANT == 'sccache' ]]; then
       # The server renames temp files into the cache in the background and holds files open,
-      # either of which can make find fail; a restarted server also rescans the real size.
-      sccache --stop-server >/dev/null || true
+      # either of which can make find fail. Its stats live only in memory and print on stop.
+      sccache --stop-server || true
       echo "before: $(du -sh "$SCCACHE_DIR" | cut -f1)"
       if evicted=$(find "${SCCACHE_DIR:?}" -type f -mmin "+$(( (unused_for + 59) / 60 ))" -print -delete); then
         echo "evicted $(grep -c . <<<"$evicted") files, after: $(du -sh "$SCCACHE_DIR" | cut -f1)"
@@ -447,9 +447,11 @@ if [[ $USE_CCACHE ]]; then
     fi
     echo "::endgroup::"
   fi
-  echo "::group::Show ccache stats again"
-  ccachestatsverbose
-  echo "::endgroup::"
+  if [[ ! ($CCACHE_VARIANT == 'sccache' && $CCACHE_EVICT_UNUSED) ]]; then
+    echo "::group::Show ccache stats again"
+    ccachestatsverbose
+    echo "::endgroup::"
+  fi
 elif [[ $CCACHE_EVICT_UNUSED ]]; then
   echo "::error file=$0::ccache eviction is enabled while ccache is disabled!"
 fi
