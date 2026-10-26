@@ -433,7 +433,10 @@ if [[ $USE_CCACHE ]]; then
     unused_for=$(( $(date +%s) - build_start + 60 ))
     echo "::group::evict compiler cache entries unused for ${unused_for}s"
     if [[ $CCACHE_VARIANT == 'sccache' ]]; then
-      find "${SCCACHE_DIR:?}" -type f -mmin "+$(( (unused_for + 59) / 60 ))" -delete
+      # sccache -s reports the server's in-memory size, which does not see these deletions
+      echo "before: $(du -sh "$SCCACHE_DIR" | cut -f1)"
+      evicted=$(find "${SCCACHE_DIR:?}" -type f -mmin "+$(( (unused_for + 59) / 60 ))" -print -delete)
+      echo "evicted $(grep -c . <<<"$evicted") files, after: $(du -sh "$SCCACHE_DIR" | cut -f1)"
     else
       ccache --evict-older-than "${unused_for}s"
     fi
