@@ -340,7 +340,10 @@ jobs:
           CACHE_PRIMARY_KEY: ${{ steps.restore_ccache.outputs.cache-primary-key }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh cache delete --repo "$GITHUB_REPOSITORY" "$CACHE_PRIMARY_KEY"; then
+          # Deleting by key also deletes every key it prefixes: ccache-Debian13 takes ccache-Debian13test with it
+          id=$(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$CACHE_PRIMARY_KEY" \
+            --json id,key --jq ".[] | select(.key == \"$CACHE_PRIMARY_KEY\") | .id")
+          if [[ -n $id ]] && gh cache delete --repo "$GITHUB_REPOSITORY" "$id"; then
             echo "Cache deleted successfully"
           fi
 
@@ -841,7 +844,10 @@ jobs:
           CACHE_PRIMARY_KEY: ${{ steps.restore_ccache.outputs.cache-primary-key }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh cache delete --repo "$GITHUB_REPOSITORY" "$CACHE_PRIMARY_KEY"; then
+          # Deleting by key also deletes every key it prefixes: ccache-Debian13 takes ccache-Debian13test with it
+          id=$(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$CACHE_PRIMARY_KEY" \
+            --json id,key --jq ".[] | select(.key == \"$CACHE_PRIMARY_KEY\") | .id")
+          if [[ -n $id ]] && gh cache delete --repo "$GITHUB_REPOSITORY" "$id"; then
             echo "Cache deleted successfully"
           fi
 
