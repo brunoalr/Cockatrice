@@ -523,7 +523,7 @@ if [[ ${USE_CCACHE:-} == "1" ]]; then
   if [[ ${CCACHE_EVICT_UNUSED:-} == "1" ]]; then
     unused_for=$(( $(date +%s) - build_start + 60 ))
     echo "::group::evict compiler cache entries unused for ${unused_for}s"
-    ccache --evict-older-than "${unused_for}s"
+    ccache --evict-older-than "${unused_for}s" || echo "::warning file=$0::ccache eviction failed, saving the cache as it is"
     echo "::endgroup::"
   fi
   echo "::group::Show ccache stats again"
