@@ -433,12 +433,17 @@ if [[ $USE_CCACHE ]]; then
     unused_for=$(( $(date +%s) - build_start + 60 ))
     echo "::group::evict compiler cache entries unused for ${unused_for}s"
     if [[ $CCACHE_VARIANT == 'sccache' ]]; then
-      # sccache -s reports the server's in-memory size, which does not see these deletions
+      # The server renames temp files into the cache in the background and holds files open,
+      # either of which can make find fail; a restarted server also rescans the real size.
+      sccache --stop-server >/dev/null || true
       echo "before: $(du -sh "$SCCACHE_DIR" | cut -f1)"
-      evicted=$(find "${SCCACHE_DIR:?}" -type f -mmin "+$(( (unused_for + 59) / 60 ))" -print -delete)
-      echo "evicted $(grep -c . <<<"$evicted") files, after: $(du -sh "$SCCACHE_DIR" | cut -f1)"
+      if evicted=$(find "${SCCACHE_DIR:?}" -type f -mmin "+$(( (unused_for + 59) / 60 ))" -print -delete); then
+        echo "evicted $(grep -c . <<<"$evicted") files, after: $(du -sh "$SCCACHE_DIR" | cut -f1)"
+      else
+        echo "::warning file=$0::sccache eviction failed, saving the cache as it is"
+      fi
     else
-      ccache --evict-older-than "${unused_for}s"
+      ccache --evict-older-than "${unused_for}s" || echo "::warning file=$0::ccache eviction failed, saving the cache as it is"
     fi
     echo "::endgroup::"
   fi
