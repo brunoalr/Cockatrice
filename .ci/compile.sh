@@ -13,13 +13,13 @@
 
 # --debug or --release sets the build type ie CMAKE_BUILD_TYPE
 # --ccache [<size>] uses ccache and shows stats, optionally provide size
-# --evict-ccache <age> runs ccache eviction based on given age after build
+# --evict-ccache after the build, evicts cache entries this build did not use
 # --dir <dir> sets the name of the build dir, default is "build"
 # --cmake-generator <generator> sets CMAKE_GENERATOR as used by cmake
 # --target-macos-version <version> sets the min os version - only used for macOS builds
 # --target-macos-architecture <architecture> sets the architecture - only used for macOS builds
 # --profile writes an MSBuild performance summary and binary log, Windows only
-# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE CCACHE_VARIANT CCACHE_EVICTION_AGE SCCACHE_DIR BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION MAKE_SANITIZE MAKE_COVERAGE VCPKG_TARGET_MACOS_VERSION TARGET_MACOS_ARCH BUILD_PARALLEL_LEVEL BUILD_PROFILE
+# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE CCACHE_VARIANT CCACHE_EVICT_UNUSED SCCACHE_DIR BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION MAKE_SANITIZE MAKE_COVERAGE VCPKG_TARGET_MACOS_VERSION TARGET_MACOS_ARCH BUILD_PARALLEL_LEVEL BUILD_PROFILE
 # (correspond to args: --debug/--release --install --package <package type> --suffix <suffix> --server --test --sanitize --coverage --ccache <ccache_size> --dir <dir> --profile)
 # exitcode: 1 for failure, 3 for invalid arguments
 
@@ -87,12 +87,7 @@ while [[ $# != 0 ]]; do
       fi
       ;;
     '--evict-ccache')
-      shift
-      if [[ $# == 0 ]]; then
-        echo "::error file=$0::--evict-ccache expects an argument"
-        exit 3
-      fi
-      CCACHE_EVICTION_AGE=$1
+      CCACHE_EVICT_UNUSED=1
       shift
       ;;
     '--vcpkg')
@@ -147,6 +142,7 @@ while [[ $# != 0 ]]; do
 done
 
 set -e
+build_start=$(date +%s)
 
 # Setup
 ./servatrice/check_schema_version.sh
@@ -433,23 +429,20 @@ if [[ $BUILD_PROFILE && $RUNNER_OS == Windows && -f msbuild-perf.log ]]; then
 fi
 
 if [[ $USE_CCACHE ]]; then
-  if [[ $CCACHE_EVICTION_AGE ]]; then
-    echo "::group::evict ccache files older than $CCACHE_EVICTION_AGE"
+  if [[ $CCACHE_EVICT_UNUSED ]]; then
+    unused_for=$(( $(date +%s) - build_start + 60 ))
+    echo "::group::evict compiler cache entries unused for ${unused_for}s"
     if [[ $CCACHE_VARIANT == 'sccache' ]]; then
-      if [[ $CCACHE_EVICTION_AGE != *d ]]; then
-        echo "::error file=$0::sccache eviction expects an age in days, got $CCACHE_EVICTION_AGE"
-        exit 3
-      fi
-      find "${SCCACHE_DIR:?}" -type f -mtime "+${CCACHE_EVICTION_AGE%d}" -delete
+      find "${SCCACHE_DIR:?}" -type f -mmin "+$(( (unused_for + 59) / 60 ))" -delete
     else
-      ccache --evict-older-than "$CCACHE_EVICTION_AGE"
+      ccache --evict-older-than "${unused_for}s"
     fi
     echo "::endgroup::"
   fi
   echo "::group::Show ccache stats again"
   ccachestatsverbose
   echo "::endgroup::"
-elif [[ $CCACHE_EVICTION_AGE ]]; then
+elif [[ $CCACHE_EVICT_UNUSED ]]; then
   echo "::error file=$0::ccache eviction is enabled while ccache is disabled!"
 fi
 
