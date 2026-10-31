@@ -805,7 +805,8 @@ jobs:
         id: restore_qt
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          key: Qt-${{ steps.resolve_qt_version.outputs.version }}-macOS-${{ matrix.soc }}-${{ matrix.qt_modules }}-${{ env.QT_ARCHIVES }}-thin
+          # -fatmoc: Intel's Qt keeps a fat moc, see thin_macos_qtlib.sh
+          key: Qt-${{ steps.resolve_qt_version.outputs.version }}-macOS-${{ matrix.soc }}-${{ matrix.qt_modules }}-${{ env.QT_ARCHIVES }}-thin${{ matrix.soc == 'Intel' && '-fatmoc' || '' }}
           path: ${{ github.workspace }}/Qt
 
       # Using jurplel/install-qt-action to install Qt without using brew
