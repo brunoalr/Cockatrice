@@ -168,10 +168,10 @@ endif()
 
 # Define proper compilation flags
 if(MSVC)
-  # /Z7 when using sccache: avoids C1041 error: PDB lock with parallel cached compiles
+  # /Z7 when using sccache or ccache: avoids C1041 error: PDB lock with parallel cached compiles (ccache also refuses to cache /Zi)
   # /Zi /FS otherwise for Ninja + /MP parallel builds, /FS = Force Synchronous PDB writes
   # see https://github.com/mozilla/sccache#usage and https://learn.microsoft.com/en-us/cpp/build/reference/z7-zi-zi-debug-information-format?view=msvc-170
-  if(CMAKE_CXX_COMPILER_LAUNCHER STREQUAL "sccache")
+  if(CMAKE_CXX_COMPILER_LAUNCHER MATCHES "ccache")
     set(MSVC_DEBUG_FORMAT " /Z7")
   else()
     set(MSVC_DEBUG_FORMAT " /Zi /FS")
