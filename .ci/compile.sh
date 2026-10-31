@@ -508,11 +508,11 @@ if [[ $MAKE_COVERAGE ]]; then
     # whose stale .gcno files cannot be resolved. --config is named too, so the filters apply no
     # matter what directory gcovr happens to start from.
     GCOVR_ARGS=("." --root "$SRC_ROOT" --object-directory "." --config "$SRC_ROOT/gcovr.cfg")
-    "$GCOVR" "${GCOVR_ARGS[@]}" --txt --decisions
-    "$GCOVR" "${GCOVR_ARGS[@]}" --html-details coverage-details.html --html-title "Cockatrice line coverage"
-    "$GCOVR" "${GCOVR_ARGS[@]}" --lcov -o coverage.lcov
-    "$GCOVR" "${GCOVR_ARGS[@]}" --cobertura-pretty -o coverage.xml
-    "$GCOVR" "${GCOVR_ARGS[@]}" --json-summary-pretty -o coverage-summary.json
+    # One call: gcovr re-reads every .gcda on each run, ~45 s apiece on CI
+    "$GCOVR" "${GCOVR_ARGS[@]}" -j "$(nproc)" --decisions --txt \
+      --html-details coverage-details.html --html-title "Cockatrice line coverage" \
+      --lcov coverage.lcov --cobertura-pretty --cobertura coverage.xml \
+      --json-summary-pretty --json-summary coverage-summary.json
     echo "Coverage artifacts written to coverage-details.html, coverage.lcov, coverage.xml and coverage-summary.json"
   fi
   echo "::endgroup::"
