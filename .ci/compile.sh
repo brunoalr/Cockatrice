@@ -198,7 +198,12 @@ if [[ $USE_CCACHE ]]; then
     flags+=("-DUSE_CCACHE=0" "-DCMAKE_C_COMPILER_LAUNCHER=sccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
   else
     # ccache only
-    flags+=("-DUSE_CCACHE=1")
+    if [[ $RUNNER_OS == Windows ]]; then
+      # CMakeLists.txt leaves RULE_LAUNCH_COMPILE off on WIN32, so name ccache as the launcher
+      flags+=("-DUSE_CCACHE=0" "-DCMAKE_C_COMPILER_LAUNCHER=ccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache")
+    else
+      flags+=("-DUSE_CCACHE=1")
+    fi
     # PCH-aware caching is required or ccache refuses to cache any TU that
     # consumes a precompiled header, silently recompiling everything on every run.
     ccache --set-config sloppiness=pch_defines,time_macros
