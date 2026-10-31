@@ -481,7 +481,7 @@ jobs:
             # restoring the warm archives. Renaming would orphan them.
             vcpkg_scope: 'vcpkg/windows10-x64-vs2026/'
             vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
-            ccache_variant: sccache
+            ccache_variant: ccache
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
@@ -506,10 +506,20 @@ jobs:
         if: matrix.os == 'macOS'
         run: brew install ccache
 
-      - name: "[Windows] Install sccache"
+      # A pinned release, not the older ccache that Strawberry Perl bundles on the runner image
+      - name: "[Windows] Install ccache"
         if: matrix.os == 'Windows'
         shell: bash
-        run: choco install sccache
+        env:
+          CCACHE_RELEASE: 4.14.2
+          CCACHE_ZIP_SHA256: 6993ce645e53192cec592ee23186200b574ac4c59097ecde8d9cfd681b47ae84
+        run: |
+          zip="$RUNNER_TEMP/ccache.zip"
+          curl -fsSL -o "$zip" "https://github.com/ccache/ccache/releases/download/v${CCACHE_RELEASE}/ccache-${CCACHE_RELEASE}-windows-x86_64.zip"
+          echo "$CCACHE_ZIP_SHA256  $zip" | sha256sum -c -
+          "/c/Program Files/7-Zip/7z.exe" x -y -o"$RUNNER_TEMP" "$zip" >/dev/null
+          cygpath -w "$RUNNER_TEMP/ccache-${CCACHE_RELEASE}-windows-x86_64" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/ccache-${CCACHE_RELEASE}-windows-x86_64/ccache.exe" --version | head -1
 
       - name: "Restore compiler cache (${{ matrix.ccache_variant }})"
         id: restore_ccache

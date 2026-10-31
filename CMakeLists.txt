@@ -43,8 +43,8 @@ else()
   )
 endif()
 
-# ccache does not support MSVC and must not auto-engage on Windows
-# (it is installed unintentionally on the Windows CI runner).
+# ccache must not auto-engage on Windows: the CI runner image ships an old one
+# with Strawberry Perl. A Windows build opts in through CMAKE_<LANG>_COMPILER_LAUNCHER.
 # NOTE: this keys off the target OS, so a mingw/Ninja configuration on Windows
 # also opts out of ccache even though the GNUCXX branch below supports it.
 if(USE_CCACHE AND NOT WIN32)
@@ -60,7 +60,7 @@ if(USE_CCACHE AND NOT WIN32)
   endif()
 elseif(USE_CCACHE AND WIN32)
   # An explicit opt-in must not disappear silently on Windows.
-  message(STATUS "ccache disabled: not supported for the MSVC toolchain on Windows")
+  message(STATUS "ccache not engaged on Windows: pass -DCMAKE_CXX_COMPILER_LAUNCHER=ccache instead")
 endif()
 
 if(WIN32 OR USE_VCPKG)
@@ -168,10 +168,10 @@ endif()
 
 # Define proper compilation flags
 if(MSVC)
-  # /Z7 when using sccache: avoids C1041 error: PDB lock with parallel cached compiles
+  # /Z7 when using sccache or ccache: avoids C1041 error: PDB lock with parallel cached compiles (ccache also refuses to cache /Zi)
   # /Zi /FS otherwise for Ninja + /MP parallel builds, /FS = Force Synchronous PDB writes
   # see https://github.com/mozilla/sccache#usage and https://learn.microsoft.com/en-us/cpp/build/reference/z7-zi-zi-debug-information-format?view=msvc-170
-  if(CMAKE_CXX_COMPILER_LAUNCHER STREQUAL "sccache")
+  if(CMAKE_CXX_COMPILER_LAUNCHER MATCHES "ccache")
     set(MSVC_DEBUG_FORMAT " /Z7")
   else()
     set(MSVC_DEBUG_FORMAT " /Zi /FS")
