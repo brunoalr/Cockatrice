@@ -102,6 +102,7 @@ jobs:
             --notes-file "$body_path"
 
   build-linux:
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -412,77 +413,6 @@ jobs:
             vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
             xcode: "26.6"
 
-          - os: macOS
-            target: 14    # EOL 2026-??
-            runner: macos-26    # https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md
-
-            cmake_generator: Ninja
-            make_package: 1
-            override_target: 14
-            package_suffix: "-macOS14"
-            qt_version: 6.11.*
-            qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
-            soc: Apple
-            type: Release
-            ccache_variant: ccache
-            vcpkg_deployment_target: 14
-            vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
-            vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
-            xcode: "26.6"
-
-          - os: macOS
-            target: 15
-            runner: macos-26    # https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md
-
-            cmake_generator: Ninja
-            make_package: 1
-            override_target: 15
-            package_suffix: "-macOS15"
-            qt_version: 6.11.*
-            qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
-            soc: Apple
-            type: Release
-            ccache_variant: ccache
-            vcpkg_deployment_target: 14
-            vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
-            xcode: "26.6"
-
-          - os: macOS
-            target: 26
-            runner: macos-26    # https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md
-
-            cmake_generator: Ninja
-            qt_version: 6.11.*
-            qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
-            soc: Apple
-            type: Debug
-            ccache_variant: ccache
-            vcpkg_deployment_target: 14
-            vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
-            xcode: "26.6"
-
-          - os: Windows
-            target: 10
-            runner: windows-2025    # https://github.com/actions/runner-images/blob/main/images/windows/Windows2025-VS2026-Readme.md
-
-            # Ninja builds the whole dependency graph at once instead of one
-            # MSBuild node at a time, runs the compiler itself, and matches the
-            # Linux and macOS legs. Its median build phase measured ~17 min
-            # against ~21 for the Visual Studio generator (shared 4-core hosts
-            # swing either by minutes, so read medians, not single runs).
-            cmake_generator: Ninja
-            make_package: 1
-            package_suffix: "-Win10"
-            qt_version: 6.11.*
-            qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
-            type: Release
-            # Scope is named after the vs2026 toolchain, not the generator: the
-            # ABI hash covers cl.exe, which is identical, so this leg keeps
-            # restoring the warm archives. Renaming would orphan them.
-            vcpkg_scope: 'vcpkg/windows10-x64-vs2026/'
-            vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
-            ccache_variant: sccache
-
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
     runs-on: ${{ matrix.runner }}
@@ -652,6 +582,12 @@ jobs:
           # Release legs compile the sentry-native SDK; Debug legs stay SDK-free.
           WITH_CRASH_REPORTING: ${{ matrix.type == 'Release' && 'ON' || '' }}
         run: .ci/compile.sh --server --test --vcpkg --ccache
+
+      - name: "Spike: moc slices and ninja timings"
+        if: always() && matrix.soc == 'Intel'
+        continue-on-error: true
+        shell: bash
+        run: bash .ci/spike_diag.sh
 
       - name: "Install sentry-cli"
         if: needs.configure.outputs.tag != null && matrix.make_package == '1'
