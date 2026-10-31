@@ -1185,20 +1185,26 @@ jobs:
           LIVE_CCACHE_KEYS: 'ccache-Arch ccache-Servatrice_Debian12 ccache-Debian13 ccache-Fedora44 ccache-Ubuntu26.04 ccache-Ubuntu26.04sanitize ccache-macOS14-xcode-27 ccache-macOS15-xcode-27 ccache-macOS-xcode-27'
         run: |
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" \
-            --jq '.actions_caches[] | [.id, .ref, .key, .last_accessed_at] | @tsv' >"$RUNNER_TEMP/caches.tsv"
+            --jq '.actions_caches[] | [.id, .ref, .key, .last_accessed_at, .created_at] | @tsv' >"$RUNNER_TEMP/caches.tsv"
+
+          # CodeQL saves a ~800M TRAP cache per master commit and restores only the newest
+          newest_traps=$'\n'$(awk -F'\t' '$2 == "refs/heads/master" && $3 ~ /^codeql-trap-/ {
+            g = $3; sub(/-[^-]*$/, "", g)
+            if ($5 > t[g]) { t[g] = $5; k[g] = $3 }
+          } END { for (g in k) print k[g] }' "$RUNNER_TEMP/caches.tsv")$'\n'
 
           cutoff="$(( $(date -u +%s) - 7 * 24 * 3600 ))"
           live=" ${LIVE_VCPKG_SCOPES} "
           live_ccache=" ${LIVE_CCACHE_KEYS} "
 
           deleted=0
-          while IFS=$'\t' read -r id ref key accessed; do
+          while IFS=$'\t' read -r id ref key accessed created; do
             [[ -n $id ]] || continue
-            # Only ever touch the key shapes our workflows create (buildkit-* and index-*
-            # come from docker-release.yml), so that an entry of some other workflow can
-            # never be deleted by accident
+            # Only ever touch the key shapes our workflows and CodeQL create (buildkit-* and
+            # index-* come from docker-release.yml), so that an entry of some other workflow
+            # can never be deleted by accident
             case "$key" in
-              vcpkg/* | ccache-* | Qt* | buildkit-* | index-*) ;;
+              vcpkg/* | ccache-* | sccache-* | Qt* | codeql-trap-* | buildkit-* | index-*) ;;
               *) continue ;;
             esac
 
@@ -1218,6 +1224,8 @@ jobs:
               if [[ $live != *" $scope "* ]]; then
                 reason="no matrix leg uses $scope"
               fi
+            elif [[ $key == codeql-trap-* && $newest_traps != *$'\n'"$key"$'\n'* ]]; then
+              reason="a newer TRAP cache supersedes it"
             fi
             if [[ -z $reason ]]; then
               stamp="$(date -u -d "$accessed" +%s 2>/dev/null || echo 0)"
