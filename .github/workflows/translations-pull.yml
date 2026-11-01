@@ -26,15 +26,25 @@ jobs:
       - name: "Checkout repo"
         uses: actions/checkout@v7
 
+      # transifex/cli-action runs master's install.sh and the latest CLI, so pinning its commit pins nothing
+      - name: "Install the Transifex CLI"
+        env:
+          TX_VERSION: v1.6.17
+          TX_TAR_SHA256: 002dec5b9e71248a7e6a0808118e9da940205828d5a33ce88e04bb57a967164d
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/tx.tar.gz" "https://github.com/transifex/cli/releases/download/$TX_VERSION/tx-linux-amd64.tar.gz"
+          echo "$TX_TAR_SHA256  $RUNNER_TEMP/tx.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/tx" && tar -xzf "$RUNNER_TEMP/tx.tar.gz" -C "$RUNNER_TEMP/tx" tx
+          echo "$RUNNER_TEMP/tx" >>"$GITHUB_PATH"
+
       - name: "Pull translated strings from Transifex"
         # Do not run this step for PR's from forks, they don't have access to the secret
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
-        uses: transifex/cli-action@584fd205cbe598773b5a81ce711fa44842678189 # v2
-        with:
-          # Used config file: https://github.com/Cockatrice/Cockatrice/blob/master/.tx/config
-          # Docs: https://github.com/transifex/cli#pulling-files-from-transifex
-          args: pull --force --all
-          token: ${{ secrets.TX_TOKEN }}
+        env:
+          TX_TOKEN: ${{ secrets.TX_TOKEN }}
+        # Used config file: https://github.com/Cockatrice/Cockatrice/blob/master/.tx/config
+        # Docs: https://github.com/transifex/cli#pulling-files-from-transifex
+        run: tx pull --force --all
 
       - name: "Create pull request"
         if: github.event_name != 'pull_request'
