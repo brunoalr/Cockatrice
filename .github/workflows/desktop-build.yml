@@ -491,9 +491,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: "[macOS] Setup ccache"
+      # nuget.exe is a .NET Framework binary; off Windows vcpkg runs it through mono
+      - name: "[macOS] Install ccache and mono"
         if: matrix.os == 'macOS'
-        run: brew install ccache
+        run: brew install ccache mono
 
       # A pinned release, not the older ccache that Strawberry Perl bundles on the runner image
       - name: "[Windows] Install ccache"
@@ -584,11 +585,6 @@ jobs:
         uses: TheMrMilchmann/setup-msvc-dev@368ef7d1ee4d1171b31d4a7f67f4d954f903f5a9 # v4.1.0
         with:
           arch: x64
-
-      # nuget.exe is a .NET Framework binary; off Windows vcpkg runs it through mono
-      - name: "[macOS] Install Mono"
-        if: matrix.os == 'macOS'
-        run: brew install mono
 
       - name: "Add GitHub Packages as the vcpkg NuGet source"
         shell: bash
