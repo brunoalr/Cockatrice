@@ -5,6 +5,7 @@ permissions:
   attestations: write    # needed to persist the attestation.
   contents: write    # needed for e.g. vcpkg dependency graph updates
   id-token: write    # needed for signing certificate in attestation
+  packages: write    # needed to publish vcpkg binaries to GitHub Packages
 
 on:
   push:
@@ -407,8 +408,6 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             soc: Intel
             type: Release
-            vcpkg_scope: 'vcpkg/macos13-x64-xcode26.3/'
-            vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
             xcode: "26.6"
 
           - os: macOS
@@ -424,8 +423,6 @@ jobs:
             soc: Apple
             type: Release
             vcpkg_deployment_target: 14
-            vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
-            vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
             xcode: "26.6"
 
           - os: macOS
@@ -441,7 +438,6 @@ jobs:
             soc: Apple
             type: Release
             vcpkg_deployment_target: 14
-            vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
             xcode: "26.6"
 
           - os: macOS
@@ -454,7 +450,6 @@ jobs:
             soc: Apple
             type: Debug
             vcpkg_deployment_target: 14
-            vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
             xcode: "26.6"
 
           - os: Windows
@@ -475,8 +470,6 @@ jobs:
             # Scope is named after the vs2026 toolchain, not the generator: the
             # ABI hash covers cl.exe, which is identical, so this leg keeps
             # restoring the warm archives. Renaming would orphan them.
-            vcpkg_scope: 'vcpkg/windows10-x64-vs2026/'
-            vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
@@ -586,37 +579,27 @@ jobs:
         with:
           arch: x64
 
-      - name: "Setup vcpkg cache"
-        id: vcpkg-cache
-        uses: TAServers/vcpkg-cache@v3
-        with:
-          # Every entry is keyed by vcpkg ABI hash, and one hash set exists per platform,
-          # target and toolchain. The action restores every entry it finds under the
-          # prefix, not just the hashes vcpkg asks for, so with one shared vcpkg/
-          # namespace every leg downloads all 66 archives of all 5 legs on every run.
-          # Each of those restores also refreshes the entry's last access date, which
-          # is why a dead ABI generation is never evicted by age. Naming the scope is
-          # what makes those generations identifiable, and prune-caches below able to
-          # delete them.
-          prefix: ${{ matrix.vcpkg_scope }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # nuget.exe is a .NET Framework binary; off Windows vcpkg runs it through mono
+      - name: "[macOS] Install Mono"
+        if: matrix.os == 'macOS'
+        run: brew install mono
 
-      # The action only creates its directory when the prefix matched at least one
-      # entry, and it reads that directory unguarded when it saves at the end of the
-      # job. A scope nobody has written to yet therefore leaves the directory missing
-      # and fails the job, which is exactly the state every scope starts in. Make the
-      # directory up front so an empty scope is a cache miss instead of an error.
-      # always() covers the cache step itself failing: the action's post save still runs
-      # then, and it should report the real error instead of ENOENT. It cannot rescue a
-      # failure before the cache step, since a post step only runs for an action whose
-      # main step did. The fallback keeps this guard from failing when the cache step was
-      # skipped and left no path output.
-      - name: "Create vcpkg cache directory"
-        if: always()
+      - name: "Add GitHub Packages as the vcpkg NuGet source"
         shell: bash
         env:
-          CACHE_DIR: '${{ steps.vcpkg-cache.outputs.path }}'
-        run: mkdir -p "${CACHE_DIR:-$GITHUB_WORKSPACE/.vcpkg-cache}"
+          FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [[ $RUNNER_OS == Windows ]]; then
+            vcpkg/bootstrap-vcpkg.bat -disableMetrics
+            run=("$(cygpath -u "$(vcpkg/vcpkg fetch nuget | tail -n 1)")")
+          else
+            vcpkg/bootstrap-vcpkg.sh -disableMetrics
+            run=(mono "$(vcpkg/vcpkg fetch nuget | tail -n 1)")
+          fi
+          "${run[@]}" sources add -Source "$FEED_URL" -StorePasswordInClearText \
+            -Name GitHubPackages -UserName "$GITHUB_REPOSITORY_OWNER" -Password "$GITHUB_TOKEN"
+          "${run[@]}" setapikey "$GITHUB_TOKEN" -Source "$FEED_URL"
 
       # Uses environment variables, see compile.sh for more details
       - name: "Build Cockatrice"
@@ -641,16 +624,7 @@ jobs:
           PACKAGE_SUFFIX: '${{ matrix.package_suffix }}'
           TARGET_MACOS_ARCH: ${{ matrix.soc == 'Intel' && 'x86_64' || '' }}
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
-          # Only pushes to the default branch may write the shared binary cache: the
-          # archives a run compiles are only as trustworthy as the code they were
-          # built from, and only merged code may populate the scope that master and
-          # release builds restore and link. Pull requests (same-repository ones
-          # included) restore the shared cache but never write it; with the source
-          # left at read the collect step below finds nothing on PRs, so no
-          # pull-request-scoped entry is ever saved that no later run could restore.
-          # Forks pushing to their own default branch resolve github.ref against
-          # their own repository, so they keep a working cache of their own there.
-          VCPKG_BINARY_SOURCES: "clear;files,${{ steps.vcpkg-cache.outputs.path }},${{ case(github.ref == 'refs/heads/master', 'readwrite', 'read') }}"
+          VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
           VCPKG_DISABLE_METRICS: 1
           VCPKG_FEATURE_FLAGS: dependencygraph
           VCPKG_TARGET_MACOS_VERSION: ${{ matrix.vcpkg_deployment_target }}
@@ -783,63 +757,6 @@ jobs:
         if: failure() && matrix.os == 'Windows'
         shell: bash
         run: find . -name NSISOutput.log -exec cat {} +
-
-      # A master run hands over the archives it had to build itself so that
-      # vcpkg-cache-import.yml, which runs in the default branch scope, can save them
-      # where later runs can restore them. Pull requests hand over nothing: their cache
-      # entries would be scoped to refs/pull/<n>/merge and stay unreadable for every
-      # other run, so writing them only burns the repository's quota.
-      # vcpkg_upload keeps this to one leg per scope: macOS 14, 15 and 26 share a scope
-      # by design, and all three rebuild the same archives, so uploading from each of them
-      # would publish three identical 269 MB artifacts under one artifact name and make
-      # the importer spawn a save job per copy.
-      - name: "Collect new vcpkg entries"
-        id: vcpkg_new
-        if: github.ref == 'refs/heads/master' && matrix.vcpkg_upload == 1
-        shell: bash
-        env:
-          CACHE_DIR: '${{ steps.vcpkg-cache.outputs.path }}'
-          GH_TOKEN: ${{ github.token }}
-          VCPKG_SCOPE: '${{ matrix.vcpkg_scope }}'
-        run: |
-          # The archive name is the ABI hash, so a missing key is exactly what vcpkg had
-          # to compile from source in this job.
-          gh api --paginate \
-            "repos/$GITHUB_REPOSITORY/actions/caches?ref=refs/heads/master&key=$VCPKG_SCOPE&per_page=100" \
-            --jq '.actions_caches[].key' | sort -u >"$RUNNER_TEMP/master-keys.txt"
-          find "$CACHE_DIR" -type f -name '*.zip' -exec basename {} .zip \; |
-            sed "s|^|$VCPKG_SCOPE|" | sort -u >"$RUNNER_TEMP/local-keys.txt"
-          comm -23 "$RUNNER_TEMP/local-keys.txt" "$RUNNER_TEMP/master-keys.txt" >"$RUNNER_TEMP/new-keys.txt"
-
-          mkdir -p "$RUNNER_TEMP/vcpkg-new"
-          : >"$RUNNER_TEMP/vcpkg-new/keys.txt"
-          while read -r key; do
-            hash="${key##*/}"
-            archive="$(find "$CACHE_DIR" -type f -name "$hash.zip" -print -quit)"
-            dir="$RUNNER_TEMP/vcpkg-new/${hash:0:2}"    # vcpkg's own two character fanout
-            mkdir -p "$dir"
-            cp "$archive" "$dir/"
-            echo "$key ${hash:0:2}/$hash.zip" >>"$RUNNER_TEMP/vcpkg-new/keys.txt"
-          done <"$RUNNER_TEMP/new-keys.txt"
-
-          count="$(wc -l <"$RUNNER_TEMP/new-keys.txt")"
-          echo "vcpkg scope $VCPKG_SCOPE: $count entries to import"
-          echo "count=$count" >>"$GITHUB_OUTPUT"
-          echo "slug=$(sed -e 's|^vcpkg/||' -e 's|/$||' -e 's|/|-|g' <<<"$VCPKG_SCOPE")" >>"$GITHUB_OUTPUT"
-
-      # archive: false accepts a single file and nothing else, and a scope hands over one
-      # archive per ABI hash vcpkg had to rebuild, which is 23 files on a cold runner.
-      # Zipping the directory keeps the fanout at the artifact root, which is where
-      # vcpkg-cache-import.yml looks for keys.txt once download-artifact unpacks it.
-      - name: "Upload new vcpkg entries"
-        # An empty count means the step above did not run at all, on master and on forks
-        if: steps.vcpkg_new.outputs.count != '' && steps.vcpkg_new.outputs.count != '0'
-        uses: actions/upload-artifact@v7
-        with:
-          if-no-files-found: error    # a count above zero with nothing staged is a bug
-          name: vcpkg-new-${{ steps.vcpkg_new.outputs.slug }}
-          path: ${{ runner.temp }}/vcpkg-new
-          retention-days: 1
 
       # Delete used cache to emulate a ccache update. See https://github.com/actions/cache/issues/342
       - name: "Delete remote compiler cache (ccache)"
@@ -982,19 +899,12 @@ jobs:
     continue-on-error: true    # freeing space must never fail a build
 
     steps:
-      # The repository holds 10Gi of cache against entries that want more, and GitHub
-      # evicts the least recently used entry whenever that is exceeded. The vcpkg
-      # entries are the reason that never happens: the restore above touches every
-      # entry under the prefix on every run, so a dead ABI generation keeps its access
-      # date fresh forever and age based eviction can never reach it. Deleting by age
-      # alone cannot fix that, only knowing which scope an entry belongs to can.
+      # The repository holds 10Gi of cache and GitHub silently evicts the least recently
+      # used entry past that, so drop what no run can restore before it comes to that.
       - name: "Delete unusable cache entries"
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          # Must list every vcpkg_scope of the build-vcpkg matrix above, or the entries of
-          # a scope that is still in use get deleted on the next run.
-          LIVE_VCPKG_SCOPES: 'vcpkg/macos13-x64-xcode26.3/ vcpkg/macos14-arm64-xcode26.6/ vcpkg/windows10-x64-vs2026/'
         run: |
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" \
             --jq '.actions_caches[] | [.id, .ref, .key, .last_accessed_at, .created_at] | @tsv' >"$RUNNER_TEMP/caches.tsv"
@@ -1006,27 +916,19 @@ jobs:
           } END { for (g in k) print k[g] }' "$RUNNER_TEMP/caches.tsv")$'\n'
 
           cutoff="$(( $(date -u +%s) - 7 * 24 * 3600 ))"
-          live=" ${LIVE_VCPKG_SCOPES} "
           deleted=0
           while IFS=$'\t' read -r id ref key accessed created; do
             [[ -n $id ]] || continue
             # Only ever touch the key shapes this workflow and CodeQL create, so that an
             # entry of some other workflow can never be deleted by accident
             case "$key" in
-              vcpkg/* | ccache-* | Qt* | codeql-trap-*) ;;
+              ccache-* | Qt* | codeql-trap-*) ;;
               *) continue ;;
             esac
 
             reason=""
             if [[ $ref != refs/heads/master ]]; then
               reason="scoped to $ref"
-            elif [[ $key == vcpkg/* ]]; then
-              # "<scope>/<abi hash>", cut the hash off the end to get the scope
-              scope="vcpkg/${key#vcpkg/}"
-              scope="${scope%/*}/"
-              if [[ $live != *" $scope "* ]]; then
-                reason="no matrix leg uses $scope"
-              fi
             elif [[ $key == codeql-trap-* && $newest_traps != *$'\n'"$key"$'\n'* ]]; then
               reason="a newer TRAP cache supersedes it"
             fi
