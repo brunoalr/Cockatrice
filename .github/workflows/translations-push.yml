@@ -51,13 +51,15 @@ jobs:
 
       - name: "Render template"
         id: template
-        uses: chuhlomin/render-template@a7c644e341797d050d1cb24332d83791b9a46dae # v1.12
-        with:
-          template: .ci/update_translation_source_strings_template.md
-          vars: |
-            cockatrice_output: ${{ steps.cockatrice.outputs.output }}
-            oracle_output: ${{ steps.oracle.outputs.output }}
-            commit: ${{ github.sha }}
+        env:
+          COCKATRICE_OUTPUT: ${{ steps.cockatrice.outputs.output }}
+          ORACLE_OUTPUT: ${{ steps.oracle.outputs.output }}
+        run: |
+          body=$(<.ci/update_translation_source_strings_template.md)
+          body=${body//'{{ .cockatrice_output }}'/$COCKATRICE_OUTPUT}
+          body=${body//'{{ .oracle_output }}'/$ORACLE_OUTPUT}
+          body=${body//'{{ .commit }}'/$GITHUB_SHA}
+          { echo "result<<END_OF_TEMPLATE"; echo "$body"; echo "END_OF_TEMPLATE"; } >>"$GITHUB_OUTPUT"
 
       - name: "Create pull request"
         if: github.event_name != 'pull_request'
