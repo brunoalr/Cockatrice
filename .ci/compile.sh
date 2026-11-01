@@ -201,6 +201,8 @@ if [[ $USE_CCACHE ]]; then
     if [[ $RUNNER_OS == Windows ]]; then
       # CMakeLists.txt leaves RULE_LAUNCH_COMPILE off on WIN32, so name ccache as the launcher
       flags+=("-DUSE_CCACHE=0" "-DCMAKE_C_COMPILER_LAUNCHER=ccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache")
+      # Every runner image build reinstalls MSVC with new mtimes, which misses the whole cache under the default mtime check
+      ccache --set-config compiler_check=content
     else
       flags+=("-DUSE_CCACHE=1")
     fi
