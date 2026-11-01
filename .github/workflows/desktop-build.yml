@@ -197,7 +197,7 @@ jobs:
     timeout-minutes: 70
     env:
       CACHE: ${{ github.workspace }}/.cache/${{ matrix.distro }}${{ matrix.version }}${{ matrix.variant }}    # directory for caching docker image and ccache
-      CCACHE_SIZE: 800M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
+      CCACHE_SIZE: 1200M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CMAKE_GENERATOR: 'Ninja'
       NAME: ${{ matrix.distro }}${{ matrix.version }}
       IMAGE_SUFFIX: ${{ matrix.variant }}
@@ -483,7 +483,7 @@ jobs:
     timeout-minutes: 100
     env:
       CCACHE_DIR: ${{ github.workspace }}/.cache/
-      CCACHE_SIZE: 600M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
+      CCACHE_SIZE: 1200M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
 
     steps:
       - name: "Checkout"
