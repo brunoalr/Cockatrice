@@ -29,7 +29,7 @@ jobs:
       - name: "Pull translated strings from Transifex"
         # Do not run this step for PR's from forks, they don't have access to the secret
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
-        uses: transifex/cli-action@v2
+        uses: transifex/cli-action@584fd205cbe598773b5a81ce711fa44842678189 # v2
         with:
           # Used config file: https://github.com/Cockatrice/Cockatrice/blob/master/.tx/config
           # Docs: https://github.com/transifex/cli#pulling-files-from-transifex
@@ -39,7 +39,7 @@ jobs:
       - name: "Create pull request"
         if: github.event_name != 'pull_request'
         id: create_pr
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           add-paths: |
             cockatrice/translations/*.ts

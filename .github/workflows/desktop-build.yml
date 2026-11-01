@@ -543,7 +543,7 @@ jobs:
       # Qt build using vcpkg either just fails or takes too long to build
       - name: "[macOS] Install fat Qt ${{ matrix.qt_version }}"
         if: matrix.os == 'macOS' && steps.restore_qt.outputs.cache-hit != 'true'
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
         with:
           cache: false
           # cache-key-prefix: Qt
@@ -564,7 +564,7 @@ jobs:
 
       - name: "[Windows] Install Qt ${{ matrix.qt_version }}"
         if: matrix.os == 'Windows'
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
         with:
           # Qt 6.11.0 only works with aqtinstall directly from git until aqtinstall 3.4 is released
           aqtsource: git+https://github.com/miurahr/aqtinstall.git
