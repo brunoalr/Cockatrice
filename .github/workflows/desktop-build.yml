@@ -407,7 +407,6 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             soc: Intel
             type: Release
-            ccache_variant: ccache
             vcpkg_scope: 'vcpkg/macos13-x64-xcode26.3/'
             vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
             xcode: "26.6"
@@ -424,7 +423,6 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             soc: Apple
             type: Release
-            ccache_variant: ccache
             vcpkg_deployment_target: 14
             vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
             vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
@@ -442,7 +440,6 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             soc: Apple
             type: Release
-            ccache_variant: ccache
             vcpkg_deployment_target: 14
             vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
             xcode: "26.6"
@@ -456,7 +453,6 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             soc: Apple
             type: Debug
-            ccache_variant: ccache
             vcpkg_deployment_target: 14
             vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
             xcode: "26.6"
@@ -481,7 +477,6 @@ jobs:
             # restoring the warm archives. Renaming would orphan them.
             vcpkg_scope: 'vcpkg/windows10-x64-vs2026/'
             vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
-            ccache_variant: ccache
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: configure
@@ -489,12 +484,7 @@ jobs:
     timeout-minutes: 100
     env:
       CCACHE_DIR: ${{ github.workspace }}/.cache/
-      SCCACHE_DIR: ${{ github.workspace }}/.cache/
-      # Cache size over the entire repo is 10Gi:
-      # https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
-      CCACHE_SIZE: 600M
-      # sccache uses the following env var instead of having a CLI parameter
-      SCCACHE_CACHE_SIZE: 600M
+      CCACHE_SIZE: 600M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
 
     steps:
       - name: "Checkout"
@@ -521,11 +511,11 @@ jobs:
           cygpath -w "$RUNNER_TEMP/ccache-${CCACHE_RELEASE}-windows-x86_64" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/ccache-${CCACHE_RELEASE}-windows-x86_64/ccache.exe" --version | head -1
 
-      - name: "Restore compiler cache (${{ matrix.ccache_variant }})"
+      - name: "Restore compiler cache (ccache)"
         id: restore_ccache
         uses: actions/cache/restore@v6
         with:
-          key: ${{ matrix.ccache_variant }}-${{ matrix.runner }}_${{ matrix.override_target }}-Xcode${{ matrix.xcode }}
+          key: ccache-${{ matrix.runner }}_${{ matrix.override_target }}-Xcode${{ matrix.xcode }}
           path: ${{ env.CCACHE_DIR }}
 
       - name: "[macOS] Install aqtinstall"
@@ -635,7 +625,6 @@ jobs:
         env:
           BUILDTYPE: '${{ matrix.type }}'
           CCACHE_EVICT_UNUSED: 1
-          CCACHE_VARIANT: ${{ matrix.ccache_variant }}
           CMAKE_GENERATOR: ${{ matrix.cmake_generator }}
           # Tag builds only: artifacts from master pushes and PR branches must not report to
           # Sentry. Forks get no secrets on pull_request, so they keep the mock fallback either way.
@@ -853,7 +842,7 @@ jobs:
           retention-days: 1
 
       # Delete used cache to emulate a ccache update. See https://github.com/actions/cache/issues/342
-      - name: "Delete remote compiler cache (${{ matrix.ccache_variant }})"
+      - name: "Delete remote compiler cache (ccache)"
         if: github.ref == 'refs/heads/master' && steps.restore_ccache.outputs.cache-hit
         continue-on-error: true
         shell: bash
@@ -868,7 +857,7 @@ jobs:
             echo "Cache deleted successfully"
           fi
 
-      - name: "Save updated compiler cache (${{ matrix.ccache_variant }})"
+      - name: "Save updated compiler cache (ccache)"
         if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v6
         with:
@@ -1024,7 +1013,7 @@ jobs:
             # Only ever touch the key shapes this workflow and CodeQL create, so that an
             # entry of some other workflow can never be deleted by accident
             case "$key" in
-              vcpkg/* | ccache-* | sccache-* | Qt* | codeql-trap-*) ;;
+              vcpkg/* | ccache-* | Qt* | codeql-trap-*) ;;
               *) continue ;;
             esac
 

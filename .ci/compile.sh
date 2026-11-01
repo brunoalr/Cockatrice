@@ -19,7 +19,7 @@
 # --target-macos-version <version> sets the min os version - only used for macOS builds
 # --target-macos-architecture <architecture> sets the architecture - only used for macOS builds
 # --profile writes an MSBuild performance summary and binary log, Windows only
-# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE CCACHE_VARIANT CCACHE_EVICT_UNUSED SCCACHE_DIR BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION MAKE_SANITIZE MAKE_COVERAGE VCPKG_TARGET_MACOS_VERSION TARGET_MACOS_ARCH BUILD_PARALLEL_LEVEL BUILD_PROFILE
+# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE CCACHE_EVICT_UNUSED BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION MAKE_SANITIZE MAKE_COVERAGE VCPKG_TARGET_MACOS_VERSION TARGET_MACOS_ARCH BUILD_PARALLEL_LEVEL BUILD_PROFILE
 # (correspond to args: --debug/--release --install --package <package type> --suffix <suffix> --server --test --sanitize --coverage --ccache <ccache_size> --dir <dir> --profile)
 # exitcode: 1 for failure, 3 for invalid arguments
 
@@ -191,28 +191,20 @@ if [[ $MAKE_COVERAGE ]]; then
 fi
 if [[ $USE_CCACHE ]]; then
   flags+=("-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON")
-  if [[ $CCACHE_VARIANT == 'sccache' ]]; then
-    # sccache only
-	# USE_CCACHE=0 prevents RULE_LAUNCH_COMPILE (avoids Strawberry ccache on Windows), use compiler launcher variables
-	# see https://github.com/mozilla/sccache#usage
-    flags+=("-DUSE_CCACHE=0" "-DCMAKE_C_COMPILER_LAUNCHER=sccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
+  if [[ $RUNNER_OS == Windows ]]; then
+    # CMakeLists.txt leaves RULE_LAUNCH_COMPILE off on WIN32, so name ccache as the launcher
+    flags+=("-DUSE_CCACHE=0" "-DCMAKE_C_COMPILER_LAUNCHER=ccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache")
+    # Every runner image build reinstalls MSVC with new mtimes, which misses the whole cache under the default mtime check
+    ccache --set-config compiler_check=content
   else
-    # ccache only
-    if [[ $RUNNER_OS == Windows ]]; then
-      # CMakeLists.txt leaves RULE_LAUNCH_COMPILE off on WIN32, so name ccache as the launcher
-      flags+=("-DUSE_CCACHE=0" "-DCMAKE_C_COMPILER_LAUNCHER=ccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache")
-      # Every runner image build reinstalls MSVC with new mtimes, which misses the whole cache under the default mtime check
-      ccache --set-config compiler_check=content
-    else
-      flags+=("-DUSE_CCACHE=1")
-    fi
-    # PCH-aware caching is required or ccache refuses to cache any TU that
-    # consumes a precompiled header, silently recompiling everything on every run.
-    ccache --set-config sloppiness=pch_defines,time_macros
-	if [[ $CCACHE_SIZE ]]; then
-      # note, this setting persists after running the script
-      ccache --max-size "$CCACHE_SIZE"
-    fi
+    flags+=("-DUSE_CCACHE=1")
+  fi
+  # PCH-aware caching is required or ccache refuses to cache any TU that
+  # consumes a precompiled header, silently recompiling everything on every run.
+  ccache --set-config sloppiness=pch_defines,time_macros
+  if [[ $CCACHE_SIZE ]]; then
+    # note, this setting persists after running the script
+    ccache --max-size "$CCACHE_SIZE"
   fi
 fi
 if [[ $PACKAGE_TYPE ]]; then
@@ -241,16 +233,12 @@ fi
 buildflags=(--config "$BUILDTYPE")
 
 function ccachestatsverbose() {
-  if [[ $CCACHE_VARIANT == 'sccache' ]]; then
-    sccache -s
+  # note, verbose only works on newer ccache, discard the error
+  local got
+  if got="$(ccache --show-stats --verbose 2>/dev/null)"; then
+    echo "$got"
   else
-    # note, verbose only works on newer ccache, discard the error
-    local got
-    if got="$(ccache --show-stats --verbose 2>/dev/null)"; then
-      echo "$got"
-    else
-      ccache --show-stats
-    fi
+    ccache --show-stats
   fi
 }
 
@@ -439,26 +427,12 @@ if [[ $USE_CCACHE ]]; then
   if [[ $CCACHE_EVICT_UNUSED ]]; then
     unused_for=$(( $(date +%s) - build_start + 60 ))
     echo "::group::evict compiler cache entries unused for ${unused_for}s"
-    if [[ $CCACHE_VARIANT == 'sccache' ]]; then
-      # The server renames temp files into the cache in the background and holds files open,
-      # either of which can make find fail. Its stats live only in memory and print on stop.
-      sccache --stop-server || true
-      echo "before: $(du -sh "$SCCACHE_DIR" | cut -f1)"
-      if evicted=$(find "${SCCACHE_DIR:?}" -type f -mmin "+$(( (unused_for + 59) / 60 ))" -print -delete); then
-        echo "evicted $(grep -c . <<<"$evicted") files, after: $(du -sh "$SCCACHE_DIR" | cut -f1)"
-      else
-        echo "::warning file=$0::sccache eviction failed, saving the cache as it is"
-      fi
-    else
-      ccache --evict-older-than "${unused_for}s" || echo "::warning file=$0::ccache eviction failed, saving the cache as it is"
-    fi
+    ccache --evict-older-than "${unused_for}s" || echo "::warning file=$0::ccache eviction failed, saving the cache as it is"
     echo "::endgroup::"
   fi
-  if [[ ! ($CCACHE_VARIANT == 'sccache' && $CCACHE_EVICT_UNUSED) ]]; then
-    echo "::group::Show ccache stats again"
-    ccachestatsverbose
-    echo "::endgroup::"
-  fi
+  echo "::group::Show ccache stats again"
+  ccachestatsverbose
+  echo "::endgroup::"
 elif [[ $CCACHE_EVICT_UNUSED ]]; then
   echo "::error file=$0::ccache eviction is enabled while ccache is disabled!"
 fi
