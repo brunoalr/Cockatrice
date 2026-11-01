@@ -633,6 +633,9 @@ jobs:
           VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
           VCPKG_DISABLE_METRICS: 1
           VCPKG_FEATURE_FLAGS: dependencygraph
+          # Legs that share an ABI (vcpkg_deployment_target: 14) race to push the same
+          # package on a cold run, and the loser's 409 would trip the check.
+          VCPKG_REQUIRE_PUSH: ${{ github.ref == 'refs/heads/master' && !matrix.vcpkg_deployment_target && 1 || '' }}
           VCPKG_TARGET_MACOS_VERSION: ${{ matrix.vcpkg_deployment_target }}
           # Release legs compile the sentry-native SDK; Debug legs stay SDK-free.
           WITH_CRASH_REPORTING: ${{ matrix.type == 'Release' && 'ON' || '' }}

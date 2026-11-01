@@ -19,7 +19,7 @@
 # --target-macos-version <version> sets the min os version - only used for macOS builds
 # --target-macos-architecture <architecture> sets the architecture - only used for macOS builds
 # --profile writes an MSBuild performance summary and binary log, Windows only
-# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE CCACHE_EVICT_UNUSED BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION MAKE_SANITIZE MAKE_COVERAGE VCPKG_TARGET_MACOS_VERSION TARGET_MACOS_ARCH BUILD_PARALLEL_LEVEL BUILD_PROFILE
+# uses env: BUILDTYPE MAKE_INSTALL MAKE_PACKAGE PACKAGE_TYPE PACKAGE_SUFFIX MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST USE_CCACHE CCACHE_SIZE CCACHE_EVICT_UNUSED VCPKG_REQUIRE_PUSH BUILD_DIR CMAKE_GENERATOR TARGET_MACOS_VERSION MAKE_SANITIZE MAKE_COVERAGE VCPKG_TARGET_MACOS_VERSION TARGET_MACOS_ARCH BUILD_PARALLEL_LEVEL BUILD_PROFILE
 # (correspond to args: --debug/--release --install --package <package type> --suffix <suffix> --server --test --sanitize --coverage --ccache <ccache_size> --dir <dir> --profile)
 # exitcode: 1 for failure, 3 for invalid arguments
 
@@ -406,8 +406,14 @@ fi
 echo "::group::Configure cmake"
 cmake --version
 echo "Running cmake with flags: ${flags[*]}"
-cmake .. "${flags[@]}"
+cmake .. "${flags[@]}" 2>&1 | tee configure.log
+[[ ${PIPESTATUS[0]} -eq 0 ]]
 echo "::endgroup::"
+# vcpkg only warns when a push to the binary cache fails, and every later run then builds from source
+if [[ $VCPKG_REQUIRE_PUSH ]] && grep -q 'binary cache submission failed' configure.log; then
+  echo "::error file=$0::vcpkg could not publish to the NuGet feed, see the warning above"
+  exit 1
+fi
 
 echo "::group::Build project"
 cpuinfo
