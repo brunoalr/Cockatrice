@@ -5,7 +5,6 @@ permissions:
   attestations: write    # needed to persist the attestation.
   contents: write    # needed for e.g. vcpkg dependency graph updates
   id-token: write    # needed for signing certificate in attestation
-  packages: write    # needed to publish vcpkg binaries to GitHub Packages
 
 on:
   push:
@@ -392,6 +391,13 @@ jobs:
         run: gh attestation verify "$BUILD_PATH" --repo Cockatrice/Cockatrice
 
   build-vcpkg:
+    # A job-level block replaces the workflow-level one, so it repeats every scope this job uses
+    permissions:
+      actions: write
+      attestations: write
+      contents: write
+      id-token: write
+      packages: write    # publish vcpkg binaries to GitHub Packages
     strategy:
       fail-fast: false
       matrix:
