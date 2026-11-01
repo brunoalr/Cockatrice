@@ -40,7 +40,7 @@ jobs:
           dot -V
 
       - name: "Install Doxygen"
-        uses: ssciwr/doxygen-install@v2
+        uses: ssciwr/doxygen-install@fa3e94d34131d3990b6b8ba939ab982964aa3758 # v2.0.3
         with:
           version: "1.18.0"
 
@@ -65,7 +65,7 @@ jobs:
 
       - name: "Deploy to cockatrice.github.io/docs"
         if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           deploy_key: ${{ secrets.DOCS_DEPLOY_KEY }}
           destination_dir: docs    # docs will be available at https://cockatrice.github.io/docs/
