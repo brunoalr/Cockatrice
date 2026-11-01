@@ -306,8 +306,8 @@ if [[ $RUNNER_OS == macOS ]]; then
       # The triplet is what vcpkg hashes into the ABI hash of every port, so two legs that
       # agree here reuse each other's binary cache. Targets 14, 15 and 26 on the same Xcode
       # produce identical binaries when they share the lowest deployment target, so they all
-      # build against 14 to keep one vcpkg cache scope instead of three.
-      # Keep in sync with "vcpkg_scope" and "vcpkg_deployment_target" in desktop-build.yml.
+      # build against 14 to keep one set of vcpkg binaries instead of three.
+      # Keep in sync with "vcpkg_deployment_target" in desktop-build.yml.
       vcpkg_target="${VCPKG_TARGET_MACOS_VERSION:-$TARGET_MACOS_VERSION}"
       extra_triplet_vars+=("set(VCPKG_CMAKE_SYSTEM_VERSION $vcpkg_target)")
       extra_triplet_vars+=("set(VCPKG_OSX_DEPLOYMENT_TARGET $vcpkg_target)")
