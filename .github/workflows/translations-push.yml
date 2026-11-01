@@ -50,9 +50,7 @@ jobs:
 
       - name: "Render template"
         id: template
-        # Not pinnable to a SHA: the action downloads its release binary by ref name,
-        # so a commit ref matches no release tag.
-        uses: chuhlomin/render-template/binary@v1
+        uses: chuhlomin/render-template/binary@a7c644e341797d050d1cb24332d83791b9a46dae # v1.12
         with:
           template: .ci/update_translation_source_strings_template.md
           vars: |
