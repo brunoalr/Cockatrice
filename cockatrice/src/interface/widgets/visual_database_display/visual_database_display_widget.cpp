@@ -27,6 +27,7 @@
 #include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMouseEvent>
 #include <QPushButton>
 #include <QSizePolicy>
 #include <QSlider>
@@ -42,8 +43,6 @@
 #include <libcockatrice/deck_list/tree/inner_deck_list_node.h>
 #include <libcockatrice/settings/cards_display_settings.h>
 #include <libcockatrice/utility/qt_utils.h>
-
-class QMouseEvent;
 
 VisualDatabaseDisplayWidget::VisualDatabaseDisplayWidget(QWidget *parent,
                                                          CardDatabaseModel *database_model,
