@@ -162,6 +162,12 @@ if [[ $MAKE_COVERAGE ]]; then
   SRC_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 fi
 
+# rcc stamps each resource file's mtime into qrc_*.cpp, so every fresh checkout misses ccache on them.
+# The QML disk cache keys on that stamp, so derive it from the QML sources' content, not from a clock.
+if qml_id=$(git ls-tree -r HEAD 2>/dev/null | grep -E '\.(qml|js)$' | git hash-object --stdin); then
+  export QT_RCC_SOURCE_DATE_OVERRIDE=$((16#${qml_id:0:8}))
+fi
+
 cd "$BUILD_DIR"
 
 # Set minimum CMake Version
