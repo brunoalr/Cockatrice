@@ -139,6 +139,27 @@ jobs:
           fi
           echo "vcpkg submodule and builtin-baseline agree on $baseline"
 
+  resolve-qt:
+    name: Resolve Qt
+    runs-on: ubuntu-slim
+    outputs:
+      mac: ${{ steps.resolve.outputs.mac }}
+      windows: ${{ steps.resolve.outputs.windows }}
+    steps:
+      # One aqt query per host instead of an aqtinstall install on every macOS and Windows leg;
+      # each leg checks its qt_version against this spec and fails on drift.
+      - name: "Resolve the latest Qt patch release for macOS and Windows"
+        id: resolve
+        env:
+          QT_VERSION: 6.11.*
+        shell: bash
+        run: |
+          for host in mac windows; do
+            version=$(pipx run --spec aqtinstall aqt list-qt "$host" desktop --spec "$QT_VERSION" --latest-version)
+            echo "$host=$version" >> "$GITHUB_OUTPUT"
+            echo "$host: $version"
+          done
+
   build-linux:
     strategy:
       fail-fast: false
@@ -587,7 +608,7 @@ jobs:
             # restoring the warm archives. Renaming would orphan them.
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
-    needs: [configure, vcpkg-baseline]
+    needs: [configure, vcpkg-baseline, resolve-qt]
     # The nightly leg lives in build-vcpkg-nightly below, next to the Linux nightly legs.
     if: github.event_name != 'schedule'
     runs-on: ${{ matrix.runner }}
@@ -632,18 +653,19 @@ jobs:
           key: ccache-${{ matrix.os }}${{ matrix.override_target }}-${{ matrix.runner }}
           path: ${{ env.CCACHE_DIR }}
 
-      - name: "[macOS] Install aqtinstall"
-        if: matrix.os == 'macOS'
-        run: pipx install aqtinstall
-
       # Resolve given wildcard versions (e.g. Qt 6.6.*) to latest version via aqtinstall to avoid stale caches on new releases
-      - name: "[macOS] Resolve latest Qt from ${{ matrix.qt_version }} input"
-        if: matrix.os == 'macOS'
+      - name: "Check Qt ${{ matrix.qt_version }} against the release the resolve-qt job found"
         env:
           QT_VERSION: ${{ matrix.qt_version }}
+          QT_RESOLVED: ${{ matrix.os == 'macOS' && needs.resolve-qt.outputs.mac || needs.resolve-qt.outputs.windows }}
         id: resolve_qt_version
         shell: bash
-        run: .ci/resolve_latest_aqt_qt_version.sh "$QT_VERSION"
+        run: |
+          if [[ $QT_RESOLVED != ${QT_VERSION%\*}* ]]; then
+            echo "::error::resolve-qt found Qt $QT_RESOLVED but this leg asks for $QT_VERSION"
+            exit 1
+          fi
+          echo "version=$QT_RESOLVED" >> "$GITHUB_OUTPUT"
 
       - name: "[macOS] Restore thin Qt ${{ steps.resolve_qt_version.outputs.version }}"
         if: matrix.os == 'macOS'
@@ -677,16 +699,49 @@ jobs:
           key: ${{ steps.restore_qt.outputs.cache-primary-key }}
           path: ${{ github.workspace }}/Qt
 
-      - name: "[Windows] Install Qt ${{ matrix.qt_version }}"
+      - name: "[Windows] Restore Qt ${{ steps.resolve_qt_version.outputs.version }}"
         if: matrix.os == 'Windows'
+        id: restore_qt_windows
+        uses: actions/cache/restore@v6
+        with:
+          key: Qt-${{ steps.resolve_qt_version.outputs.version }}-windows-${{ matrix.qt_modules }}
+          path: ${{ runner.workspace }}/Qt
+
+      - name: "[Windows] Install Qt ${{ matrix.qt_version }}"
+        if: matrix.os == 'Windows' && steps.restore_qt_windows.outputs.cache-hit != 'true'
         uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
         with:
           # Qt 6.11.0 only works with aqtinstall directly from git until aqtinstall 3.4 is released
           aqtsource: git+https://github.com/miurahr/aqtinstall.git
-          cache: ${{ github.ref == 'refs/heads/master' }}
-          cache-key-prefix: Qt
+          cache: false
           modules: ${{ matrix.qt_modules }}
-          version: ${{ matrix.qt_version }}
+          version: ${{ steps.resolve_qt_version.outputs.version }}
+
+      # install-qt-action exports these after a fresh install; a restored Qt needs the same
+      - name: "[Windows] Export the restored Qt"
+        if: matrix.os == 'Windows' && steps.restore_qt_windows.outputs.cache-hit == 'true'
+        env:
+          QT_VERSION: ${{ steps.resolve_qt_version.outputs.version }}
+        shell: bash
+        run: |
+          qt=$(echo "$(cygpath -u "$RUNNER_WORKSPACE")/Qt/$QT_VERSION"/msvc*_64)
+          if [[ ! -d $qt ]]; then
+            echo "::error::no Qt under $qt"
+            exit 1
+          fi
+          cygpath -w "$qt/bin" >> "$GITHUB_PATH"
+          {
+            echo "QT_ROOT_DIR=$(cygpath -w "$qt")"
+            echo "QT_PLUGIN_PATH=$(cygpath -w "$qt/plugins")"
+            echo "QML2_IMPORT_PATH=$(cygpath -w "$qt/qml")"
+          } >> "$GITHUB_ENV"
+
+      - name: "[Windows] Cache Qt"
+        if: matrix.os == 'Windows' && steps.restore_qt_windows.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
+        uses: actions/cache/save@v6
+        with:
+          key: ${{ steps.restore_qt_windows.outputs.cache-primary-key }}
+          path: ${{ runner.workspace }}/Qt
 
       - name: "[Windows] Install NSIS"
         if: matrix.os == 'Windows'
@@ -1028,7 +1083,7 @@ jobs:
             type: Release
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
-    needs: configure
+    needs: [configure, resolve-qt]
     # The EOL target on the slowest runner is too slow to gate a change, so it runs in the
     # nightly and on tags only.
     if: github.event_name == 'schedule' || github.ref_type == 'tag'
