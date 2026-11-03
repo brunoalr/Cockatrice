@@ -566,7 +566,7 @@ jobs:
         id: restore_ccache
         uses: actions/cache/restore@v6
         with:
-          key: ccache-${{ matrix.runner }}_${{ matrix.override_target }}-Xcode${{ matrix.xcode }}
+          key: ccache-${{ matrix.os }}${{ matrix.target }}${{ matrix.soc == 'Intel' && 'Intel' || '' }}${{ matrix.type == 'Debug' && 'Debug' || '' }}
           path: ${{ env.CCACHE_DIR }}
 
       # Resolve given wildcard versions (e.g. Qt 6.6.*) to latest version via aqtinstall to avoid stale caches on new releases
