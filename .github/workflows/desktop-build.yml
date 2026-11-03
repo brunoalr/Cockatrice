@@ -999,28 +999,20 @@ jobs:
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" \
             --jq '.actions_caches[] | [.id, .ref, .key, .last_accessed_at, .created_at] | @tsv' >"$RUNNER_TEMP/caches.tsv"
 
-          # CodeQL saves a ~800M TRAP cache per master commit and restores only the newest
-          newest_traps=$'\n'$(awk -F'\t' '$2 == "refs/heads/master" && $3 ~ /^codeql-trap-/ {
-            g = $3; sub(/-[^-]*$/, "", g)
-            if ($5 > t[g]) { t[g] = $5; k[g] = $3 }
-          } END { for (g in k) print k[g] }' "$RUNNER_TEMP/caches.tsv")$'\n'
-
           cutoff="$(( $(date -u +%s) - 7 * 24 * 3600 ))"
           deleted=0
           while IFS=$'\t' read -r id ref key accessed created; do
             [[ -n $id ]] || continue
-            # Only ever touch the key shapes this workflow and CodeQL create, so that an
-            # entry of some other workflow can never be deleted by accident
+            # Only ever touch the key shapes this workflow creates, so that an entry of
+            # some other workflow can never be deleted by accident
             case "$key" in
-              ccache-* | Qt* | codeql-trap-*) ;;
+              ccache-* | Qt*) ;;
               *) continue ;;
             esac
 
             reason=""
             if [[ $ref != refs/heads/master ]]; then
               reason="scoped to $ref"
-            elif [[ $key == codeql-trap-* && $newest_traps != *$'\n'"$key"$'\n'* ]]; then
-              reason="a newer TRAP cache supersedes it"
             fi
             if [[ -z $reason ]]; then
               stamp="$(date -u -d "$accessed" +%s 2>/dev/null || echo 0)"
