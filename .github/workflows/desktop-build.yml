@@ -161,20 +161,31 @@ jobs:
 
           - distro: Debian
             version: 13
+            variant: test    # debug build and test suite, separate image and ccache
+            package: skip
+            debug_test: yes
+
+          - distro: Debian
+            version: 13
 
             package: DEB
-            ccache_size: 850M    # the Release build plus the suite it runs
+            test: skip    # the test leg above runs the suite for this distro
 
           - distro: Fedora
             version: 44
-
-            package: RPM
+            variant: test    # debug build and test suite, separate image and ccache
+            package: skip
             # Arch and Fedora 44 are the two newest toolchains, and the -Wno-error= exceptions
             # in CMakeLists.txt exist for exactly their warnings. They keep compiling Debug:
             # only the Debug configuration passes -Werror, so these two are the legs where a
             # new warning in either compiler still fails the build.
             debug_test: yes
-            ccache_size: 900M    # Debug for the suite and Release for the package
+
+          - distro: Fedora
+            version: 44
+
+            package: RPM
+            test: skip    # the test leg above runs the suite for this distro
 
           - distro: Ubuntu
             version: 26.04
