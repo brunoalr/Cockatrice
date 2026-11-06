@@ -718,7 +718,7 @@ jobs:
         id: restore_ccache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          key: ccache-${{ matrix.os }}${{ matrix.target }}
+          key: ccache-${{ matrix.os }}${{ matrix.target }}${{ matrix.soc == 'Intel' && 'Intel' || '' }}${{ matrix.type == 'Debug' && 'Debug' || '' }}
           path: ${{ env.CCACHE_DIR }}
 
       # Resolve given wildcard versions (e.g. Qt 6.6.*) to latest version via aqtinstall to avoid stale caches on new releases
@@ -1214,10 +1214,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           # Must list the ccache key of every leg that keeps a compiler cache
           # (PERSIST_CCACHE in build-linux and build-vcpkg), or a live entry is deleted.
-          # The nightly legs and the pull-request legs that finish under the Windows leg
-          # keep none, so their leftover entries are reclaimed here instead of waiting out
-          # the age rule.
-          LIVE_CCACHE_KEYS: 'ccache-Arch ccache-Debian13 ccache-Fedora45debug ccache-Fedora45release ccache-Windows10 ccache-macOS14 ccache-macOS15 ccache-macOS27'
+          # The nightly legs keep none, so their leftover entries are reclaimed here
+          # instead of waiting out the age rule.
+          LIVE_CCACHE_KEYS: 'ccache-Arch ccache-Servatrice_Debian12 ccache-Debian13 ccache-Fedora45debug ccache-Fedora45release ccache-Ubuntu26.04 ccache-macOS14 ccache-macOS15 ccache-macOS27Debug ccache-Windows10'
         run: |
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" \
             --jq '.actions_caches[] | [.id, .ref, .key, .last_accessed_at] | @tsv' >"$RUNNER_TEMP/caches.tsv"
