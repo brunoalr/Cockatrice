@@ -50,7 +50,9 @@ jobs:
         # https://docs.github.com/en/code-security/reference/code-scanning/codeql/codeql-queries/c-cpp-built-in-queries
         # https://docs.github.com/en/code-security/reference/code-scanning/codeql/codeql-queries/actions-built-in-queries
         queries: security-extended
-        dependency-caching: true
+        # Each TRAP cache is ~0.8 GiB of the repository's 10 GiB cache budget; dependency
+        # caching only ever applies to Java and C#
+        trap-caching: false
 
     - name: "[C++] Install dependencies"
       if: matrix.language == 'cpp' && matrix.build-mode == 'manual'
