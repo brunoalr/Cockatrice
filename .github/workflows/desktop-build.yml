@@ -654,7 +654,8 @@ jobs:
           key: ccache-${{ matrix.os }}${{ matrix.target }}${{ matrix.soc == 'Intel' && 'Intel' || '' }}${{ matrix.type == 'Debug' && 'Debug' || '' }}
           path: ${{ env.CCACHE_DIR }}
 
-      # Resolve given wildcard versions (e.g. Qt 6.6.*) to latest version via aqtinstall to avoid stale caches on new releases
+      # The Qt cache keys below use the release resolve-qt found, not the wildcard, so a new
+      # patch release misses the cache instead of restoring the previous one.
       - name: "Check Qt ${{ matrix.qt_version }} against the release the resolve-qt job found"
         env:
           QT_VERSION: ${{ matrix.qt_version }}
