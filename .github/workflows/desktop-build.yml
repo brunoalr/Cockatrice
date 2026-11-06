@@ -199,9 +199,15 @@ jobs:
 
           - distro: Debian
             version: 13
+            variant: test    # debug build and test suite, separate image and ccache
+            package: skip
+            debug_test: yes
+
+          - distro: Debian
+            version: 13
 
             package: DEB
-            ccache_size: 800M    # Release plus the suite: 625 MB working set at -g1
+            test: skip    # the test leg above runs the suite for this distro
 
           # The single Fedora leg used to build Debug for the suite and Release for the
           # package in one job (measured on Fedora 44: 30.8 min, the only leg slower than
