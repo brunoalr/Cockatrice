@@ -312,9 +312,9 @@ if [[ $RUNNER_OS == macOS ]]; then
       # CMAKE_OSX_DEPLOYMENT_TARGET is a vanilla CMake flag needed to compile cockatrice to target macOS version
       flags+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=$TARGET_MACOS_VERSION")
       # The triplet is what vcpkg hashes into the ABI hash of every port, so two legs that
-      # agree here reuse each other's binary cache. Targets 14, 15 and 26 on the same Xcode
-      # produce identical binaries when they share the lowest deployment target, so they all
-      # build against 14 to keep one set of vcpkg binaries instead of three.
+      # agree here reuse each other's binary cache. Targets 14 and 15 on the same Xcode
+      # produce identical binaries when they share the lowest deployment target, so both
+      # build against 14 to keep one set of vcpkg binaries instead of two.
       # Keep in sync with "vcpkg_deployment_target" in desktop-build.yml.
       vcpkg_target="${VCPKG_TARGET_MACOS_VERSION:-$TARGET_MACOS_VERSION}"
       extra_triplet_vars+=("set(VCPKG_CMAKE_SYSTEM_VERSION $vcpkg_target)")
@@ -432,17 +432,18 @@ if [[ $VCPKG_REQUIRE_PUSH ]] && grep -q 'binary cache submission failed' configu
 fi
 
 if [[ $USE_CCACHE ]]; then
-  # PCH-aware caching is required or ccache refuses to cache any TU that consumes a
-  # precompiled header, silently recompiling everything on every run. The mtime and ctime
+  # The build below compiles no precompiled header (CMAKE_DISABLE_PRECOMPILE_HEADERS above),
+  # so pch_defines only keeps the entry CMakeLists.txt sets. The mtime and ctime
   # entries cover files created during the build itself: the moc/uic/rcc output and the
   # protobuf headers are generated after ccache starts, so without them every TU including
   # one is read as a race and never cached. Checked-out sources are older than the compile
   # that follows them and do not trip the check.
   #
-  # This has to run after configure: CMakeLists.txt sets sloppiness=pch_defines,time_macros
-  # at configure time, and --set-config replaces the whole list rather than extending it, so
-  # setting it earlier would leave the build below with two entries. Re-asserting all four
-  # here is what actually reaches the compiler; the order is the point.
+  # This has to run after configure: off Windows, CMakeLists.txt sets
+  # sloppiness=pch_defines,time_macros at configure time, and --set-config replaces the whole
+  # list rather than extending it, so setting it earlier would leave the build below with two
+  # entries. Re-asserting all four here is what actually reaches the compiler; the order is
+  # the point.
   ccache --set-config sloppiness=pch_defines,time_macros,include_file_mtime,include_file_ctime
 fi
 
