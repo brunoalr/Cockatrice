@@ -426,9 +426,11 @@ cmake .. "${flags[@]}" 2>&1 | tee configure.log
 # macOS runs this under /bin/bash 3.2, where set -e ignores a failed [[ ]]
 [[ ${PIPESTATUS[0]} -eq 0 ]] || exit 1
 echo "::endgroup::"
-# vcpkg only warns when a push to the binary cache fails, and every later run then builds from source
+# vcpkg prints a failed binary cache push as an error but still exits 0, and every later run then
+# builds from source. The text below first appears in vcpkg-tool 2026-09-26; an older tool
+# never prints it, so the check would pass silently.
 if [[ $VCPKG_REQUIRE_PUSH ]] && grep -q 'binary cache submission failed' configure.log; then
-  echo "::error file=$0::vcpkg could not publish to the NuGet feed, see the warning above"
+  echo "::error file=$0::vcpkg could not publish to the NuGet feed, see the error above"
   exit 1
 fi
 
