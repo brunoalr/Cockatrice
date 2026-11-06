@@ -157,7 +157,6 @@ jobs:
             package: DEB
             server_only: yes
             test: skip
-            ccache_size: 400M    # server only, no client to compile
 
           - distro: Debian
             version: 13
@@ -207,7 +206,6 @@ jobs:
 
             package: skip
             sanitize: yes
-            ccache_size: 800M    # instrumented objects are larger
 
     name: ${{ matrix.distro }} ${{ matrix.version }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}
     needs: configure
@@ -219,27 +217,8 @@ jobs:
     timeout-minutes: 70
     env:
       CACHE: ${{ github.workspace }}/.cache/${{ matrix.distro }}${{ matrix.version }}${{ matrix.variant }}    # directory for caching docker image and ccache
-      # The bound is sized against the repository's 10 GB cache quota
-      # (https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy),
-      # not against what one leg would like. The quota currently holds about 1.1 GB of
-      # CodeQL trap, 1.1 GB of vcpkg, 0.7 GB of Qt and 2.1 GB of docker buildkit layers
-      # (mode=min in docker-release.yml, added here, brings the last one down to roughly
-      # 0.3 GB - the one input here that is an expectation rather than a measurement, since
-      # mode=min still writes one layer per pushed binary) plus the compiler caches of the nine legs a pull request runs. The five
-      # nightly-only legs keep no compiler cache (see PERSIST_CCACHE below), which is what
-      # makes these per-leg bounds affordable. Accounting for all of it: 6.45G of ccache
-      # bounds + 3.2G of the fixed entries = 9.65G against the 10G quota.
-      #
-      # A configuration needs roughly 500-850 MB on Linux, so the old uniform 600M bound sat
-      # below what a leg writes: ccache spent each build deleting the entries the next run
-      # asked for (measured: 2624-3720 cleanup passes per build, 8% of calls served). Each
-      # leg states the size it needs instead: one configuration for most, two for Fedora 44
-      # (Debug for the suite, Release for the package), the server alone for Servatrice.
-      # Raising these further means caching fewer legs, since GitHub evicts a whole entry
-      # when the total is exceeded.
-      #
       # Every key listed in LIVE_CCACHE_KEYS in prune-caches below must match this matrix.
-      CCACHE_SIZE: ${{ matrix.ccache_size || '700M' }}
+      CCACHE_SIZE: 1200M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       CMAKE_GENERATOR: 'Ninja'
       NAME: ${{ matrix.distro }}${{ matrix.version }}
       IMAGE_SUFFIX: ${{ matrix.variant }}
@@ -615,12 +594,7 @@ jobs:
     timeout-minutes: 100
     env:
       CCACHE_DIR: ${{ github.workspace }}/.cache/
-      # macOS configurations compile about twice the TUs of a Linux one, so each of these
-      # three legs gets a bound above what it has been measured to write. The four macOS
-      # legs used to be bounded at 600M from the same quota as the Linux ones; the three
-      # pull-request legs now get 700M each while the nightly Intel leg keeps none, and
-      # that is what fits (see CCACHE_SIZE in build-linux for the full arithmetic).
-      CCACHE_SIZE: 700M
+      CCACHE_SIZE: 1200M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       PERSIST_CCACHE: 'true'
 
     # Shared with build-vcpkg-nightly so the two leg sets run the same steps.
