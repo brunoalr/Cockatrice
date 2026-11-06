@@ -603,9 +603,6 @@ jobs:
             qt_version: 6.11.*
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             type: Release
-            # Scope is named after the vs2026 toolchain, not the generator: the
-            # ABI hash covers cl.exe, which is identical, so this leg keeps
-            # restoring the warm archives. Renaming would orphan them.
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: [configure, vcpkg-baseline, resolve-qt]
