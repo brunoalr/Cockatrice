@@ -423,7 +423,8 @@ echo "::group::Configure cmake"
 cmake --version
 echo "Running cmake with flags: ${flags[*]}"
 cmake .. "${flags[@]}" 2>&1 | tee configure.log
-[[ ${PIPESTATUS[0]} -eq 0 ]]
+# macOS runs this under /bin/bash 3.2, where set -e ignores a failed [[ ]]
+[[ ${PIPESTATUS[0]} -eq 0 ]] || exit 1
 echo "::endgroup::"
 # vcpkg only warns when a push to the binary cache fails, and every later run then builds from source
 if [[ $VCPKG_REQUIRE_PUSH ]] && grep -q 'binary cache submission failed' configure.log; then
