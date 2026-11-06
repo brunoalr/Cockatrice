@@ -1065,6 +1065,13 @@ jobs:
         run: gh attestation verify "$BUILD_PATH" --repo Cockatrice/Cockatrice
 
   build-vcpkg-nightly:
+    # The same block as build-vcpkg: the shared steps publish to GitHub Packages and attest
+    permissions:
+      actions: write
+      attestations: write
+      contents: write
+      id-token: write
+      packages: write    # publish vcpkg binaries to GitHub Packages
     strategy:
       fail-fast: false
       matrix:
@@ -1084,8 +1091,8 @@ jobs:
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
     needs: [configure, resolve-qt]
-    # The EOL target on the slowest runner is too slow to gate a change, so it runs in the
-    # nightly and on tags only.
+    # An EOL target almost never breaks on a change under review, so it runs in the nightly
+    # and on tags only.
     if: github.event_name == 'schedule' || github.ref_type == 'tag'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 100
