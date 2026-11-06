@@ -1133,7 +1133,7 @@ jobs:
           # (PERSIST_CCACHE in build-linux and build-vcpkg), or a live entry is deleted.
           # The nightly legs keep none, so their leftover entries are reclaimed here
           # instead of waiting out the age rule.
-          LIVE_CCACHE_KEYS: 'ccache-Arch ccache-Servatrice_Debian12 ccache-Debian13 ccache-Fedora44 ccache-Ubuntu26.04 ccache-Ubuntu26.04sanitize ccache-macOS14 ccache-macOS15 ccache-macOS27Debug ccache-Windows10'
+          LIVE_CCACHE_KEYS: 'ccache-Arch ccache-Servatrice_Debian12 ccache-Debian13 ccache-Debian13test ccache-Fedora44 ccache-Fedora44test ccache-Ubuntu26.04 ccache-Ubuntu26.04sanitize ccache-macOS14 ccache-macOS15 ccache-macOS27Debug ccache-Windows10'
         run: |
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" \
             --jq '.actions_caches[] | [.id, .ref, .key, .last_accessed_at] | @tsv' >"$RUNNER_TEMP/caches.tsv"
