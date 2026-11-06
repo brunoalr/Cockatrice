@@ -34,7 +34,7 @@ on:
       - 'vcpkg.json'
       - 'vcpkg'    # needed to match submodule bumps (gitlink)
   # The legs the pull-request matrix leaves out run here instead, so the legacy distros and
-  # the slow macOS runner stay covered without gating a pull request on them. Tags still
+  # the EOL macOS 13 target stay covered without gating a pull request on them. Tags still
   # build every leg, because a tag is what ships.
   schedule:
     - cron: '23 3 * * *'
@@ -246,10 +246,10 @@ jobs:
       # Which build the suite runs in, decided once per leg here so the steps' if: conditions
       # and their shells cannot drift apart. A step's own env is not visible to its if:, which
       # is why these live at job level rather than on the release step.
-      #   DEBUG_TEST  the instrumented legs (symbols and instrumentation matter) and the two
-      #               newest distro toolchains, which only fail on a warning in Debug.
-      #   RUN_TESTS   every other leg that tests runs the suite against the release build it may
-      #               also package, so testing and packaging cost one compile instead of two.
+      #   DEBUG_TEST  every leg that runs the suite: the instrumented legs (symbols and
+      #               instrumentation matter) and the debug_test legs, which package nothing.
+      #   RUN_TESTS   a leg that tests the release build it packages. No leg does: every
+      #               package leg sets test: skip, and the suite runs only in Debug test legs.
       DEBUG_TEST: ${{ matrix.sanitize == 'yes' || matrix.coverage == 'yes' || matrix.debug_test == 'yes' }}
       RUN_TESTS: ${{ matrix.test != 'skip' && !(matrix.sanitize == 'yes' || matrix.coverage == 'yes' || matrix.debug_test == 'yes') }}
       # Whether this leg restores and saves its compiler cache. Every leg a pull request
@@ -275,9 +275,6 @@ jobs:
         shell: bash
         run: source .ci/docker.sh --build
 
-      # The instrumented legs and the two newest distro toolchains build and test Debug; every
-      # other leg runs its suite against the release build below, so testing and packaging cost
-      # one compile instead of two.
       - name: "Build debug and test"
         if: env.DEBUG_TEST == 'true'
         shell: bash
@@ -319,13 +316,7 @@ jobs:
           path: coverage/
           if-no-files-found: warn
 
-      # One build serves both purposes: the suite runs against the same configuration that
-      # gets packaged, so a packaging leg no longer pays for a full Debug compile it then
-      # throws away. macOS and Windows have always tested their release build.
-      #
-      # Instrumented and debug-test legs reach this step only when they also package; their
-      # suite already ran in the debug step above, so the tests are not repeated here.
-      - name: "Build release, test and package"
+      - name: "Build release and package"
         id: build
         if: matrix.package != 'skip' || env.RUN_TESTS == 'true'
         shell: bash
@@ -499,8 +490,7 @@ jobs:
           # It moved here from build-linux: gcovr.cfg sets no fail_under, so the leg cannot
           # fail a build, and nothing consumes the report per change, which made it an
           # artifact nobody read on every pull request. On the default branch it becomes a
-          # trend instead. Image and ccache keys come from distro, version and variant, so
-          # they are unchanged and the warm cache that leg built still matches.
+          # trend instead.
           - distro: Ubuntu
             version: 26.04
             variant: cover    # separate image and ccache, same distro
