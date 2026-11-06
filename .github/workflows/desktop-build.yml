@@ -1087,7 +1087,7 @@ jobs:
             type: Release
 
     name: ${{ matrix.os }} ${{ matrix.target }}${{ matrix.soc == 'Intel' && ' Intel' || '' }}${{ matrix.type == 'Debug' && ' Debug' || '' }}
-    needs: [configure, resolve-qt]
+    needs: [configure, vcpkg-baseline, resolve-qt]
     # An EOL target almost never breaks on a change under review, so it runs in the nightly
     # and on tags only.
     if: github.event_name == 'schedule' || github.ref_type == 'tag'
