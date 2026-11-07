@@ -539,6 +539,7 @@ qt_add_executable(
   ${cockatrice_MOC_SRCS}
   MANUAL_FINALIZATION
 )
+set_target_properties(cockatrice PROPERTIES AUTOGEN_ORIGIN_DEPENDS OFF)
 
 target_precompile_headers(cockatrice PRIVATE "${CMAKE_SOURCE_DIR}/cmake/pch/qtwidgets_pch.h")
 
