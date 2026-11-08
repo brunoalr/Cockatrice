@@ -661,7 +661,6 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             soc: Apple
             type: Release
-            use_ccache: 1
             vcpkg_deployment_target: 14
             vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
             vcpkg_upload: 1    # only one leg per vcpkg_scope hands its archives over
@@ -680,7 +679,6 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             soc: Apple
             type: Release
-            use_ccache: 1
             vcpkg_deployment_target: 14
             vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
 
@@ -695,7 +693,6 @@ jobs:
             qt_modules: qtimageformats qtmultimedia qtshadertools qtwebsockets
             soc: Apple
             type: Debug
-            use_ccache: 1
             vcpkg_deployment_target: 14
             vcpkg_scope: 'vcpkg/macos14-arm64-xcode26.6/'
 
@@ -716,7 +713,6 @@ jobs:
             type: Release
             ccache_eviction_age: 7d
             ccache_size: 950M    # Release plus the package: 890 MB working set without /Z7
-            use_ccache: 1
             # Scope is named after the vs2026 toolchain, not the generator: the
             # ABI hash covers cl.exe, which is identical, so this leg keeps
             # restoring the warm archives. Renaming would orphan them.
@@ -753,23 +749,27 @@ jobs:
         with:
           submodules: recursive
 
-      - name: "[Windows] Add msbuild to PATH"
-        if: matrix.os == 'Windows'
-        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3.0.0
-        with:
-          msbuild-architecture: x64
-
-      - name: "[Windows] Setup ccache"
-        if: matrix.os == 'Windows' && matrix.use_ccache == 1
-        shell: bash
-        run: choco install ccache --no-progress -y
-
       - name: "[macOS] Setup ccache"
-        if: matrix.os == 'macOS' && matrix.use_ccache == 1
+        if: matrix.os == 'macOS'
         run: brew install ccache
 
+      # A pinned release, not the older ccache that Strawberry Perl bundles on the runner image
+      - name: "[Windows] Install ccache"
+        if: matrix.os == 'Windows'
+        shell: bash
+        env:
+          CCACHE_RELEASE: 4.14.2
+          CCACHE_ZIP_SHA256: 6993ce645e53192cec592ee23186200b574ac4c59097ecde8d9cfd681b47ae84
+        run: |
+          zip="$RUNNER_TEMP/ccache.zip"
+          curl -fsSL -o "$zip" "https://github.com/ccache/ccache/releases/download/v${CCACHE_RELEASE}/ccache-${CCACHE_RELEASE}-windows-x86_64.zip"
+          echo "$CCACHE_ZIP_SHA256  $zip" | sha256sum -c -
+          "/c/Program Files/7-Zip/7z.exe" x -y -o"$RUNNER_TEMP" "$zip" >/dev/null
+          cygpath -w "$RUNNER_TEMP/ccache-${CCACHE_RELEASE}-windows-x86_64" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/ccache-${CCACHE_RELEASE}-windows-x86_64/ccache.exe" --version | head -1
+
       - name: "Restore compiler cache (ccache)"
-        if: matrix.use_ccache == 1 && env.PERSIST_CCACHE == 'true'
+        if: env.PERSIST_CCACHE == 'true'
         id: restore_ccache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -906,7 +906,6 @@ jobs:
           MAKE_PACKAGE: '${{ matrix.make_package }}'
           PACKAGE_SUFFIX: '${{ matrix.package_suffix }}'
           TARGET_MACOS_VERSION: ${{ matrix.override_target }}
-          USE_CCACHE: ${{ matrix.use_ccache }}
           # Only pushes to the default branch may write the shared binary cache: the
           # archives a run compiles are only as trustworthy as the code they were
           # built from, and only merged code may populate the scope that master and
@@ -922,7 +921,7 @@ jobs:
           VCPKG_TARGET_MACOS_VERSION: ${{ matrix.vcpkg_deployment_target }}
           # Release legs compile the sentry-native SDK; Debug legs stay SDK-free.
           WITH_CRASH_REPORTING: ${{ matrix.type == 'Release' && 'ON' || '' }}
-        run: .ci/compile.sh --server --test --vcpkg
+        run: .ci/compile.sh --server --test --vcpkg --ccache
 
       # What the compiler cache has to hold for this leg. ccache stores the objects it
       # compiles, so their total is the working set a bound has to fit, and the cache
@@ -1124,7 +1123,7 @@ jobs:
 
       # Delete used cache to emulate a ccache update. See https://github.com/actions/cache/issues/342
       - name: "Delete remote compiler cache (ccache)"
-        if: matrix.use_ccache == 1 && env.PERSIST_CCACHE == 'true' && github.ref == 'refs/heads/master' && steps.restore_ccache.outputs.cache-hit
+        if: env.PERSIST_CCACHE == 'true' && github.ref == 'refs/heads/master' && steps.restore_ccache.outputs.cache-hit
         continue-on-error: true
         # Bash, not the Windows runner's default pwsh, which cannot parse this `if`.
         shell: bash
@@ -1136,8 +1135,8 @@ jobs:
             echo "Cache deleted successfully"
           fi
 
-      - name: "Cache updated compiler cache (ccache)"
-        if: matrix.use_ccache == 1 && env.PERSIST_CCACHE == 'true' && github.ref == 'refs/heads/master'
+      - name: "Save updated compiler cache (ccache)"
+        if: env.PERSIST_CCACHE == 'true' && github.ref == 'refs/heads/master'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           key: ${{ steps.restore_ccache.outputs.cache-primary-key }}
