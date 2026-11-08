@@ -103,6 +103,7 @@ endif()
 if(WIN32
    AND USE_VCPKG
    AND CMAKE_GENERATOR STREQUAL "Ninja"
+   AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.20
 )
   # vcpkg.cmake must be the primary toolchain; MSVC+Ninja toolchain is chainloaded
   # See https://github.com/MarkSchofield/WindowsToolchain#windowstoolchain-and-vcpkg
