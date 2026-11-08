@@ -39,13 +39,14 @@ on:
   schedule:
     - cron: '23 3 * * *'
 
-# Cancel earlier, unfinished runs of this workflow on the same branch (unless on tag --> release)
+# Cancel earlier, unfinished runs of this workflow on the same branch (not on master, and not on tag --> release)
 concurrency:
   # The event name is part of the group because a nightly run and a push run on master share
   # refs/heads/master but must not cancel each other: the nightly would drop the push's cache
   # saves, and a merge landing during the nightly would drop that night's coverage.
   group: "${{ github.workflow }} @ ${{ github.ref_name }} (${{ github.event_name }})"
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  # A cancelled master run saves no compiler cache, so a master push waits for the running one.
+  cancel-in-progress: ${{ github.ref_type != 'tag' && github.ref != 'refs/heads/master' }}
 
 jobs:
   configure:
