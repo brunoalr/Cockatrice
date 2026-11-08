@@ -13,7 +13,7 @@
 
 # --debug or --release sets the build type ie CMAKE_BUILD_TYPE
 # --ccache [<size>] uses ccache and shows stats, optionally provide size
-# --evict-ccache after the build, evicts cache entries this build did not use
+# --evict-ccache after the build, evicts cache entries none of the last 3 builds run with it used
 # --dir <dir> sets the name of the build dir, default is "build"
 # --cmake-generator <generator> sets CMAKE_GENERATOR as used by cmake
 # --target-macos-version <version> sets the min os version - only used for macOS builds
@@ -466,8 +466,23 @@ fi
 
 if [[ $USE_CCACHE ]]; then
   if [[ $CCACHE_EVICT_UNUSED ]]; then
-    unused_for=$(( $(date +%s) - build_start + 60 ))
-    echo "::group::evict compiler cache entries unused for ${unused_for}s"
+    echo "::group::evict compiler cache entries the last 3 evicting builds did not use"
+    # Pull requests often build on an older master commit than the cache's last build.
+    window_start=$build_start
+    if cache_dir=$(ccache --get-config cache_dir) && cache_dir=${cache_dir%$'\r'} &&
+      sha=$(git rev-parse HEAD 2>/dev/null) &&
+      kept=$({ grep -v "^$sha " "$cache_dir/kept-builds" 2>/dev/null; echo "$sha $build_start"; } | tail -n 3) &&
+      echo "$kept" >"$cache_dir/kept-builds"; then
+      echo "$kept"
+      read -r _ oldest_start <<<"$kept"
+      if [[ $oldest_start =~ ^[0-9]+$ ]]; then
+        window_start=$oldest_start
+      fi
+    else
+      echo "::warning file=$0::could not record this build, evicting what it did not use"
+    fi
+    unused_for=$(( $(date +%s) - window_start + 60 ))
+    echo "evicting entries unused for ${unused_for}s"
     ccache --evict-older-than "${unused_for}s" || echo "::warning file=$0::ccache eviction failed, saving the cache as it is"
     echo "::endgroup::"
   fi
