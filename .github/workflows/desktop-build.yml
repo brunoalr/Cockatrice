@@ -254,7 +254,22 @@ jobs:
             version: 26.04
 
             package: DEB
-            test: skip    # Debian 13 covers the uninstrumented suite on pull requests
+            test: skip    # The sanitizer leg below runs this distro's suite
+
+          # The one leg that runs the suite under AddressSanitizer and
+          # UndefinedBehaviorSanitizer. Debian 13 and Fedora 45 keep covering the
+          # uninstrumented suite, so nothing is lost by instrumenting this one.
+          #
+          # It packages nothing. A sanitized Debug build is not something to ship, and
+          # carrying the package build here meant 18 minutes of Release compile queued
+          # behind the instrumented one in a single job. The leg above publishes this
+          # distro's DEB.
+          - distro: Ubuntu
+            version: 26.04
+            variant: sanitize    # separate image and ccache, same distro
+
+            package: skip
+            sanitize: yes
 
     name: ${{ matrix.distro }} ${{ matrix.version }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}
     needs: configure
@@ -523,28 +538,6 @@ jobs:
             package: DEB
             test: skip    # Running tests on all distros is superfluous
 
-          # The one leg that runs the suite under AddressSanitizer and
-          # UndefinedBehaviorSanitizer. It runs nightly rather than on pull requests: it is
-          # not on the pull-request critical path (Windows sets that), and its 1.2G cache
-          # was the largest single entry in the 10 GB quota. Debian 13 and Fedora 45 keep
-          # covering the uninstrumented suite on pull requests, so nothing is lost there.
-          #
-          # It packages nothing. A sanitized Debug build is not something to ship; the
-          # pull-request Ubuntu 26.04 leg publishes this distro's DEB.
-          - distro: Ubuntu
-            version: 26.04
-            variant: sanitize    # separate image, same distro as the coverage leg below
-
-            package: skip
-            sanitize: yes
-            # A sanitizer finding must not redden the nightly run: vcpkg-cache-import only
-            # imports the archives of a run whose conclusion is success. The job itself
-            # still reports failure.
-            allow-failure: yes
-            # Scratch only (nightly legs persist no cache); sized so the instrumented
-            # objects, which are larger than the 614 MB measured, do not thrash mid-build.
-            ccache_size: 1200M
-
           # The one leg that runs instrumented for line coverage and publishes the report as
           # a workflow artifact. It stays a separate leg rather than a second flag on the
           # sanitizer leg because the two instruments answer different questions: the
@@ -567,7 +560,7 @@ jobs:
     name: ${{ matrix.distro }} ${{ matrix.version }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}
     needs: configure
     # A nightly and a tag build cover the legs a pull request or a merge does not wait for:
-    # the previous release of each distro, and the instrumented legs.
+    # the previous release of each distro, and the one instrument that only reports.
     if: github.event_name == 'schedule' || github.ref_type == 'tag'
     runs-on: ubuntu-latest    # https://github.com/actions/runner-images
     continue-on-error: ${{ matrix.allow-failure == 'yes' }}
@@ -1212,7 +1205,7 @@ jobs:
           # (PERSIST_CCACHE in build-linux and build-vcpkg), or a live entry is deleted.
           # The nightly legs keep none, so their leftover entries are reclaimed here
           # instead of waiting out the age rule.
-          LIVE_CCACHE_KEYS: 'ccache-Arch ccache-Servatrice_Debian12 ccache-Debian13 ccache-Debian13test ccache-Fedora45debug ccache-Fedora45release ccache-Ubuntu26.04 ccache-macOS14 ccache-macOS15 ccache-macOS27Debug ccache-Windows10'
+          LIVE_CCACHE_KEYS: 'ccache-Arch ccache-Servatrice_Debian12 ccache-Debian13 ccache-Debian13test ccache-Fedora45debug ccache-Fedora45release ccache-Ubuntu26.04 ccache-Ubuntu26.04sanitize ccache-macOS14 ccache-macOS15 ccache-macOS27Debug ccache-Windows10'
         run: |
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" \
             --jq '.actions_caches[] | [.id, .ref, .key, .last_accessed_at] | @tsv' >"$RUNNER_TEMP/caches.tsv"
@@ -1240,8 +1233,8 @@ jobs:
               reason="scoped to $ref"
             elif [[ $key == ccache-* ]]; then
               # An exact token compare, because one key can be a prefix of another:
-              # ccache-Fedora45 is a prefix of ccache-Fedora45debug and
-              # ccache-Fedora45release, and only the latter two are live.
+              # ccache-Ubuntu26.04 is a prefix of ccache-Ubuntu26.04sanitize, and both
+              # keys are live.
               if [[ $live_ccache != *" $key "* ]]; then
                 reason="no pull-request leg keeps it"
               fi
