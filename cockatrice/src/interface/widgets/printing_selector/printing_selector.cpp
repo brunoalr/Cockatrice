@@ -27,8 +27,8 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSharedPointer>
-#include <QSizePolicy>
 #include <QShowEvent>
+#include <QSizePolicy>
 #include <QString>
 #include <QTimer>
 #include <QVBoxLayout>
