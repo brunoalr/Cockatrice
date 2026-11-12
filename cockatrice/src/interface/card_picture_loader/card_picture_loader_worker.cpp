@@ -190,8 +190,12 @@ QNetworkReply *CardPictureLoaderWorker::makeRequest(const QUrl &url, CardPicture
     }
 
     QNetworkRequest req(resolvedUrl);
+#ifndef Q_OS_WASM
+    // A browser sends a preflight for a User-Agent it lets a page set, and for an Accept value over 128 bytes.
+    // The picture hosts answer preflights with 403.
     req.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
     req.setRawHeader("Accept", CardPictureLoaderImageFormats::acceptHeader());
+#endif
 
     // Cached entries are served straight from the disk cache even when picture downloads are
     // enabled: re-fetching an already-cached image would burn the rate limit for nothing. Only a
