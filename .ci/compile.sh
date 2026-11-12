@@ -8,6 +8,7 @@
 # --suffix <suffix> renames package with this suffix, requires arg
 # --server compiles servatrice
 # --test runs tests
+# --wasm builds only the client, for WebAssembly; needs EMSDK QT_WASM_DIR QT_HOST_PATH WASM_DEPS_DIR WASM_PROTOC
 # --sanitize builds with AddressSanitizer and UndefinedBehaviorSanitizer, gcc/clang only
 # --coverage instruments the test run for line coverage and prints a gcovr summary, gcc only
 
@@ -61,6 +62,10 @@ while [[ $# != 0 ]]; do
       ;;
     '--test')
       MAKE_TEST=1
+      shift
+      ;;
+    '--wasm')
+      MAKE_WASM=1
       shift
       ;;
     '--sanitize')
@@ -145,6 +150,21 @@ done
 set -e
 build_start=$(date +%s)
 
+if [[ ${MAKE_WASM:-} == "1" ]]; then
+  for conflicting in MAKE_SERVER MAKE_NO_CLIENT MAKE_TEST MAKE_PACKAGE MAKE_INSTALL USE_VCPKG MAKE_SANITIZE MAKE_COVERAGE; do
+    if [[ ${!conflicting:-} == "1" ]]; then
+      echo "::error file=$0::--wasm cannot be combined with $conflicting"
+      exit 3
+    fi
+  done
+  for required in EMSDK QT_WASM_DIR QT_HOST_PATH WASM_DEPS_DIR WASM_PROTOC; do
+    if [[ -z ${!required:-} ]]; then
+      echo "::error file=$0::--wasm needs $required in the environment"
+      exit 3
+    fi
+  done
+fi
+
 # Schema version consistency (only relevant to the server)
 if [[ ${MAKE_SERVER:-} == "1" ]]; then
   ./servatrice/check_schema_version.sh
@@ -189,6 +209,17 @@ fi
 if [[ ${MAKE_TEST:-} == "1" ]]; then
   flags+=("-DTEST=1")
 fi
+if [[ ${MAKE_WASM:-} == "1" ]]; then
+  export CMAKE_TOOLCHAIN_FILE="$QT_WASM_DIR/lib/cmake/Qt6/qt.toolchain.cmake"
+  export CMAKE_GENERATOR="${CMAKE_GENERATOR:-Ninja}"
+  flags+=("-DQT_HOST_PATH=$QT_HOST_PATH" "-DWITH_ORACLE=0" "-DWITH_SERVER=0" "-DTEST=0")
+  flags+=("-DQT_ADDITIONAL_PACKAGES_PREFIX_PATH=$WASM_DEPS_DIR" "-DOPENSSL_ROOT_DIR=$WASM_DEPS_DIR")
+  flags+=("-DProtobuf_PROTOC_EXECUTABLE=$WASM_PROTOC")
+  flags+=("-DCMAKE_C_FLAGS=-pthread" "-DCMAKE_CXX_FLAGS=-pthread")
+  if [[ ${USE_CCACHE:-} != "1" ]]; then
+    flags+=("-DUSE_CCACHE=0")
+  fi
+fi
 if [[ ${MAKE_SANITIZE:-} == "1" ]]; then
   flags+=("-DENABLE_SANITIZERS=ON")
 else
@@ -206,6 +237,10 @@ if [[ ${USE_CCACHE:-} == "1" ]]; then
   if [[ $RUNNER_OS == Windows ]]; then
     # Every runner image build reinstalls MSVC with new mtimes, which misses the whole cache under the default mtime check
     ccache --set-config compiler_check=content
+  fi
+  if [[ ${MAKE_WASM:-} == "1" ]]; then
+    # emsdk is installed anew on every run, so the default modification-time check would never hit
+    ccache --set-config "compiler_check=string:emscripten-$(emcc -dumpversion)"
   fi
   if [[ -n $CCACHE_SIZE ]]; then
     # This setting persists after running the script
