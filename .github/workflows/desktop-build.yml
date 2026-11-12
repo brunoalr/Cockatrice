@@ -182,10 +182,11 @@ jobs:
     outputs:
       mac: ${{ steps.resolve.outputs.mac }}
       windows: ${{ steps.resolve.outputs.windows }}
+      wasm: ${{ steps.resolve.outputs.wasm }}
     steps:
       # One aqt query per host instead of an aqtinstall install on every macOS and Windows leg;
       # each leg checks its qt_version against this spec and fails on drift.
-      - name: "Resolve the latest Qt patch release for macOS and Windows"
+      - name: "Resolve the latest Qt patch release for macOS, Windows and WebAssembly"
         id: resolve
         env:
           QT_VERSION: 6.11.*
@@ -196,6 +197,10 @@ jobs:
             echo "$host=$version" >> "$GITHUB_OUTPUT"
             echo "$host: $version"
           done
+          # A failed query must only fail the WebAssembly leg, which checks this value, not the desktop legs
+          version=$(pipx run --spec aqtinstall aqt list-qt all_os wasm --spec "$QT_VERSION" --latest-version) || true
+          echo "wasm=$version" >> "$GITHUB_OUTPUT"
+          echo "wasm: $version"
 
   build-linux:
     strategy:
@@ -1168,6 +1173,154 @@ jobs:
     timeout-minutes: 100
     steps: *vcpkg-steps
 
+  build-wasm:
+    # A job-level block replaces the workflow-level one: this job only deletes its own cache entry
+    permissions:
+      actions: write
+      contents: read
+    name: WebAssembly
+    needs: [configure, vcpkg-baseline, resolve-qt]
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest    # https://github.com/actions/runner-images
+    timeout-minutes: 60
+    env:
+      # Qt's WebAssembly kit refuses to configure with any other Emscripten release
+      EMSDK_VERSION: 4.0.7
+      EMSDK_COMMIT: c69d433d8509c5c64564c2f0d054bf102a5cf67e    # the emsdk repository's 4.0.7 tag
+      QT_VERSION: ${{ needs.resolve-qt.outputs.wasm }}
+      CCACHE_DIR: ${{ github.workspace }}/.cache/
+      CCACHE_SIZE: 1200M
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          # The steps below run downloaded tools; none of them needs the checkout's token
+          persist-credentials: false
+
+      - name: "Check the WebAssembly kit is the desktop legs' Qt ${{ needs.resolve-qt.outputs.mac }}"
+        env:
+          QT_DESKTOP: ${{ needs.resolve-qt.outputs.mac }}
+        run: |
+          if [[ $QT_VERSION != "$QT_DESKTOP" ]]; then
+            echo "::error::resolve-qt found Qt $QT_VERSION for WebAssembly but $QT_DESKTOP for the desktop legs"
+            exit 1
+          fi
+
+      # The libraries are what the desktop Qt's build tools link against: qsb will not start without them
+      - name: "Install Ninja, ccache and the libraries Qt's build tools need"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build ccache \
+            libbrotli1 libdbus-1-3 libegl1 libfontconfig1 libfreetype6 libgl1 libglib2.0-0t64 libx11-6 libxkbcommon0
+
+      - name: "Restore compiler cache (ccache)"
+        id: restore_ccache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: ccache-Wasm
+          path: ${{ env.CCACHE_DIR }}
+
+      - name: "Install Emscripten ${{ env.EMSDK_VERSION }}"
+        run: |
+          git init -q "$RUNNER_TEMP/emsdk"
+          cd "$RUNNER_TEMP/emsdk"
+          git fetch -q --depth 1 https://github.com/emscripten-core/emsdk "$EMSDK_COMMIT"
+          git checkout -q FETCH_HEAD
+          ./emsdk install "$EMSDK_VERSION"
+          ./emsdk activate "$EMSDK_VERSION"
+
+      # The kit holds no build tools: moc, rcc, lrelease and qsb come from a desktop Qt of the same release
+      - name: "Install Qt ${{ env.QT_VERSION }} for the runner and for WebAssembly"
+        run: |
+          aqt=(pipx run --spec aqtinstall==3.3.0 aqt install-qt --outputdir "$RUNNER_TEMP/Qt")
+          "${aqt[@]}" linux desktop "$QT_VERSION" linux_gcc_64 -m qtshadertools
+          "${aqt[@]}" all_os wasm "$QT_VERSION" wasm_multithread -m qtwebsockets qtmultimedia qtshadertools qtimageformats
+          echo "QT_HOST_PATH=$RUNNER_TEMP/Qt/$QT_VERSION/gcc_64" >> "$GITHUB_ENV"
+          echo "QT_WASM_DIR=$RUNNER_TEMP/Qt/$QT_VERSION/wasm_multithread" >> "$GITHUB_ENV"
+
+      - name: "Key the vcpkg binaries"
+        id: vcpkg_key
+        env:
+          DEPS_SCRIPT_HASH: ${{ hashFiles('.ci/wasm_deps.sh') }}
+        run: echo "prefix=vcpkg-wasm-$(git -C vcpkg rev-parse HEAD)-$DEPS_SCRIPT_HASH-emsdk$EMSDK_VERSION" >> "$GITHUB_OUTPUT"
+
+      # The key ends in a hash of the archive names, which are the packages' ABI hashes. A runner image that
+      # changes a hashed tool then gives a new key and a new save, not an exact hit that is never updated.
+      - name: "Restore vcpkg binaries"
+        id: restore_vcpkg
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: ${{ steps.vcpkg_key.outputs.prefix }}-none
+          restore-keys: ${{ steps.vcpkg_key.outputs.prefix }}-
+          path: ${{ runner.temp }}/vcpkg-bincache
+
+      - name: "Build protobuf and OpenSSL for WebAssembly"
+        id: deps
+        env:
+          KEY_PREFIX: ${{ steps.vcpkg_key.outputs.prefix }}
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          mkdir -p "$RUNNER_TEMP/vcpkg-bincache"
+          VCPKG_BINARY_SOURCES="clear;files,$RUNNER_TEMP/vcpkg-bincache,readwrite" .ci/wasm_deps.sh >> "$GITHUB_ENV"
+          archives=$(cd "$RUNNER_TEMP/vcpkg-bincache" && find . -type f | sort | sha256sum | cut -c1-16)
+          echo "key=$KEY_PREFIX-$archives" >> "$GITHUB_OUTPUT"
+
+      # Only master publishes, as with every other cache of this workflow
+      - name: "Save vcpkg binaries"
+        if: github.ref == 'refs/heads/master' && steps.restore_vcpkg.outputs.cache-matched-key != steps.deps.outputs.key
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: ${{ steps.deps.outputs.key }}
+          path: ${{ runner.temp }}/vcpkg-bincache
+
+      - name: "Build Cockatrice"
+        env:
+          CCACHE_EVICT_UNUSED: 1
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          .ci/compile.sh --wasm --release --ccache
+
+      - name: "Delete remote compiler cache (ccache)"
+        if: github.ref == 'refs/heads/master' && steps.restore_ccache.outputs.cache-hit
+        continue-on-error: true
+        env:
+          CACHE_PRIMARY_KEY: ${{ steps.restore_ccache.outputs.cache-primary-key }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Deleting by key also deletes every key it prefixes, so delete by id
+          id=$(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$CACHE_PRIMARY_KEY" \
+            --json id,key --jq ".[] | select(.key == \"$CACHE_PRIMARY_KEY\") | .id")
+          if [[ -n $id ]] && gh cache delete --repo "$GITHUB_REPOSITORY" "$id"; then
+            echo "Cache deleted successfully"
+          fi
+
+      - name: "Save updated compiler cache (ccache)"
+        if: github.ref == 'refs/heads/master'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          key: ${{ steps.restore_ccache.outputs.cache-primary-key }}
+          path: ${{ env.CCACHE_DIR }}
+
+      - name: "Start the client in headless Chrome"
+        env:
+          # The runner image forbids the unprivileged user namespaces that Chrome's sandbox needs
+          CHROME_FLAGS: --no-sandbox
+        run: .ci/wasm_smoke.sh build/cockatrice cockatrice.html
+
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Cockatrice-wasm
+          path: |
+            build/cockatrice/cockatrice.html
+            build/cockatrice/cockatrice.js
+            build/cockatrice/cockatrice.wasm
+            build/cockatrice/qtloader.js
+            build/cockatrice/qtlogo.svg
+          if-no-files-found: error
+
   prune-caches:
     name: Prune caches
     # Only master writes caches at all, so only master may clean them up too
@@ -1204,10 +1357,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           # Must list the ccache key of every leg that keeps a compiler cache
-          # (PERSIST_CCACHE in build-linux and build-vcpkg), or a live entry is deleted.
+          # (PERSIST_CCACHE in build-linux and build-vcpkg, and build-wasm), or a live entry is deleted.
           # The nightly legs keep none, so their leftover entries are reclaimed here
           # instead of waiting out the age rule.
-          LIVE_CCACHE_KEYS: 'ccache-Arch ccache-Servatrice_Debian12 ccache-Debian13 ccache-Debian13test ccache-Fedora45debug ccache-Fedora45release ccache-Ubuntu26.04 ccache-Ubuntu26.04sanitize ccache-macOS14 ccache-macOS15 ccache-macOS27Debug ccache-Windows10'
+          LIVE_CCACHE_KEYS: 'ccache-Arch ccache-Servatrice_Debian12 ccache-Debian13 ccache-Debian13test ccache-Fedora45debug ccache-Fedora45release ccache-Ubuntu26.04 ccache-Ubuntu26.04sanitize ccache-macOS14 ccache-macOS15 ccache-macOS27Debug ccache-Windows10 ccache-Wasm'
         run: |
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" \
             --jq '.actions_caches[] | [.id, .ref, .key, .last_accessed_at] | @tsv' >"$RUNNER_TEMP/caches.tsv"
@@ -1226,7 +1379,7 @@ jobs:
             # come from docker-release.yml, codeql-trap-* from codeql-action in codeql.yml),
             # so that an entry of some other workflow can never be deleted by accident
             case "$key" in
-              ccache-* | Qt* | buildkit-* | index-* | codeql-trap-*) ;;
+              ccache-* | Qt* | vcpkg-wasm-* | buildkit-* | index-* | codeql-trap-*) ;;
               *) continue ;;
             esac
 
