@@ -114,10 +114,12 @@ private slots:
     void showWindowIfHidden();
     void onUrlChainFinished(bool connected);
 
+#ifndef Q_OS_WASM
     void cardUpdateError(QProcess::ProcessError err);
     void cardUpdateFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void cardUpdateProgressOutput();
     void cardUpdateStandardError();
+#endif
     void refreshShortcuts();
     void cardDatabaseLoadingFailed();
     void cardDatabaseNewSetsFound(int numUnknownSets, QStringList unknownSetsNames);
@@ -160,8 +162,10 @@ private:
     {
         return "oracle";
     }
+#ifndef Q_OS_WASM
     void createCardUpdateProcess(bool background = false);
     void exitCardDatabaseUpdate(bool doReload);
+#endif
     /**
      * @brief Reloads the card database on a worker thread and runs checkUnknownSets() once the finished
      *        snapshot has been swapped in.

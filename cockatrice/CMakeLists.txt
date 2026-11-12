@@ -58,7 +58,6 @@ set(cockatrice_SOURCES
     src/interface/widgets/dialogs/dlg_startup_card_check.cpp
     src/interface/widgets/dialogs/dlg_tip_of_the_day.cpp
     src/interface/widgets/dialogs/dlg_turn_order.cpp
-    src/interface/widgets/dialogs/dlg_update.cpp
     src/interface/widgets/dialogs/dlg_view_log.cpp
     src/interface/widgets/dialogs/override_printing_warning.cpp
     src/interface/widgets/dialogs/path_safety_warning.cpp
@@ -345,9 +344,7 @@ set(cockatrice_SOURCES
     src/interface/widgets/visual_deck_storage/visual_deck_storage_tag_filter_widget.cpp
     src/interface/widgets/visual_deck_storage/visual_deck_storage_widget.cpp
     src/interface/window_main.cpp
-    src/installer_close_server.cpp
     src/main.cpp
-    src/single_instance_manager.cpp
     src/interface/widgets/tabs/abstract_tab_deck_editor.cpp
     src/interface/widgets/tabs/api/archidekt/tab_archidekt.cpp
     src/interface/widgets/tabs/api/archidekt/api_response/archidekt_deck_listing_api_response.cpp
@@ -454,8 +451,6 @@ set(cockatrice_SOURCES
     src/interface/widgets/tabs/api/edhrec/display/commander/edhrec_commander_api_response_budget_navigation_widget.h
     src/interface/widgets/utility/compact_push_button.cpp
     src/interface/widgets/utility/compact_push_button.h
-    src/installer_close_server.h
-    src/single_instance_manager.h
     src/client/url_scheme_event_filter.h
     src/interface/intents/intent_connect_to_server.cpp
     src/interface/intents/intent_connect_to_server.h
@@ -478,6 +473,19 @@ set(cockatrice_SOURCES
     src/interface/widgets/server/user/user_info_popup.cpp
     src/interface/widgets/server/user/user_info_popup.h
 )
+
+if(NOT EMSCRIPTEN)
+  # A browser tab cannot update itself, and has no second instance or installer to talk to.
+  list(
+    APPEND
+    cockatrice_SOURCES
+    src/installer_close_server.cpp
+    src/installer_close_server.h
+    src/interface/widgets/dialogs/dlg_update.cpp
+    src/single_instance_manager.cpp
+    src/single_instance_manager.h
+  )
+endif()
 
 add_subdirectory(sounds)
 add_subdirectory(themes)

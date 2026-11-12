@@ -29,7 +29,9 @@
 #include "../interface/widgets/dialogs/dlg_settings.h"
 #include "../interface/widgets/dialogs/dlg_startup_card_check.h"
 #include "../interface/widgets/dialogs/dlg_tip_of_the_day.h"
+#ifndef Q_OS_WASM
 #include "../interface/widgets/dialogs/dlg_update.h"
+#endif
 #include "../interface/widgets/dialogs/dlg_view_log.h"
 #include "../interface/widgets/onboarding/first_run_wizard.h"
 #include "../interface/widgets/settings_page/general_settings_page.h"
@@ -338,8 +340,10 @@ void MainWindow::actTips()
 
 void MainWindow::actUpdate()
 {
+#ifndef Q_OS_WASM
     DlgUpdate dlg(this);
     dlg.exec();
+#endif
 }
 
 void MainWindow::actViewLog()
@@ -579,15 +583,19 @@ void MainWindow::createMenus()
     helpMenu->addAction(aAbout);
     helpMenu->addAction(aTips);
     helpMenu->addSeparator();
+#ifndef Q_OS_WASM
     helpMenu->addAction(aUpdate);
     helpMenu->addAction(aCheckCardUpdates);
     helpMenu->addAction(aCheckCardUpdatesBackground);
+#endif
     helpMenu->addSeparator();
     helpMenu->addAction(aStatusBar);
     helpMenu->addAction(aViewLog);
     helpMenu->addAction(aOpenSettingsFolder);
     helpMenu->addSeparator();
+#ifndef Q_OS_WASM
     helpMenu->addAction(aFirstRunWizard);
+#endif
 #ifdef WITH_GUI_TEST
     helpMenu->addSeparator();
     helpMenu->addAction(aRecord);
@@ -699,6 +707,17 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::startupConfigCheck()
 {
+#ifdef Q_OS_WASM
+    // A tab has no installer, updater, Oracle or wizard to prompt for. The flag keeps the new-set handlers from
+    // asking before they enable a set: a card with no enabled set has no picture.
+    firstRunWizardActive = true;
+    if (SettingsCache::instance().network().getClientVersion() == CLIENT_INFO_NOT_SET) {
+        SettingsCache::instance().downloads().resetToDefaultURLs();
+    }
+    SettingsCache::instance().network().setClientVersion(VERSION_STRING);
+    CardDatabaseManager::getInstance()->checkUnknownSets();
+    actCheckCommanderBracketDefinitionUpdates();
+#else
     AtRiskDataWarning::warnAboutDataPathsInProgramDir(this);
 
     const bool isCleanInstall = SettingsCache::instance().network().getClientVersion() == CLIENT_INFO_NOT_SET;
@@ -811,6 +830,7 @@ void MainWindow::startupConfigCheck()
             tip->show();
         }
     }
+#endif
 }
 
 void MainWindow::runFirstRunWizard(bool firstRun)
@@ -960,12 +980,14 @@ MainWindow::~MainWindow()
         trayIcon->deleteLater();
     }
 
+#ifndef Q_OS_WASM
     if (cardUpdateProcess) {
         cardUpdateProcess->disconnect(this);
         cardUpdateProcess->terminate();
         cardUpdateProcess->waitForFinished(1000);
         cardUpdateProcess = nullptr;
     }
+#endif
 }
 
 void MainWindow::createTrayIcon()
@@ -1024,6 +1046,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
     shutdownState = ShutdownState::Confirming;
 
+#ifndef Q_OS_WASM
     if (cardUpdateProcess && cardUpdateProcess->state() != QProcess::NotRunning) {
         const QString runningFor = cardUpdateStatusBar ? cardUpdateStatusBar->statusText() : QString();
         const QString message = runningFor.isEmpty()
@@ -1038,6 +1061,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
             return;
         }
     }
+#endif
 
     if (!tabSupervisor->close()) {
         event->ignore();
@@ -1181,6 +1205,10 @@ void MainWindow::onUrlChainFinished(bool connected)
 
 void MainWindow::cardDatabaseLoadingFailed()
 {
+#ifdef Q_OS_WASM
+    // A tab cannot launch Oracle, so there is no update to offer.
+    askedForDbUpdater = true;
+#endif
     if (askedForDbUpdater) {
         return;
     }
@@ -1283,6 +1311,16 @@ void MainWindow::cardDatabaseAllNewSetsEnabled()
 }
 
 /* CARD UPDATER */
+#ifdef Q_OS_WASM
+// A tab cannot launch Oracle.
+void MainWindow::actCheckCardUpdates()
+{
+}
+
+void MainWindow::actCheckCardUpdatesBackground()
+{
+}
+#else
 void MainWindow::actCheckCardUpdates()
 {
     createCardUpdateProcess();
@@ -1459,6 +1497,8 @@ void MainWindow::exitCardDatabaseUpdate(bool doReload)
     }
 }
 
+#endif
+
 void MainWindow::reloadCardDatabaseAndCheckSets()
 {
     auto *watcher = new QFutureWatcher<void>(this);
@@ -1469,6 +1509,7 @@ void MainWindow::reloadCardDatabaseAndCheckSets()
     watcher->setFuture(QtConcurrent::run([] { CardDatabaseManager::getInstance()->loadCardDatabases(); }));
 }
 
+#ifndef Q_OS_WASM
 void MainWindow::cardUpdateError(QProcess::ProcessError err)
 {
     QString error;
@@ -1527,6 +1568,8 @@ void MainWindow::cardUpdateFinished(int exitCode, QProcess::ExitStatus exitStatu
     emit cardDatabaseUpdateFinished(success);
 }
 
+#endif
+
 bool MainWindow::requestCardUpdateRaise()
 {
     const QString serverName = scopedLocalServerName(QStringLiteral("CockatriceOracleRaise"));
@@ -1577,10 +1620,14 @@ void MainWindow::actCheckClientUpdates()
 
 void MainWindow::checkClientUpdatesFinished(bool needToUpdate, bool /* isCompatible */, Release * /* release */)
 {
+#ifdef Q_OS_WASM
+    Q_UNUSED(needToUpdate);
+#else
     if (needToUpdate) {
         DlgUpdate dlg(this);
         dlg.exec();
     }
+#endif
 }
 
 void MainWindow::actCheckCommanderBracketDefinitionUpdates()
