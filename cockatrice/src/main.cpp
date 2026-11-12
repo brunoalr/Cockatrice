@@ -26,7 +26,9 @@
 #include "client/sound_engine.h"
 #include "client/url_scheme_event_filter.h"
 #include "database/interface/settings_card_preference_provider.h"
+#ifndef Q_OS_WASM
 #include "installer_close_server.h"
+#endif
 #include "interface/intents/intent.h"
 #include "interface/intents/intent_open_local_deck.h"
 #include "interface/logger.h"
@@ -36,7 +38,9 @@
 #include "interface/window_main.h"
 #include "libcockatrice/card/database/card_database.h"
 #include "libcockatrice/rng/rng_abstract.h"
+#ifndef Q_OS_WASM
 #include "single_instance_manager.h"
+#endif
 #include "version_string.h"
 
 #ifdef WITH_GUI_TEST
@@ -58,7 +62,11 @@
 #include <QLocale>
 #include <QMessageBox>
 #include <QMessageLogger>
+#ifdef Q_OS_WASM
+#include <QRandomGenerator>
+#else
 #include <QNetworkInterface>
+#endif
 #include <QObject>
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
@@ -128,6 +136,14 @@ void installNewTranslator()
 
 QString const generateClientID()
 {
+#ifdef Q_OS_WASM
+    // A browser exposes no network hardware to hash, and an empty list would give every web player the same id.
+    const QString stored = SettingsCache::instance().network().getClientID();
+    if (!stored.isEmpty() && stored != CLIENT_INFO_NOT_SET) {
+        return stored;
+    }
+    return QString::number(QRandomGenerator::system()->generate64(), 16).rightJustified(15, QLatin1Char('0')).right(15);
+#else
     QString macList;
     for (const QNetworkInterface &networkInterface : QNetworkInterface::allInterfaces()) {
         if (networkInterface.hardwareAddress() != "") {
@@ -138,6 +154,7 @@ QString const generateClientID()
     }
     QString strClientID = QCryptographicHash::hash(macList.toUtf8(), QCryptographicHash::Sha1).toHex().right(15);
     return strClientID;
+#endif
 }
 
 static QString redactActivationUrl(const QString &url)
@@ -370,8 +387,9 @@ int main(int argc, char *argv[])
     // Only positional arguments are treated as files/URLs, so options like
     // --connect are never handed off to another instance.
     const QStringList startupFiles = parser.positionalArguments();
-    const bool hasActivationFiles = !startupFiles.isEmpty();
+    [[maybe_unused]] const bool hasActivationFiles = !startupFiles.isEmpty();
 
+#ifndef Q_OS_WASM
     SingleInstanceManager instance;
 
     if (hasActivationFiles) {
@@ -401,6 +419,7 @@ int main(int argc, char *argv[])
             qInfo() << "No existing instance found, starting server";
         }
     }
+#endif
 
     // Unclean-exit detection (cross-platform QLockFile session tracking, replacing the
     // legacy Windows-only .dmp scan): a leftover session lock means the previous run died
@@ -462,6 +481,7 @@ int main(int argc, char *argv[])
 
     MainWindow ui;
 
+#ifndef Q_OS_WASM
     // The installer asks a running instance to close over this socket, which reaches a
     // hidden window and one sitting on its own confirmation. Failure is not fatal: the
     // installer falls back to WM_CLOSE for clients that have no socket.
@@ -470,6 +490,7 @@ int main(int argc, char *argv[])
         QObject::connect(&installerClose, &InstallerCloseServer::closeRequested, &ui,
                          &MainWindow::requestInstallerClose);
     }
+#endif
 
     // A URL launch must own the connection: the intent chain triggered by the
     // URL connects to the server named in the URL, so the window's own startup
@@ -577,12 +598,14 @@ int main(int argc, char *argv[])
     }
 #endif
 
+#ifndef Q_OS_WASM
     // Connect to future file/URL events from other instances
     QObject::connect(&instance, &SingleInstanceManager::filesReceived, [&handleActivation](const QStringList &files) {
         for (const QString &file : files) {
             handleActivation(file);
         }
     });
+#endif
 
     int ret = app.exec();
 
