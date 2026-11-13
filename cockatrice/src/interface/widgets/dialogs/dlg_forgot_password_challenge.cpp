@@ -1,13 +1,14 @@
 #include "dlg_forgot_password_challenge.h"
 
 #include "../../../client/settings/cache_settings.h"
+#include "../utility/non_blocking_dialogs.h"
 
 #include <QDialogButtonBox>
 #include <QGridLayout>
 #include <QIntValidator>
 #include <QLabel>
-#include <QMessageBox>
 #include <QSize>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <libcockatrice/settings/servers_settings.h>
 #include <libcockatrice/utility/string_limits.h>
@@ -31,8 +32,10 @@ DlgForgotPasswordChallenge::DlgForgotPasswordChallenge(QWidget *parent) : QDialo
     }
 
     if (servers.getFPHostname().isEmpty() && servers.getFPPort().isEmpty() && servers.getFPPlayerName().isEmpty()) {
-        QMessageBox::warning(this, tr("Reset Password Challenge Warning"),
+        QTimer::singleShot(0, this, [this] {
+            Dialogs::warning(this, tr("Reset Password Challenge Warning"),
                              tr("A problem has occurred. Please try to request a new password again."));
+        });
         reject();
     }
 
@@ -97,7 +100,7 @@ DlgForgotPasswordChallenge::DlgForgotPasswordChallenge(QWidget *parent) : QDialo
 void DlgForgotPasswordChallenge::actOk()
 {
     if (emailEdit->text().isEmpty()) {
-        QMessageBox::critical(this, tr("Reset Password Challenge Error"), tr("The email address can't be empty."));
+        Dialogs::critical(this, tr("Reset Password Challenge Error"), tr("The email address can't be empty."));
         return;
     }
 

@@ -1,12 +1,12 @@
 #include "dlg_forgot_password_request.h"
 
 #include "../../../client/settings/cache_settings.h"
+#include "../utility/non_blocking_dialogs.h"
 
 #include <QDialogButtonBox>
 #include <QGridLayout>
 #include <QIntValidator>
 #include <QLabel>
-#include <QMessageBox>
 #include <QSize>
 #include <QVBoxLayout>
 #include <libcockatrice/settings/servers_settings.h>
@@ -74,7 +74,7 @@ DlgForgotPasswordRequest::DlgForgotPasswordRequest(QWidget *parent) : QDialog(pa
 void DlgForgotPasswordRequest::actOk()
 {
     if (playernameEdit->text().isEmpty()) {
-        QMessageBox::critical(this, tr("Reset Password Error"), tr("The player name can't be empty."));
+        Dialogs::critical(this, tr("Reset Password Error"), tr("The player name can't be empty."));
         return;
     }
 

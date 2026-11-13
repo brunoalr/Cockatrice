@@ -331,6 +331,29 @@ TEST_F(ConnectionControllerDialogs, AResetPromptAsksForTheTokenAfterItsNotice)
     EXPECT_EQ(token, typed);
 }
 
+TEST_F(ConnectionControllerDialogs, AResetWithoutItsRequestWarnsOverTheOpenResetDialog)
+{
+    ServersSettings &servers = SettingsCache::instance().servers();
+    const QStringList saved{servers.getFPHostname(), servers.getFPPort(), servers.getFPPlayerName()};
+    servers.setFPHostName("");
+    servers.setFPPort("");
+    servers.setFPPlayerName("");
+
+    emit client->sigPromptForForgotPasswordReset();
+    clickOk();
+    DlgForgotPasswordReset *dialog = onlyOpen<DlgForgotPasswordReset>();
+    settle();
+
+    servers.setFPHostName(saved[0]);
+    servers.setFPPort(saved[1]);
+    servers.setFPPlayerName(saved[2]);
+    ASSERT_NE(dialog, nullptr);
+    QMessageBox *warning = dialog->findChild<QMessageBox *>();
+    ASSERT_NE(warning, nullptr);
+    EXPECT_TRUE(warning->isVisible());
+    EXPECT_EQ(warning->icon(), QMessageBox::Warning);
+}
+
 TEST_F(ConnectionControllerDialogs, ANoticeOutlivingTheControllerReopensNothing)
 {
     emit client->socketError("refused");

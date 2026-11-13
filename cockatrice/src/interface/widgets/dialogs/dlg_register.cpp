@@ -4,6 +4,7 @@
 #include "../../theme_icon.h"
 #include "../server/handle_public_servers.h"
 #include "../server/user/user_info_connection.h"
+#include "../utility/non_blocking_dialogs.h"
 
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -13,7 +14,6 @@
 #include <QIntValidator>
 #include <QLabel>
 #include <QList>
-#include <QMessageBox>
 #include <QPixmap>
 #include <QPushButton>
 #include <QRadioButton>
@@ -519,19 +519,18 @@ void DlgRegister::updateDisplayInfo(const QString &saveName)
 void DlgRegister::actOk()
 {
     if (passwordEdit->text().length() < 8) {
-        QMessageBox::critical(this, tr("Registration Warning"), tr("Your password is too short."));
+        Dialogs::critical(this, tr("Registration Warning"), tr("Your password is too short."));
         return;
     }
     if (passwordEdit->text() != passwordConfirmationEdit->text()) {
-        QMessageBox::critical(this, tr("Registration Warning"), tr("Your passwords do not match, please try again."));
+        Dialogs::critical(this, tr("Registration Warning"), tr("Your passwords do not match, please try again."));
         return;
     } else if (emailConfirmationEdit->text() != emailEdit->text()) {
-        QMessageBox::critical(this, tr("Registration Warning"),
-                              tr("Your email addresses do not match, please try again."));
+        Dialogs::critical(this, tr("Registration Warning"), tr("Your email addresses do not match, please try again."));
         return;
     }
     if (playernameEdit->text().isEmpty()) {
-        QMessageBox::critical(this, tr("Registration Warning"), tr("The player name can't be empty."));
+        Dialogs::critical(this, tr("Registration Warning"), tr("The player name can't be empty."));
         return;
     }
 

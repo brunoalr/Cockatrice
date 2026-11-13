@@ -1,11 +1,11 @@
 #include "dlg_edit_password.h"
 
 #include "../../../client/settings/cache_settings.h"
+#include "../utility/non_blocking_dialogs.h"
 
 #include <QDialogButtonBox>
 #include <QGridLayout>
 #include <QLabel>
-#include <QMessageBox>
 #include <QSharedPointer>
 #include <QSize>
 #include <QVBoxLayout>
@@ -70,11 +70,11 @@ void DlgEditPassword::actOk()
 {
     //! \todo This stuff should be using QValidators.
     if (newPasswordEdit->text().length() < 8) {
-        QMessageBox::critical(this, tr("Error"), tr("Your password is too short."));
+        Dialogs::critical(this, tr("Error"), tr("Your password is too short."));
         return;
     }
     if (newPasswordEdit->text() != newPasswordEdit2->text()) {
-        QMessageBox::warning(this, tr("Error"), tr("The new passwords don't match."));
+        Dialogs::warning(this, tr("Error"), tr("The new passwords don't match."));
         return;
     }
 
