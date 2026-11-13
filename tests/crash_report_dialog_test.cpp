@@ -14,7 +14,7 @@
 #include <memory>
 #include <optional>
 
-RNG_Abstract *rng = nullptr;
+RNG_Abstract *rng = nullptr; // NOSONAR: the client declares it extern and assigns it
 
 namespace
 {
@@ -31,7 +31,7 @@ void settleBoxThenDialog()
 }
 
 // Built without crash reporting, the reporter fails every send.
-class CrashReportDialog : public ::testing::Test
+class CrashReportDialog : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:
     std::unique_ptr<QWidget> window = std::make_unique<QWidget>();

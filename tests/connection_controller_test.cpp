@@ -30,8 +30,8 @@
 #include <memory>
 #include <optional>
 
-ThemeManager *themeManager = nullptr;
-RNG_Abstract *rng = nullptr;
+ThemeManager *themeManager = nullptr; // NOSONAR: the client declares it extern and assigns it
+RNG_Abstract *rng = nullptr;          // NOSONAR: the client declares it extern and assigns it
 
 namespace
 {
@@ -41,7 +41,7 @@ void settle()
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
 }
 
-class ConnectionControllerDialogs : public ::testing::Test
+class ConnectionControllerDialogs : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:
     std::unique_ptr<QWidget> window = std::make_unique<QWidget>();
@@ -124,7 +124,7 @@ TEST_F(ConnectionControllerDialogs, AcceptingConnectConnectsWithTheTypedLogin)
 {
     std::optional<QStringList> request;
     QObject::connect(client, &RemoteClient::sigConnectToServer,
-                     [&](const QString &host, unsigned int port, const QString &user, const QString &password) {
+                     [&request](const QString &host, unsigned int port, const QString &user, const QString &password) {
                          request = QStringList{host, QString::number(port), user, password};
                      });
     controller->connectToServer();
@@ -145,7 +145,7 @@ TEST_F(ConnectionControllerDialogs, AcceptingConnectConnectsWithTheTypedLogin)
 TEST_F(ConnectionControllerDialogs, RejectingConnectConnectsNowhere)
 {
     bool requested = false;
-    QObject::connect(client, &RemoteClient::sigConnectToServer, [&] { requested = true; });
+    QObject::connect(client, &RemoteClient::sigConnectToServer, [&requested] { requested = true; });
     controller->connectToServer();
     DlgConnect *dialog = onlyOpen<DlgConnect>();
     ASSERT_NE(dialog, nullptr);
@@ -225,8 +225,8 @@ TEST_F(ConnectionControllerDialogs, AcceptingRegisterRegistersWithTheTypedAccoun
 {
     std::optional<QStringList> request;
     QObject::connect(client, &RemoteClient::sigRegisterToServer,
-                     [&](const QString &host, unsigned int port, const QString &user, const QString &password,
-                         const QString &email, const QString &country, const QString &realName) {
+                     [&request](const QString &host, unsigned int port, const QString &user, const QString &password,
+                                const QString &email, const QString &country, const QString &realName) {
                          request = QStringList{host, QString::number(port), user, password, email, country, realName};
                      });
     controller->registerToServer();
@@ -256,7 +256,7 @@ TEST_F(ConnectionControllerDialogs, ARegisterErrorReopensRegisterAfterItsNotice)
 TEST_F(ConnectionControllerDialogs, AnInactiveAccountSendsTheTypedToken)
 {
     std::optional<QString> token;
-    QObject::connect(client, &RemoteClient::sigActivateToServer, [&](const QString &sent) { token = sent; });
+    QObject::connect(client, &RemoteClient::sigActivateToServer, [&token](const QString &sent) { token = sent; });
     emit client->loginError(Response::RespAccountNotActivated, QString(), 0, {});
 
     QInputDialog *dialog = onlyOpen<QInputDialog>();
@@ -274,8 +274,8 @@ TEST_F(ConnectionControllerDialogs, CancellingTheActivationTokenDisconnects)
 {
     bool disconnected = false;
     bool activated = false;
-    QObject::connect(client, &RemoteClient::sigDisconnectFromServer, [&] { disconnected = true; });
-    QObject::connect(client, &RemoteClient::sigActivateToServer, [&] { activated = true; });
+    QObject::connect(client, &RemoteClient::sigDisconnectFromServer, [&disconnected] { disconnected = true; });
+    QObject::connect(client, &RemoteClient::sigActivateToServer, [&activated] { activated = true; });
     emit client->loginError(Response::RespAccountNotActivated, QString(), 0, {});
 
     QInputDialog *dialog = onlyOpen<QInputDialog>();
@@ -292,7 +292,7 @@ TEST_F(ConnectionControllerDialogs, ARequiredPasswordChangeSendsBothPasswords)
 {
     std::optional<QStringList> change;
     QObject::connect(client, &RemoteClient::sigChangePasswordToServer,
-                     [&](const QString &oldPassword, const QString &newPassword) {
+                     [&change](const QString &oldPassword, const QString &newPassword) {
                          change = QStringList{oldPassword, newPassword};
                      });
     emit client->loginError(Response::RespPasswordChangeRequired, QString(), 0, {});
@@ -315,7 +315,7 @@ TEST_F(ConnectionControllerDialogs, ForgotPasswordFromConnectRequestsTheReset)
 {
     std::optional<QString> user;
     QObject::connect(client, &RemoteClient::sigRequestForgotPasswordToServer,
-                     [&](const QString &, unsigned int, const QString &sent) { user = sent; });
+                     [&user](const QString &, unsigned int, const QString &sent) { user = sent; });
     controller->connectToServer();
     DlgConnect *connectDialog = onlyOpen<DlgConnect>();
     ASSERT_NE(connectDialog, nullptr);
@@ -334,9 +334,10 @@ TEST_F(ConnectionControllerDialogs, ForgotPasswordFromConnectRequestsTheReset)
 TEST_F(ConnectionControllerDialogs, AResetPromptAsksForTheTokenAfterItsNotice)
 {
     std::optional<QString> token;
-    QObject::connect(
-        client, &RemoteClient::sigSubmitForgotPasswordResetToServer,
-        [&](const QString &, unsigned int, const QString &, const QString &sent, const QString &) { token = sent; });
+    QObject::connect(client, &RemoteClient::sigSubmitForgotPasswordResetToServer,
+                     [&token](const QString &, unsigned int, const QString &, const QString &sent, const QString &) {
+                         token = sent;
+                     });
     emit client->sigPromptForForgotPasswordReset();
 
     EXPECT_TRUE(openDialogs<DlgForgotPasswordReset>().isEmpty());
@@ -388,9 +389,9 @@ TEST_F(ConnectionControllerDialogs, ANoticeOutlivingTheControllerReopensNothing)
 TEST_F(ConnectionControllerDialogs, ALinkToAServerWithoutALoginAsksForOneAndSavesIt)
 {
     ContextConnectToServer context{"unsaved.example", "4747", {}, {}};
-    auto *intent = new IntentGetLoginCredentials(&context, true);
+    auto *intent = std::make_unique<IntentGetLoginCredentials>(&context, true).release();
     bool finished = false;
-    QObject::connect(intent, &Intent::finished, [&] { finished = true; });
+    QObject::connect(intent, &Intent::finished, [&finished] { finished = true; });
     intent->execute();
 
     DlgLoginPrompt *prompt = openLoginPrompt();
@@ -416,9 +417,9 @@ TEST_F(ConnectionControllerDialogs, ALinkToAServerWithoutALoginAsksForOneAndSave
 TEST_F(ConnectionControllerDialogs, CancellingTheLoginPromptCancelsTheLink)
 {
     ContextConnectToServer context{"cancelled.example", "4747", {}, {}};
-    auto *intent = new IntentGetLoginCredentials(&context, true);
+    auto *intent = std::make_unique<IntentGetLoginCredentials>(&context, true).release();
     bool cancelled = false;
-    QObject::connect(intent, &Intent::cancelled, [&] { cancelled = true; });
+    QObject::connect(intent, &Intent::cancelled, [&cancelled] { cancelled = true; });
     intent->execute();
 
     DlgLoginPrompt *prompt = openLoginPrompt();
@@ -448,7 +449,8 @@ int main(int argc, char **argv)
         return RUN_ALL_TESTS();
     }
 
-    themeManager = new ThemeManager;
+    ThemeManager theme;
+    themeManager = &theme;
     ServersSettings &servers = SettingsCache::instance().servers();
     // With a single saved server the connect and register dialogs download the public server list.
     servers.addNewServer("First", "first.example", "4747", "first player", QString(), false);
