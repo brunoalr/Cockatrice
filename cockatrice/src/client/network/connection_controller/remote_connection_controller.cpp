@@ -281,28 +281,7 @@ void ConnectionController::onLoginError(int r,
     const auto reopenConnect = Dialogs::whileAlive(this, [this] { connectToServer(); });
     switch (static_cast<Response::ResponseCode>(r)) {
         case Response::RespClientUpdateRequired: {
-            auto *msgBox = new QMessageBox(dialogParent);
-            msgBox->setIcon(QMessageBox::Critical);
-            msgBox->setWindowTitle(tr("Failed Login"));
-
-            if (missingFeatures.isEmpty()) {
-                // Without a feature list this is either a login the client stopped itself or a
-                // strict server asking for a password; the reason string already says which and
-                // what to do. No client update can fix any of those causes, so show it instead of
-                // the update advice.
-                msgBox->setText(reasonStr.isEmpty() ? tr("The login did not complete.") : reasonStr);
-            } else {
-                QString formatted = tr("Missing Features:");
-                for (const QString &feature : missingFeatures) {
-                    formatted.append(QString("\n     %1 ").arg(QChar(0x2022)) + feature);
-                }
-
-                msgBox->setText(tr("Your client seems to be missing features this server requires for connection.") +
-                                "\n\n" + tr("To update your client, go to 'Help -> Check for Client Updates'."));
-                msgBox->setDetailedText(formatted);
-            }
-
-            Dialogs::open(msgBox, [reopenConnect](QAbstractButton *) { reopenConnect(); });
+            showClientUpdateRequired(reasonStr, missingFeatures);
             break;
         }
 
@@ -379,35 +358,12 @@ void ConnectionController::onLoginError(int r,
         }
 
         case Response::RespAccountNotActivated: {
-            auto *dialog =
-                newTextDialogWithMax(dialogParent, tr("Account activation"),
-                                     tr("Your account has not been activated yet.\n"
-                                        "You need to provide the activation token received in the activation email."));
-            Dialogs::open(dialog, Dialogs::whileAlive(this, [this, dialog](int result) {
-                              const QString token = dialog->textValue();
-                              if (result == QDialog::Accepted && !token.isEmpty()) {
-                                  remoteClient->activateToServer(token);
-                                  return;
-                              }
-                              remoteClient->disconnectFromServer();
-                          }));
+            promptForActivationToken();
             return;
         }
 
         case Response::RespPasswordChangeRequired: {
-            // The credentials were right, but the account may not be used until a new password
-            // is chosen. Let the user complete the change here: sending them off to "ask the
-            // administrator for your temporary password" sends them in circles, since they just
-            // logged in with it and the session ends without a way to comply.
-            auto *dlg = new DlgEditPassword(dialogParent);
-            dlg->setWindowTitle(tr("Password Change Required"));
-            Dialogs::open(dlg, Dialogs::whileAlive(this, [this, dlg](int result) {
-                              if (result == QDialog::Accepted) {
-                                  remoteClient->changePasswordToServer(dlg->getOldPassword(), dlg->getNewPassword());
-                                  return; // onPasswordChangeSuccess/onPasswordChangeError decides the next step
-                              }
-                              remoteClient->disconnectFromServer();
-                          }));
+            promptForRequiredPasswordChange();
             return;
         }
 
@@ -427,6 +383,64 @@ void ConnectionController::onLoginError(int r,
             break;
         }
     }
+}
+
+void ConnectionController::showClientUpdateRequired(const QString &reasonStr, const QList<QString> &missingFeatures)
+{
+    auto *msgBox = new QMessageBox(dialogParent);
+    msgBox->setIcon(QMessageBox::Critical);
+    msgBox->setWindowTitle(tr("Failed Login"));
+
+    if (missingFeatures.isEmpty()) {
+        // Without a feature list this is either a login the client stopped itself or a
+        // strict server asking for a password; the reason string already says which and
+        // what to do. No client update can fix any of those causes, so show it instead of
+        // the update advice.
+        msgBox->setText(reasonStr.isEmpty() ? tr("The login did not complete.") : reasonStr);
+    } else {
+        QString formatted = tr("Missing Features:");
+        for (const QString &feature : missingFeatures) {
+            formatted.append(QString("\n     %1 ").arg(QChar(0x2022)) + feature);
+        }
+
+        msgBox->setText(tr("Your client seems to be missing features this server requires for connection.") + "\n\n" +
+                        tr("To update your client, go to 'Help -> Check for Client Updates'."));
+        msgBox->setDetailedText(formatted);
+    }
+
+    Dialogs::open(msgBox, Dialogs::whileAlive(this, [this](const QAbstractButton *) { connectToServer(); }));
+}
+
+void ConnectionController::promptForActivationToken()
+{
+    auto *dialog =
+        newTextDialogWithMax(dialogParent, tr("Account activation"),
+                             tr("Your account has not been activated yet.\n"
+                                "You need to provide the activation token received in the activation email."));
+    Dialogs::open(dialog, Dialogs::whileAlive(this, [this, dialog](int result) {
+                      if (const QString token = dialog->textValue(); result == QDialog::Accepted && !token.isEmpty()) {
+                          remoteClient->activateToServer(token);
+                          return;
+                      }
+                      remoteClient->disconnectFromServer();
+                  }));
+}
+
+void ConnectionController::promptForRequiredPasswordChange()
+{
+    // The credentials were right, but the account may not be used until a new password
+    // is chosen. Let the user complete the change here: sending them off to "ask the
+    // administrator for your temporary password" sends them in circles, since they just
+    // logged in with it and the session ends without a way to comply.
+    auto *dlg = new DlgEditPassword(dialogParent);
+    dlg->setWindowTitle(tr("Password Change Required"));
+    Dialogs::open(dlg, Dialogs::whileAlive(this, [this, dlg](int result) {
+                      if (result == QDialog::Accepted) {
+                          remoteClient->changePasswordToServer(dlg->getOldPassword(), dlg->getNewPassword());
+                          return; // onPasswordChangeSuccess/onPasswordChangeError decides the next step
+                      }
+                      remoteClient->disconnectFromServer();
+                  }));
 }
 
 void ConnectionController::onRegisterError(int r, QString reasonStr, quint32 endTime)

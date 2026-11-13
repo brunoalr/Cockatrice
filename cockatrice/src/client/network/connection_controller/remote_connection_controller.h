@@ -100,6 +100,9 @@ private slots:
 private:
     void wireClientSignals();
     void updateWindowTitle();
+    void showClientUpdateRequired(const QString &reasonStr, const QList<QString> &missingFeatures);
+    void promptForActivationToken();
+    void promptForRequiredPasswordChange();
 
     /** Parse the server's pipe-delimited username-rule string into HTML. */
     static QString extractInvalidUsernameMessage(QString &in);
