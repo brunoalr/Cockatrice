@@ -164,6 +164,11 @@ private:
     }
 #ifndef Q_OS_WASM
     void continueStartupConfigCheck();
+    void startAfterCleanInstall();
+    void startAfterUpdate();
+    void startOnCurrentVersion();
+    void applyStartupCardCheckChoice(int choice);
+    void showStartupTips();
     void createCardUpdateProcess(bool background = false);
     void exitCardDatabaseUpdate(bool doReload);
 #endif

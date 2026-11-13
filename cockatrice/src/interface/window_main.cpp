@@ -752,97 +752,118 @@ void MainWindow::continueStartupConfigCheck()
     actCheckCommanderBracketDefinitionUpdates();
 
     if (isCleanInstall) {
-        // no config found, 99% new clean install
-        qCInfo(WindowMainStartupVersionLog)
-            << "Startup: old client version empty, assuming first start after clean install";
-        SettingsCache::instance().downloads().resetToDefaultURLs(); // populate the download urls
-        SettingsCache::instance().network().setClientVersion(VERSION_STRING);
-        actCheckServerUpdates();
-        runFirstRunWizard(true);
-
-        if (QString(VERSION_STRING).contains("custom", Qt::CaseInsensitive)) {
-            SettingsCache::instance().updates().setCheckUpdatesOnStartup(false);
-        } else if (QString(VERSION_STRING).contains("beta", Qt::CaseInsensitive)) {
-            SettingsCache::instance().updates().setUpdateReleaseChannelIndex(1);
-        }
+        startAfterCleanInstall();
     } else if (SettingsCache::instance().network().getClientVersion() != VERSION_STRING) {
-        // config found, from another (presumably older) version
-        qCInfo(WindowMainStartupVersionLog)
-            << "Startup: old client version" << SettingsCache::instance().network().getClientVersion()
-            << "differs, assuming first start after update";
-        if (SettingsCache::instance().updates().getNotifyAboutNewVersion()) {
-            alertForcedOracleRun(VERSION_STRING, true);
-        }
-
-        qCInfo(WindowMainStartupShortcutsLog) << "Migrating shortcuts after update detected.";
-        SettingsCache::instance().shortcuts().migrateShortcuts();
-
-        if (SettingsCache::instance().updates().getCheckUpdatesOnStartup()) {
-            if (QString(VERSION_STRING).contains("custom", Qt::CaseInsensitive)) {
-                qCInfo(WindowMainStartupShortcutsLog) << "Update has changed to custom version, disabling auto update";
-                SettingsCache::instance().updates().setCheckUpdatesOnStartup(false);
-            } else {
-                int channel = 0;
-                if (QString(VERSION_STRING).contains("beta", Qt::CaseInsensitive)) {
-                    channel = 1;
-                }
-                if (SettingsCache::instance().getUpdateReleaseChannelIndex() != channel) {
-                    qCInfo(WindowMainStartupShortcutsLog) << "Update has changed beta state, updating release channel.";
-                    SettingsCache::instance().updates().setUpdateReleaseChannelIndex(channel);
-                }
-            }
-        }
-
-        SettingsCache::instance().network().setClientVersion(VERSION_STRING);
+        startAfterUpdate();
     } else {
-        // previous config from this version found
-        qCInfo(WindowMainStartupVersionLog) << "Startup: found config with current version";
+        startOnCurrentVersion();
+    }
+}
 
-        // Run the tips dialog only on subsequent startups.
-        // On the first run after an install/update the startup is already crowded enough
-        const auto showTips = [this] {
-            if (tip->successfulInit && SettingsCache::instance().personal().getShowTipsOnStartup() &&
-                tip->newTipsAvailable) {
-                tip->raise();
-                tip->show();
+void MainWindow::startAfterCleanInstall()
+{
+    // no config found, 99% new clean install
+    qCInfo(WindowMainStartupVersionLog)
+        << "Startup: old client version empty, assuming first start after clean install";
+    SettingsCache::instance().downloads().resetToDefaultURLs(); // populate the download urls
+    SettingsCache::instance().network().setClientVersion(VERSION_STRING);
+    actCheckServerUpdates();
+    runFirstRunWizard(true);
+
+    if (QString(VERSION_STRING).contains("custom", Qt::CaseInsensitive)) {
+        SettingsCache::instance().updates().setCheckUpdatesOnStartup(false);
+    } else if (QString(VERSION_STRING).contains("beta", Qt::CaseInsensitive)) {
+        SettingsCache::instance().updates().setUpdateReleaseChannelIndex(1);
+    }
+}
+
+void MainWindow::startAfterUpdate()
+{
+    // config found, from another (presumably older) version
+    qCInfo(WindowMainStartupVersionLog) << "Startup: old client version"
+                                        << SettingsCache::instance().network().getClientVersion()
+                                        << "differs, assuming first start after update";
+    if (SettingsCache::instance().updates().getNotifyAboutNewVersion()) {
+        alertForcedOracleRun(VERSION_STRING, true);
+    }
+
+    qCInfo(WindowMainStartupShortcutsLog) << "Migrating shortcuts after update detected.";
+    SettingsCache::instance().shortcuts().migrateShortcuts();
+
+    if (SettingsCache::instance().updates().getCheckUpdatesOnStartup()) {
+        if (QString(VERSION_STRING).contains("custom", Qt::CaseInsensitive)) {
+            qCInfo(WindowMainStartupShortcutsLog) << "Update has changed to custom version, disabling auto update";
+            SettingsCache::instance().updates().setCheckUpdatesOnStartup(false);
+        } else {
+            int channel = 0;
+            if (QString(VERSION_STRING).contains("beta", Qt::CaseInsensitive)) {
+                channel = 1;
             }
-        };
-
-        if (SettingsCache::instance().updates().getCardUpdateCheckRequired()) {
-            if (SettingsCache::instance().updates().getStartupCardUpdateCheckPromptForUpdate()) {
-                auto startupCardCheckDialog = new DlgStartupCardCheck(this);
-
-                Dialogs::open(startupCardCheckDialog, [this, startupCardCheckDialog, showTips](int result) {
-                    if (result == QDialog::Accepted) {
-                        switch (startupCardCheckDialog->group->checkedId()) {
-                            case 0: // foreground
-                                actCheckCardUpdates();
-                                break;
-                            case 1: // background
-                                actCheckCardUpdatesBackground();
-                                break;
-                            case 2: // background + always
-                                SettingsCache::instance().updates().setStartupCardUpdateCheckPromptForUpdate(false);
-                                SettingsCache::instance().updates().setStartupCardUpdateCheckAlwaysUpdate(true);
-                                actCheckCardUpdatesBackground();
-                                break;
-                            case 3: // don't prompt again + don't run
-                                SettingsCache::instance().updates().setStartupCardUpdateCheckPromptForUpdate(false);
-                                SettingsCache::instance().updates().setStartupCardUpdateCheckAlwaysUpdate(false);
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-                    showTips();
-                });
-                return;
-            } else if (SettingsCache::instance().updates().getStartupCardUpdateCheckAlwaysUpdate()) {
-                actCheckCardUpdatesBackground();
+            if (SettingsCache::instance().getUpdateReleaseChannelIndex() != channel) {
+                qCInfo(WindowMainStartupShortcutsLog) << "Update has changed beta state, updating release channel.";
+                SettingsCache::instance().updates().setUpdateReleaseChannelIndex(channel);
             }
         }
+    }
 
-        showTips();
+    SettingsCache::instance().network().setClientVersion(VERSION_STRING);
+}
+
+void MainWindow::startOnCurrentVersion()
+{
+    // previous config from this version found
+    qCInfo(WindowMainStartupVersionLog) << "Startup: found config with current version";
+
+    if (!SettingsCache::instance().updates().getCardUpdateCheckRequired()) {
+        showStartupTips();
+        return;
+    }
+    if (SettingsCache::instance().updates().getStartupCardUpdateCheckPromptForUpdate()) {
+        auto *startupCardCheckDialog = new DlgStartupCardCheck(this);
+        Dialogs::open(startupCardCheckDialog, [this, startupCardCheckDialog](int result) {
+            if (result == QDialog::Accepted) {
+                applyStartupCardCheckChoice(startupCardCheckDialog->group->checkedId());
+            }
+            showStartupTips();
+        });
+        return;
+    }
+    if (SettingsCache::instance().updates().getStartupCardUpdateCheckAlwaysUpdate()) {
+        actCheckCardUpdatesBackground();
+    }
+    showStartupTips();
+}
+
+void MainWindow::applyStartupCardCheckChoice(int choice)
+{
+    switch (choice) {
+        case 0: // foreground
+            actCheckCardUpdates();
+            break;
+        case 1: // background
+            actCheckCardUpdatesBackground();
+            break;
+        case 2: // background + always
+            SettingsCache::instance().updates().setStartupCardUpdateCheckPromptForUpdate(false);
+            SettingsCache::instance().updates().setStartupCardUpdateCheckAlwaysUpdate(true);
+            actCheckCardUpdatesBackground();
+            break;
+        case 3: // don't prompt again + don't run
+            SettingsCache::instance().updates().setStartupCardUpdateCheckPromptForUpdate(false);
+            SettingsCache::instance().updates().setStartupCardUpdateCheckAlwaysUpdate(false);
+            break;
+        default:
+            break;
+    }
+}
+
+// Run the tips dialog only on subsequent startups.
+// On the first run after an install/update the startup is already crowded enough
+void MainWindow::showStartupTips()
+{
+    if (tip->successfulInit && SettingsCache::instance().personal().getShowTipsOnStartup() && tip->newTipsAvailable) {
+        tip->raise();
+        tip->show();
     }
 }
 #endif
@@ -1230,7 +1251,7 @@ void MainWindow::cardDatabaseLoadingFailed()
         return;
     }
     askedForDbUpdater = true;
-    auto *msgBox = new QMessageBox;
+    auto msgBox = std::make_unique<QMessageBox>();
     msgBox->setWindowTitle(tr("Card database"));
     msgBox->setIcon(QMessageBox::Question);
     msgBox->setText(tr("Cockatrice is unable to load the card database.\n"
@@ -1239,13 +1260,14 @@ void MainWindow::cardDatabaseLoadingFailed()
 
     QPushButton *yesButton = msgBox->addButton(tr("Yes"), QMessageBox::YesRole);
     msgBox->addButton(tr("No"), QMessageBox::NoRole);
-    QPushButton *settingsButton = msgBox->addButton(tr("Open settings"), QMessageBox::ActionRole);
+    const QPushButton *openSettingsButton = msgBox->addButton(tr("Open settings"), QMessageBox::ActionRole);
     msgBox->setDefaultButton(yesButton);
 
-    Dialogs::open(msgBox, Dialogs::whileAlive(this, [this, yesButton, settingsButton](QAbstractButton *clicked) {
+    Dialogs::open(msgBox.release(),
+                  Dialogs::whileAlive(this, [this, yesButton, openSettingsButton](const QAbstractButton *clicked) {
                       if (clicked == yesButton) {
                           actCheckCardUpdates();
-                      } else if (clicked == settingsButton) {
+                      } else if (clicked == openSettingsButton) {
                           actSettings();
                       }
                   }));
@@ -1261,8 +1283,8 @@ void MainWindow::cardDatabaseNewSetsFound(int numUnknownSets, QStringList unknow
     }
 
     // The answer applies to every unknown set, so only the prompt that lists the current ones may stay open.
-    const QString promptName = QStringLiteral("newSetsPrompt");
-    delete findChild<QMessageBox *>(promptName, Qt::FindDirectChildrenOnly);
+    const auto promptName = QStringLiteral("newSetsPrompt");
+    delete findChild<QMessageBox *>(promptName, Qt::FindDirectChildrenOnly); // NOSONAR: drops its pending answer too
     auto *msgBox = new QMessageBox(this);
     msgBox->setObjectName(promptName);
     msgBox->setWindowTitle(tr("New sets found"));
@@ -1274,12 +1296,12 @@ void MainWindow::cardDatabaseNewSetsFound(int numUnknownSets, QStringList unknow
                         .arg(unknownSetsNames.join(", ")));
 
     QPushButton *yesButton = msgBox->addButton(tr("Yes"), QMessageBox::YesRole);
-    QPushButton *yesAlwaysButton = msgBox->addButton(tr("Yes, always enable"), QMessageBox::YesRole);
-    QPushButton *noButton = msgBox->addButton(tr("No"), QMessageBox::NoRole);
-    QPushButton *settingsButton = msgBox->addButton(tr("View sets"), QMessageBox::ActionRole);
+    const QPushButton *yesAlwaysButton = msgBox->addButton(tr("Yes, always enable"), QMessageBox::YesRole);
+    const QPushButton *noButton = msgBox->addButton(tr("No"), QMessageBox::NoRole);
+    const QPushButton *viewSetsButton = msgBox->addButton(tr("View sets"), QMessageBox::ActionRole);
     msgBox->setDefaultButton(yesButton);
 
-    Dialogs::open(msgBox, [this, yesButton, yesAlwaysButton, noButton, settingsButton](QAbstractButton *clicked) {
+    Dialogs::open(msgBox, [this, yesButton, yesAlwaysButton, noButton, viewSetsButton](const QAbstractButton *clicked) {
         if (clicked == yesButton) {
             CardDatabaseManager::getInstance()->enableAllUnknownSets();
             const auto reloadOk1 =
@@ -1291,7 +1313,7 @@ void MainWindow::cardDatabaseNewSetsFound(int numUnknownSets, QStringList unknow
             SettingsCache::instance().updates().setAlwaysEnableNewSets(true);
         } else if (clicked == noButton) {
             CardDatabaseManager::getInstance()->markAllSetsAsKnown();
-        } else if (clicked == settingsButton) {
+        } else if (clicked == viewSetsButton) {
             CardDatabaseManager::getInstance()->markAllSetsAsKnown();
             actManageSets();
         }
