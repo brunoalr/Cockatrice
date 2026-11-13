@@ -543,13 +543,7 @@ void UserContextMenu::execMenuAction(const QAction *actionClicked,
     } else if (actionClicked == aKick) {
         execKick(playerId);
     } else if (actionClicked == aReport) {
-        int gameId = game ? game->getGameMetaInfo()->gameId() : -1;
-        QString autoChatLog;
-        if (chatView) {
-            autoChatLog = chatView->getRecentChatLog(50);
-        }
-        auto dlgReport = new DlgReportUser(client, userName, gameId, autoChatLog, static_cast<QWidget *>(parent()));
-        Dialogs::open(dlgReport, {});
+        execReport(userName, chatView);
     } else if (actionClicked == aBan) {
         execBan(userName);
     } else if (actionClicked == aPromoteToMod || actionClicked == aDemoteFromMod) {
@@ -571,6 +565,17 @@ void UserContextMenu::execMenuAction(const QAction *actionClicked,
     } else if (actionClicked == aInvestigateAlts) {
         execInvestigateAlts(userName);
     }
+}
+
+void UserContextMenu::execReport(const QString &userName, const ChatView *chatView)
+{
+    int gameId = game ? game->getGameMetaInfo()->gameId() : -1;
+    QString autoChatLog;
+    if (chatView) {
+        autoChatLog = chatView->getRecentChatLog(50);
+    }
+    auto dlgReport = new DlgReportUser(client, userName, gameId, autoChatLog, static_cast<QWidget *>(parent()));
+    Dialogs::open(dlgReport, {});
 }
 
 void UserContextMenu::execChat(const QString &userName)
