@@ -1,18 +1,14 @@
 #include "client/settings/cache_settings.h"
+#include "dialog_test_support.h"
 #include "interface/shutdown_chain.h"
 #include "interface/widgets/deck_editor/deck_state_manager.h"
 #include "interface/widgets/tabs/unsaved_deck_guard.h"
 
 #include <QAbstractButton>
-#include <QApplication>
 #include <QCloseEvent>
 #include <QDir>
 #include <QMessageBox>
 #include <QPointer>
-#include <QStandardPaths>
-#include <QTemporaryDir>
-#include <QThread>
-#include <QTimer>
 #include <gtest/gtest.h>
 #include <libcockatrice/rng/rng_abstract.h>
 #include <libcockatrice/settings/deck_editor_settings.h>
@@ -28,26 +24,8 @@ using Location = UnsavedDeckGuard::DeckOpenLocation;
 void settle()
 {
     for (int pass = 0; pass < 3; ++pass) {
-        QCoreApplication::processEvents();
-        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        DialogTest::settle();
     }
-}
-
-void failOnNestedLoops(QTimer &watchdog)
-{
-    // A dialog that blocks runs a nested event loop: fail and close it instead of hanging.
-    QObject::connect(&watchdog, &QTimer::timeout, [] {
-        if (QThread::currentThread()->loopLevel() == 0) {
-            return;
-        }
-        ADD_FAILURE() << "a nested event loop is running";
-        for (QWidget *widget : QApplication::topLevelWidgets()) {
-            if (auto *dialog = qobject_cast<QDialog *>(widget); dialog && dialog->isVisible()) {
-                dialog->reject();
-            }
-        }
-    });
-    watchdog.start(10);
 }
 
 QList<QMessageBox *> openBoxes(const QWidget *parent)
@@ -286,11 +264,10 @@ protected:
                            [this](std::function<void(bool saved)> then) { save(std::move(then)); }};
     std::optional<bool> mayClose;
     std::optional<Location> location;
-    QTimer nestedLoopWatchdog;
+    DialogTest::NestedLoopWatchdog nestedLoopWatchdog;
 
     void SetUp() override
     {
-        failOnNestedLoops(nestedLoopWatchdog);
         deck.setModified(true);
     }
 
@@ -612,11 +589,10 @@ protected:
     QPointer<QWidget> secondTab = new QWidget(window.get());
     UnsavedDeckGuard firstGuard{firstTab, &firstDeck, [] {}, savingTo(firstDeck)};
     UnsavedDeckGuard secondGuard{secondTab, &secondDeck, [] {}, savingTo(secondDeck)};
-    QTimer nestedLoopWatchdog;
+    DialogTest::NestedLoopWatchdog nestedLoopWatchdog;
 
     void SetUp() override
     {
-        failOnNestedLoops(nestedLoopWatchdog);
         firstDeck.setModified(true);
         secondDeck.setModified(true);
         window->steps = [this] {
@@ -749,23 +725,11 @@ TEST_F(WindowClose, CloseForUpdateReportsNotClosedAtOnceWhileAShutdownIsAsking)
 
 int main(int argc, char **argv)
 {
-    qputenv("QT_QPA_PLATFORM", "offscreen");
-    // The tests write the deck editor settings, and a CI container's user has no home it can write to.
-    const QTemporaryDir home;
-    qputenv("HOME", home.path().toUtf8());
-    QStandardPaths::setTestModeEnabled(true);
-    QApplication app(argc, argv);
-    QCoreApplication::setOrganizationName(QStringLiteral("CockatriceTest"));
-    QCoreApplication::setApplicationName(QStringLiteral("deck-close-test-%1").arg(QCoreApplication::applicationPid()));
-    ::testing::InitGoogleTest(&argc, argv);
-    // CMake lists the cases at build time, where LeakSanitizer is on: the settings singleton leaks at exit.
-    if (::testing::GTEST_FLAG(list_tests)) {
-        return RUN_ALL_TESTS();
-    }
+    return DialogTest::run(argc, argv, QStringLiteral("deck-close-test"), [] {
+        const int result = RUN_ALL_TESTS();
 
-    const int result = RUN_ALL_TESTS();
-
-    QDir(SettingsCache::instance().getDataPath()).removeRecursively();
-    QDir(SettingsCache::instance().getCachePath()).removeRecursively();
-    return result;
+        QDir(SettingsCache::instance().getDataPath()).removeRecursively();
+        QDir(SettingsCache::instance().getCachePath()).removeRecursively();
+        return result;
+    });
 }
