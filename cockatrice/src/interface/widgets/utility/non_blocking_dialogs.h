@@ -8,7 +8,6 @@
 #include <QMessageBox>
 #include <QPointer>
 #include <QString>
-#include <QStringList>
 #include <functional>
 #include <type_traits>
 #include <utility>
@@ -50,15 +49,7 @@ void getInt(QWidget *parent,
             int value,
             int minimum,
             int maximum,
-            int step,
             std::function<void(int value)> thenAccepted);
-void getItem(QWidget *parent,
-             const QString &title,
-             const QString &label,
-             const QStringList &items,
-             int current,
-             bool editable,
-             std::function<void(const QString &item)> thenAccepted);
 
 void getColor(const QColor &initial,
               QWidget *parent,
