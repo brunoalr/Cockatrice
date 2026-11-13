@@ -2,13 +2,13 @@
 
 #include "../../../client/settings/cache_settings.h"
 #include "../utility/non_blocking_dialogs.h"
+#include "forgot_password_server.h"
 
 #include <QDialogButtonBox>
 #include <QGridLayout>
 #include <QIntValidator>
 #include <QLabel>
 #include <QSize>
-#include <QTimer>
 #include <QVBoxLayout>
 #include <libcockatrice/settings/servers_settings.h>
 #include <libcockatrice/utility/string_limits.h>
@@ -17,27 +17,9 @@ class QWidget;
 
 DlgForgotPasswordChallenge::DlgForgotPasswordChallenge(QWidget *parent) : QDialog(parent)
 {
-    QString lastfphost;
-    QString lastfpport;
-    QString lastfpplayername;
-    ServersSettings &servers = SettingsCache::instance().servers();
-    lastfphost = servers.getHostname();
-    lastfpport = servers.getPort();
-    lastfpplayername = servers.getPlayerName();
-
-    if (!servers.getFPHostname().isEmpty() && !servers.getFPPort().isEmpty() && !servers.getFPPlayerName().isEmpty()) {
-        lastfphost = servers.getFPHostname();
-        lastfpport = servers.getFPPort();
-        lastfpplayername = servers.getFPPlayerName();
-    }
-
-    if (servers.getFPHostname().isEmpty() && servers.getFPPort().isEmpty() && servers.getFPPlayerName().isEmpty()) {
-        QTimer::singleShot(0, this, [this] {
-            Dialogs::warning(this, tr("Reset Password Challenge Warning"),
-                             tr("A problem has occurred. Please try to request a new password again."));
-        });
-        reject();
-    }
+    const auto [lastfphost, lastfpport, lastfpplayername] = lastForgotPasswordServer();
+    rejectWithoutPasswordRequest(this, tr("Reset Password Challenge Warning"),
+                                 tr("A problem has occurred. Please try to request a new password again."));
 
     infoLabel =
         new QLabel(tr("Enter the information of the server and the account you'd like to request a new password for."));
@@ -63,6 +45,7 @@ DlgForgotPasswordChallenge::DlgForgotPasswordChallenge(QWidget *parent) : QDialo
     emailEdit->setMaxLength(MAX_NAME_LENGTH);
     emailLabel->setBuddy(emailLabel);
 
+    const ServersSettings &servers = SettingsCache::instance().servers();
     if (!servers.getFPHostname().isEmpty() && !servers.getFPPort().isEmpty() && !servers.getFPPlayerName().isEmpty()) {
         hostLabel->hide();
         hostEdit->hide();

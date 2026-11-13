@@ -2,6 +2,7 @@
 
 #include "../../../client/settings/cache_settings.h"
 #include "../utility/non_blocking_dialogs.h"
+#include "forgot_password_server.h"
 
 #include <QDialogButtonBox>
 #include <QGridLayout>
@@ -9,7 +10,6 @@
 #include <QLabel>
 #include <QSharedPointer>
 #include <QSize>
-#include <QTimer>
 #include <QVBoxLayout>
 #include <libcockatrice/settings/servers_settings.h>
 #include <libcockatrice/utility/string_limits.h>
@@ -19,27 +19,9 @@ class QWidget;
 
 DlgForgotPasswordReset::DlgForgotPasswordReset(QWidget *parent) : QDialog(parent)
 {
-    QString lastfphost;
-    QString lastfpport;
-    QString lastfpplayername;
-    ServersSettings &servers = SettingsCache::instance().servers();
-    lastfphost = servers.getHostname();
-    lastfpport = servers.getPort();
-    lastfpplayername = servers.getPlayerName();
-
-    if (!servers.getFPHostname().isEmpty() && !servers.getFPPort().isEmpty() && !servers.getFPPlayerName().isEmpty()) {
-        lastfphost = servers.getFPHostname();
-        lastfpport = servers.getFPPort();
-        lastfpplayername = servers.getFPPlayerName();
-    }
-
-    if (servers.getFPHostname().isEmpty() && servers.getFPPort().isEmpty() && servers.getFPPlayerName().isEmpty()) {
-        QTimer::singleShot(0, this, [this] {
-            Dialogs::warning(this, tr("Reset Password Warning"),
-                             tr("A problem has occurred. Please try to request a new password again."));
-        });
-        reject();
-    }
+    const auto [lastfphost, lastfpport, lastfpplayername] = lastForgotPasswordServer();
+    rejectWithoutPasswordRequest(this, tr("Reset Password Warning"),
+                                 tr("A problem has occurred. Please try to request a new password again."));
 
     infoLabel = new QLabel(tr("Enter the received token and the new password in order to set your new password."));
     infoLabel->setWordWrap(true);
@@ -77,6 +59,7 @@ DlgForgotPasswordReset::DlgForgotPasswordReset(QWidget *parent) : QDialog(parent
     newpasswordverifyLabel->setBuddy(newpasswordEdit);
     newpasswordverifyEdit->setEchoMode(QLineEdit::Password);
 
+    const ServersSettings &servers = SettingsCache::instance().servers();
     if (!servers.getFPHostname().isEmpty() && !servers.getFPPort().isEmpty() && !servers.getFPPlayerName().isEmpty()) {
         hostLabel->hide();
         hostEdit->hide();

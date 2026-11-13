@@ -2,6 +2,7 @@
 
 #include "../../../client/settings/cache_settings.h"
 #include "../utility/non_blocking_dialogs.h"
+#include "forgot_password_server.h"
 
 #include <QDialogButtonBox>
 #include <QGridLayout>
@@ -16,19 +17,7 @@ class QWidget;
 
 DlgForgotPasswordRequest::DlgForgotPasswordRequest(QWidget *parent) : QDialog(parent)
 {
-    QString lastfphost;
-    QString lastfpport;
-    QString lastfpplayername;
-    ServersSettings &servers = SettingsCache::instance().servers();
-    lastfphost = servers.getHostname();
-    lastfpport = servers.getPort();
-    lastfpplayername = servers.getPlayerName();
-
-    if (!servers.getFPHostname().isEmpty() && !servers.getFPPort().isEmpty() && !servers.getFPPlayerName().isEmpty()) {
-        lastfphost = servers.getFPHostname();
-        lastfpport = servers.getFPPort();
-        lastfpplayername = servers.getFPPlayerName();
-    }
+    const auto [lastfphost, lastfpport, lastfpplayername] = lastForgotPasswordServer();
 
     infoLabel = new QLabel(tr("Enter the information of the server you'd like to request a new password for."));
     infoLabel->setWordWrap(true);
