@@ -159,29 +159,12 @@ void getInt(QWidget *parent,
             int value,
             int minimum,
             int maximum,
-            int step,
             std::function<void(int value)> thenAccepted)
 {
     auto *dialog = inputDialog(parent, title, label);
     dialog->setIntRange(minimum, maximum);
     dialog->setIntValue(value);
-    dialog->setIntStep(step);
     openForValue(dialog, &QInputDialog::intValue, std::move(thenAccepted));
-}
-
-void getItem(QWidget *parent,
-             const QString &title,
-             const QString &label,
-             const QStringList &items,
-             int current,
-             bool editable,
-             std::function<void(const QString &item)> thenAccepted)
-{
-    auto *dialog = inputDialog(parent, title, label);
-    dialog->setComboBoxItems(items);
-    dialog->setTextValue(items.value(current));
-    dialog->setComboBoxEditable(editable);
-    openForValue(dialog, &QInputDialog::textValue, std::move(thenAccepted));
 }
 
 void getColor(const QColor &initial,
