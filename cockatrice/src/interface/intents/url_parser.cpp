@@ -43,6 +43,10 @@ IntentUrlParser::IntentUrlParser(QObject *parent, MainWindow *_mainWindow) : QOb
 
 void IntentUrlParser::handle(const QString &urlStr)
 {
+    if (QUrl(urlStr).scheme() != "cockatrice") {
+        return;
+    }
+
     pendingLinks.append(urlStr);
     if (pendingLinks.size() == 1) {
         parseFirstLink();
@@ -52,11 +56,6 @@ void IntentUrlParser::handle(const QString &urlStr)
 void IntentUrlParser::parseFirstLink()
 {
     QUrl url(pendingLinks.first());
-
-    if (url.scheme() != "cockatrice") {
-        finishLink();
-        return;
-    }
 
     const QString action = url.host();
     QUrlQuery query(url);
@@ -80,14 +79,8 @@ void IntentUrlParser::parseFirstLink()
 
 void IntentUrlParser::queueChain(const PendingIntentChain &chain, Intent *firstIntent)
 {
-    if (firstIntent == nullptr) {
-        // The link was invalid or the user declined the confirm: nothing runs.
-        // Report the idle state when no other chain is queued so that a startup
-        // launch (which skipped its own connection for this URL) falls back to it.
-        if (!chainRunning && pendingChains.isEmpty()) {
-            emit urlChainFinished(mainWindow->getRemoteClient()->getStatus() == StatusLoggedIn);
-        }
-    } else {
+    // Without an intent the link was invalid or the user declined the confirm: nothing runs.
+    if (firstIntent != nullptr) {
         pendingChains.append(chain);
         startNextChain();
     }
@@ -99,6 +92,12 @@ void IntentUrlParser::finishLink()
     pendingLinks.removeFirst();
     if (!pendingLinks.isEmpty()) {
         parseFirstLink();
+        return;
+    }
+    // Report the idle state once no link waits for an answer and no chain is queued, so that a
+    // startup launch (which skipped its own connection for this URL) falls back to it.
+    if (!chainRunning && pendingChains.isEmpty()) {
+        emit urlChainFinished(mainWindow->getRemoteClient()->getStatus() == StatusLoggedIn);
     }
 }
 
@@ -390,7 +389,7 @@ void IntentUrlParser::chainEnded(bool chainSucceeded)
 
     // Only report the terminal state once the queue has fully drained, so a
     // queued follow-up link keeps the startup fallback out of the picture.
-    if (!chainRunning && pendingChains.isEmpty()) {
+    if (pendingLinks.isEmpty() && !chainRunning && pendingChains.isEmpty()) {
         emit urlChainFinished(mainWindow->getRemoteClient()->getStatus() == StatusLoggedIn);
     }
 }
