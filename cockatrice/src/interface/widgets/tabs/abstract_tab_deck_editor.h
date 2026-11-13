@@ -11,10 +11,13 @@
 #include "../../deck_loader/deck_loader.h"
 #include "libcockatrice/card/card_info.h"
 #include "tab.h"
+#include "unsaved_deck_guard.h"
 
 #include <QMap>
 #include <QSize>
 #include <QString>
+#include <functional>
+#include <memory>
 #include <qtmetamacros.h>
 
 class DeckStateManager;
@@ -27,7 +30,6 @@ class DeckEditorFilterDockWidget;
 class DeckEditorPrintingSelectorDockWidget;
 class Response;
 class FilterTree;
-class QMessageBox;
 class QDockWidget;
 class QMenu;
 class QAction;
@@ -93,7 +95,7 @@ public:
     [[nodiscard]] QString getTabText() const override = 0;
 
     /** @brief Confirms whether the tab can be safely closed. */
-    bool confirmClose();
+    void confirmClose(std::function<void(bool mayClose)> then);
 
     /** @brief Retranslates the UI text. Pure virtual. */
     void retranslateUi() override = 0;
@@ -162,7 +164,7 @@ public slots:
     void filterTreeChanged(FilterTree *filterTree);
 
     /** @brief Requests closing the tab. */
-    bool closeRequest() override;
+    void closeRequest() override;
 
     /** @brief Shows the printing selector dock and updates it with the current card. */
     void showPrintingSelector();
@@ -192,10 +194,10 @@ protected slots:
     virtual void actLoadDeck();
 
     /** @brief Saves the current deck. */
-    bool actSaveDeck();
+    void actSaveDeck(std::function<void(bool saved)> then = {});
 
     /** @brief Saves the current deck under a new name. */
-    virtual bool actSaveDeckAs();
+    virtual void actSaveDeckAs(std::function<void(bool saved)> then = {});
 
     /** @brief Opens the deck share dialog for the current deck. */
     void actShareDeck();
@@ -266,12 +268,8 @@ private:
 
 protected:
     /** @brief Enum describing deck open locations */
-    enum DeckOpenLocation
-    {
-        CANCELLED, ///< Operation cancelled
-        SAME_TAB,  ///< Open deck in the same tab
-        NEW_TAB    ///< Open deck in a new tab
-    };
+    using DeckOpenLocation = UnsavedDeckGuard::DeckOpenLocation;
+    using enum UnsavedDeckGuard::DeckOpenLocation;
 
     /**
      * @brief The actions associated with managing a QDockWidget
@@ -292,14 +290,9 @@ protected:
 
     /** @brief Confirms deck open action based on settings and modified state.
      *  @param openInSameTabIfBlank Whether to reuse same tab if blank.
-     *  @return Selected DeckOpenLocation.
+     *  @param then Told the selected DeckOpenLocation once the user answered.
      */
-    DeckOpenLocation confirmOpen(bool openInSameTabIfBlank = true);
-
-    /** @brief Creates a save confirmation message box.
-     *  @return Pointer to a QMessageBox.
-     */
-    QMessageBox *createSaveConfirmationWindow();
+    void confirmOpen(bool openInSameTabIfBlank, std::function<void(DeckOpenLocation location)> then);
 
     /** @brief Opens a deck from a file. */
     virtual void openDeckFromFile(const QString &fileName, DeckOpenLocation deckOpenLocation);
@@ -310,6 +303,12 @@ protected:
     QAction *aResetLayout;
 
     QMap<QDockWidget *, DockActions> dockToActions;
+
+private:
+    std::unique_ptr<UnsavedDeckGuard> unsavedDeckGuard;
+
+    void saveDeckToFile(const DeckList &deckList, const QString &fileName, const std::function<void(bool saved)> &then);
+    void openDeckList(const DeckList &deckList, DeckOpenLocation deckOpenLocation);
 };
 
 #endif // TAB_GENERIC_DECK_EDITOR_H

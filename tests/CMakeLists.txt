@@ -775,9 +775,18 @@ if(WITH_CLIENT)
     deck_close_test
     SOURCES
     ${CLIENT_SRC}/interface/shutdown_chain.cpp
+    ${CLIENT_SRC}/interface/widgets/deck_editor/deck_state_manager.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/unsaved_deck_guard.cpp
+    ${SETTINGS_SOURCES}
     deck_close_test.cpp
+    LIBS
+    libcockatrice_card
+    libcockatrice_deck_list
+    libcockatrice_models
+    libcockatrice_utility
+    ${SETTINGS_LIBS}
     INCLUDE_DIRS
-    ${CLIENT_SRC}
+    ${SETTINGS_INCLUDE_DIRS}
   )
   cockatrice_add_test(
     NAME

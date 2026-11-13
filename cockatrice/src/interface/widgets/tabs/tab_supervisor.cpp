@@ -351,7 +351,7 @@ QList<ShutdownChain::Step> TabSupervisor::closeSteps()
     QList<ShutdownChain::Step> steps{
         {this, [this](const ShutdownChain::Answer &answer) { confirmLeavingGames(answer); }}};
     for (AbstractTabDeckEditor *tab : deckEditorTabs) {
-        steps.append({tab, [tab](const ShutdownChain::Answer &answer) { answer(tab->confirmClose()); }});
+        steps.append({tab, [tab](const ShutdownChain::Answer &answer) { tab->confirmClose(answer); }});
     }
     return steps;
 }

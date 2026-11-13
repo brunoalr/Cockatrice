@@ -1,20 +1,72 @@
+#include "client/settings/cache_settings.h"
 #include "interface/shutdown_chain.h"
+#include "interface/widgets/deck_editor/deck_state_manager.h"
+#include "interface/widgets/tabs/unsaved_deck_guard.h"
 
+#include <QAbstractButton>
 #include <QApplication>
+#include <QCloseEvent>
+#include <QDir>
+#include <QMessageBox>
+#include <QPointer>
 #include <QStandardPaths>
 #include <QTemporaryDir>
+#include <QThread>
+#include <QTimer>
 #include <gtest/gtest.h>
+#include <libcockatrice/rng/rng_abstract.h>
+#include <libcockatrice/settings/deck_editor_settings.h>
 #include <memory>
 #include <optional>
 
+RNG_Abstract *rng = nullptr; // NOSONAR: the client declares it extern and assigns it
+
 namespace
 {
+using Location = UnsavedDeckGuard::DeckOpenLocation;
+
 void settle()
 {
     for (int pass = 0; pass < 3; ++pass) {
         QCoreApplication::processEvents();
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
     }
+}
+
+void failOnNestedLoops(QTimer &watchdog)
+{
+    // A dialog that blocks runs a nested event loop: fail and close it instead of hanging.
+    QObject::connect(&watchdog, &QTimer::timeout, [] {
+        if (QThread::currentThread()->loopLevel() == 0) {
+            return;
+        }
+        ADD_FAILURE() << "a nested event loop is running";
+        for (QWidget *widget : QApplication::topLevelWidgets()) {
+            if (auto *dialog = qobject_cast<QDialog *>(widget); dialog && dialog->isVisible()) {
+                dialog->reject();
+            }
+        }
+    });
+    watchdog.start(10);
+}
+
+QList<QMessageBox *> openBoxes(const QWidget *parent)
+{
+    QList<QMessageBox *> open;
+    for (QMessageBox *box : parent->findChildren<QMessageBox *>()) {
+        if (box->isVisible()) {
+            open.append(box);
+        }
+    }
+    return open;
+}
+
+void click(const QWidget *parent, QMessageBox::StandardButton button)
+{
+    const auto boxes = openBoxes(parent);
+    ASSERT_EQ(boxes.size(), 1);
+    boxes.first()->button(button)->click();
+    settle();
 }
 
 class ShutdownChainTest : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
@@ -220,12 +272,485 @@ TEST_F(ShutdownChainTest, AnAnswerAfterTheChainIsGoneIsDropped)
     settle();
     EXPECT_FALSE(reported);
 }
+
+class UnsavedDeckGuardTest : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    std::unique_ptr<QWidget> tab = std::make_unique<QWidget>();
+    DeckStateManager deck;
+    int tabShown = 0;
+    int saves = 0;
+    std::optional<bool> saveResult = true; // empty: the save answers later, through pendingSave
+    std::function<void(bool saved)> pendingSave;
+    UnsavedDeckGuard guard{tab.get(), &deck, [this] { ++tabShown; },
+                           [this](std::function<void(bool saved)> then) { save(std::move(then)); }};
+    std::optional<bool> mayClose;
+    std::optional<Location> location;
+    QTimer nestedLoopWatchdog;
+
+    void SetUp() override
+    {
+        failOnNestedLoops(nestedLoopWatchdog);
+        deck.setModified(true);
+    }
+
+    void TearDown() override
+    {
+        SettingsCache::instance().deckEditor().setOpenDeckInNewTab(false);
+    }
+
+    void save(std::function<void(bool saved)> then)
+    {
+        ++saves;
+        if (!saveResult) {
+            pendingSave = std::move(then);
+            return;
+        }
+        if (*saveResult) {
+            deck.setModified(false);
+        }
+        then(*saveResult);
+    }
+
+    void confirmClose()
+    {
+        guard.confirmClose([this](bool answer) {
+            EXPECT_FALSE(mayClose.has_value()) << "answered twice";
+            mayClose = answer;
+        });
+    }
+
+    void confirmOpen(bool openInSameTabIfBlank = true)
+    {
+        guard.confirmOpen(openInSameTabIfBlank, [this](Location answer) {
+            EXPECT_FALSE(location.has_value()) << "answered twice";
+            location = answer;
+        });
+    }
+};
+
+TEST_F(UnsavedDeckGuardTest, ClosingAnUnchangedDeckAsksNothing)
+{
+    deck.setModified(false);
+    confirmClose();
+
+    EXPECT_EQ(mayClose, true);
+    EXPECT_TRUE(openBoxes(tab.get()).isEmpty());
+    EXPECT_EQ(tabShown, 0);
+}
+
+TEST_F(UnsavedDeckGuardTest, ClosingAChangedDeckShowsTheTabAndAsksWithoutBlocking)
+{
+    confirmClose();
+
+    EXPECT_FALSE(mayClose.has_value());
+    EXPECT_EQ(tabShown, 1);
+    const auto boxes = openBoxes(tab.get());
+    ASSERT_EQ(boxes.size(), 1);
+    const QMessageBox *box = boxes.first();
+    // QMessageBox ignores its window title on macOS.
+#ifndef Q_OS_MACOS
+    EXPECT_EQ(box->windowTitle(), "Are you sure?");
+#endif
+    EXPECT_EQ(box->text(), "The decklist has been modified.\nDo you want to save the changes?");
+    EXPECT_EQ(box->icon(), QMessageBox::Warning);
+    EXPECT_EQ(box->standardButtons(), QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+    EXPECT_EQ(box->buttons().size(), 3);
+    EXPECT_EQ(box->windowModality(), Qt::ApplicationModal);
+}
+
+TEST_F(UnsavedDeckGuardTest, SaveLetsTheTabCloseOnceTheDeckIsSaved)
+{
+    confirmClose();
+    click(tab.get(), QMessageBox::Save);
+
+    EXPECT_EQ(saves, 1);
+    EXPECT_EQ(mayClose, true);
+    EXPECT_FALSE(deck.isModified());
+}
+
+TEST_F(UnsavedDeckGuardTest, ASaveThatFailsKeepsTheTab)
+{
+    saveResult = false;
+    confirmClose();
+    click(tab.get(), QMessageBox::Save);
+
+    EXPECT_EQ(saves, 1);
+    EXPECT_EQ(mayClose, false);
+    EXPECT_TRUE(deck.isModified());
+}
+
+TEST_F(UnsavedDeckGuardTest, TheCloseWaitsForASaveThatAnswersLater)
+{
+    saveResult.reset();
+    confirmClose();
+    click(tab.get(), QMessageBox::Save);
+    EXPECT_FALSE(mayClose.has_value());
+
+    pendingSave(true);
+    EXPECT_EQ(mayClose, true);
+}
+
+TEST_F(UnsavedDeckGuardTest, DiscardLetsTheTabCloseAndKeepsTheDeckModified)
+{
+    confirmClose();
+    click(tab.get(), QMessageBox::Discard);
+
+    EXPECT_EQ(saves, 0);
+    EXPECT_EQ(mayClose, true);
+    EXPECT_TRUE(deck.isModified());
+}
+
+TEST_F(UnsavedDeckGuardTest, CancelKeepsTheTab)
+{
+    confirmClose();
+    click(tab.get(), QMessageBox::Cancel);
+
+    EXPECT_EQ(saves, 0);
+    EXPECT_EQ(mayClose, false);
+}
+
+TEST_F(UnsavedDeckGuardTest, ClosingTheBoxKeepsTheTab)
+{
+    confirmClose();
+    const auto boxes = openBoxes(tab.get());
+    ASSERT_EQ(boxes.size(), 1);
+    boxes.first()->close();
+    settle();
+
+    EXPECT_EQ(mayClose, false);
+}
+
+TEST_F(UnsavedDeckGuardTest, ASecondCloseWhileTheBoxIsOpenIsRefused)
+{
+    confirmClose();
+    std::optional<bool> second;
+    guard.confirmClose([&second](bool answer) { second = answer; });
+
+    EXPECT_EQ(second, false);
+    EXPECT_EQ(openBoxes(tab.get()).size(), 1);
+    click(tab.get(), QMessageBox::Discard);
+    EXPECT_EQ(mayClose, true);
+}
+
+TEST_F(UnsavedDeckGuardTest, TheAnswerIsDroppedWithTheTab)
+{
+    confirmClose();
+    tab.reset();
+    settle();
+
+    EXPECT_FALSE(mayClose.has_value());
+}
+
+TEST_F(UnsavedDeckGuardTest, OpeningOverAnUnchangedDeckUsesThisTab)
+{
+    deck.setModified(false);
+    confirmOpen();
+
+    EXPECT_EQ(location, Location::SAME_TAB);
+    EXPECT_TRUE(openBoxes(tab.get()).isEmpty());
+}
+
+TEST_F(UnsavedDeckGuardTest, TheNewTabSettingOpensWithoutAsking)
+{
+    SettingsCache::instance().deckEditor().setOpenDeckInNewTab(true);
+    confirmOpen();
+
+    EXPECT_EQ(location, Location::NEW_TAB);
+    EXPECT_TRUE(openBoxes(tab.get()).isEmpty());
+}
+
+TEST_F(UnsavedDeckGuardTest, TheNewTabSettingReusesABlankTabWhenAllowed)
+{
+    SettingsCache::instance().deckEditor().setOpenDeckInNewTab(true);
+    deck.setModified(false);
+    confirmOpen(true);
+    EXPECT_EQ(location, Location::SAME_TAB);
+
+    location.reset();
+    confirmOpen(false);
+    EXPECT_EQ(location, Location::NEW_TAB);
+}
+
+TEST_F(UnsavedDeckGuardTest, OpeningOverAChangedDeckAlsoOffersANewTab)
+{
+    confirmOpen();
+
+    EXPECT_FALSE(location.has_value());
+    EXPECT_EQ(tabShown, 1);
+    const auto boxes = openBoxes(tab.get());
+    ASSERT_EQ(boxes.size(), 1);
+    const QMessageBox *box = boxes.first();
+    EXPECT_EQ(box->text(), "The decklist has been modified.\nDo you want to save the changes?");
+    EXPECT_EQ(box->standardButtons(), QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+    ASSERT_EQ(box->buttons().size(), 4);
+}
+
+TEST_F(UnsavedDeckGuardTest, OpenInNewTabOpensInANewTab)
+{
+    confirmOpen();
+    const auto boxes = openBoxes(tab.get());
+    ASSERT_EQ(boxes.size(), 1);
+    QAbstractButton *newTab = nullptr;
+    for (QAbstractButton *button : boxes.first()->buttons()) {
+        if (button->text() == "Open in new tab") {
+            newTab = button;
+        }
+    }
+    ASSERT_NE(newTab, nullptr);
+    EXPECT_EQ(boxes.first()->buttonRole(newTab), QMessageBox::ApplyRole);
+    newTab->click();
+    settle();
+
+    EXPECT_EQ(location, Location::NEW_TAB);
+    EXPECT_EQ(saves, 0);
+}
+
+TEST_F(UnsavedDeckGuardTest, SaveOpensInThisTab)
+{
+    confirmOpen();
+    click(tab.get(), QMessageBox::Save);
+
+    EXPECT_EQ(saves, 1);
+    EXPECT_EQ(location, Location::SAME_TAB);
+}
+
+TEST_F(UnsavedDeckGuardTest, ASaveThatFailsCancelsTheOpen)
+{
+    saveResult = false;
+    confirmOpen();
+    click(tab.get(), QMessageBox::Save);
+
+    EXPECT_EQ(saves, 1);
+    EXPECT_EQ(location, Location::CANCELLED);
+}
+
+TEST_F(UnsavedDeckGuardTest, DiscardOpensInThisTab)
+{
+    confirmOpen();
+    click(tab.get(), QMessageBox::Discard);
+
+    EXPECT_EQ(saves, 0);
+    EXPECT_EQ(location, Location::SAME_TAB);
+}
+
+TEST_F(UnsavedDeckGuardTest, CancelCancelsTheOpen)
+{
+    confirmOpen();
+    click(tab.get(), QMessageBox::Cancel);
+
+    EXPECT_EQ(saves, 0);
+    EXPECT_EQ(location, Location::CANCELLED);
+}
+
+TEST_F(UnsavedDeckGuardTest, ASecondOpenWhileTheBoxIsOpenIsCancelled)
+{
+    confirmOpen();
+    std::optional<Location> second;
+    guard.confirmOpen(true, [&second](Location answer) { second = answer; });
+
+    EXPECT_EQ(second, Location::CANCELLED);
+    EXPECT_EQ(openBoxes(tab.get()).size(), 1);
+}
+
+// Closes in two passes as MainWindow does, which cannot be built without most of the client.
+class TwoPassWindow : public QWidget
+{
+public:
+    ShutdownChain chain;
+    std::function<QList<ShutdownChain::Step>()> steps;
+
+    void closeForUpdate(std::function<void(bool closed)> then)
+    {
+        if (chain.state() != ShutdownChain::State::Idle) {
+            then(false);
+            return;
+        }
+        confirmShutdown(std::move(then));
+    }
+
+protected:
+    void closeEvent(QCloseEvent *event) override
+    {
+        if (chain.state() == ShutdownChain::State::Accepted) {
+            event->accept();
+            return;
+        }
+        event->ignore();
+        confirmShutdown({});
+    }
+
+private:
+    void confirmShutdown(std::function<void(bool closed)> then)
+    {
+        chain.start(steps(), [this, then = std::move(then)](bool accepted) {
+            if (accepted) {
+                close();
+            }
+            if (then) {
+                then(accepted);
+            }
+        });
+    }
+};
+
+UnsavedDeckGuard::Save savingTo(DeckStateManager &deck)
+{
+    return [&deck](const std::function<void(bool saved)> &then) {
+        deck.setModified(false);
+        then(true);
+    };
+}
+
+class WindowClose : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    std::unique_ptr<TwoPassWindow> window = std::make_unique<TwoPassWindow>();
+    DeckStateManager firstDeck;
+    DeckStateManager secondDeck;
+    QPointer<QWidget> firstTab = new QWidget(window.get());
+    QPointer<QWidget> secondTab = new QWidget(window.get());
+    UnsavedDeckGuard firstGuard{firstTab, &firstDeck, [] {}, savingTo(firstDeck)};
+    UnsavedDeckGuard secondGuard{secondTab, &secondDeck, [] {}, savingTo(secondDeck)};
+    QTimer nestedLoopWatchdog;
+
+    void SetUp() override
+    {
+        failOnNestedLoops(nestedLoopWatchdog);
+        firstDeck.setModified(true);
+        secondDeck.setModified(true);
+        window->steps = [this] {
+            return QList<ShutdownChain::Step>{
+                {firstTab, [this](const ShutdownChain::Answer &answer) { firstGuard.confirmClose(answer); }},
+                {secondTab, [this](const ShutdownChain::Answer &answer) { secondGuard.confirmClose(answer); }},
+            };
+        };
+        window->show();
+    }
+};
+
+TEST_F(WindowClose, AWindowWithNothingToAskClosesOnTheSecondPass)
+{
+    firstDeck.setModified(false);
+    secondDeck.setModified(false);
+
+    EXPECT_FALSE(window->close());
+    settle();
+    EXPECT_FALSE(window->isVisible());
+    EXPECT_EQ(window->chain.state(), ShutdownChain::State::Accepted);
+}
+
+TEST_F(WindowClose, CancelOnTheFirstDeckAsksNothingMore)
+{
+    window->close();
+    EXPECT_EQ(openBoxes(firstTab).size(), 1);
+    EXPECT_TRUE(openBoxes(secondTab).isEmpty());
+
+    click(firstTab, QMessageBox::Cancel);
+    EXPECT_TRUE(openBoxes(window.get()).isEmpty());
+    EXPECT_TRUE(window->isVisible());
+    EXPECT_TRUE(firstDeck.isModified());
+    EXPECT_TRUE(secondDeck.isModified());
+    EXPECT_EQ(window->chain.state(), ShutdownChain::State::Idle);
+}
+
+TEST_F(WindowClose, SaveOnTheFirstThenCancelOnTheSecondKeepsTheSaveAndTheWindow)
+{
+    window->close();
+    click(firstTab, QMessageBox::Save);
+    EXPECT_EQ(openBoxes(secondTab).size(), 1);
+    click(secondTab, QMessageBox::Cancel);
+
+    EXPECT_FALSE(firstDeck.isModified());
+    EXPECT_TRUE(secondDeck.isModified());
+    EXPECT_TRUE(window->isVisible());
+    EXPECT_EQ(window->chain.state(), ShutdownChain::State::Idle);
+}
+
+TEST_F(WindowClose, AnsweringEveryDeckClosesTheWindow)
+{
+    window->close();
+    click(firstTab, QMessageBox::Save);
+    click(secondTab, QMessageBox::Discard);
+
+    EXPECT_FALSE(firstDeck.isModified());
+    EXPECT_FALSE(window->isVisible());
+    EXPECT_EQ(window->chain.state(), ShutdownChain::State::Accepted);
+}
+
+TEST_F(WindowClose, ASecondCloseWhileAskingAsksNothingMore)
+{
+    window->close();
+    window->close();
+
+    EXPECT_EQ(openBoxes(window.get()).size(), 1);
+    click(firstTab, QMessageBox::Discard);
+    click(secondTab, QMessageBox::Discard);
+    EXPECT_FALSE(window->isVisible());
+}
+
+TEST_F(WindowClose, ADeckTabDestroyedWhileAskingLetsTheWindowClose)
+{
+    window->close();
+    ASSERT_EQ(openBoxes(firstTab).size(), 1);
+
+    firstTab->deleteLater();
+    settle();
+    ASSERT_EQ(openBoxes(secondTab).size(), 1);
+    click(secondTab, QMessageBox::Discard);
+    EXPECT_FALSE(window->isVisible());
+}
+
+TEST_F(WindowClose, CloseForUpdateReportsClosedOnceTheWindowClosed)
+{
+    firstDeck.setModified(false);
+    secondDeck.setModified(false);
+    std::optional<bool> closed;
+    window->closeForUpdate([&closed](bool answer) { closed = answer; });
+
+    EXPECT_FALSE(closed.has_value());
+    settle();
+    EXPECT_EQ(closed, true);
+    EXPECT_FALSE(window->isVisible());
+}
+
+TEST_F(WindowClose, CloseForUpdateReportsClosedAfterEveryDeckWasAnswered)
+{
+    std::optional<bool> closed;
+    window->closeForUpdate([&closed](bool answer) { closed = answer; });
+    click(firstTab, QMessageBox::Save);
+    EXPECT_FALSE(closed.has_value());
+    click(secondTab, QMessageBox::Discard);
+
+    EXPECT_EQ(closed, true);
+    EXPECT_FALSE(window->isVisible());
+}
+
+TEST_F(WindowClose, CloseForUpdateReportsNotClosedOnCancel)
+{
+    std::optional<bool> closed;
+    window->closeForUpdate([&closed](bool answer) { closed = answer; });
+    click(firstTab, QMessageBox::Cancel);
+
+    EXPECT_EQ(closed, false);
+    EXPECT_TRUE(window->isVisible());
+}
+
+TEST_F(WindowClose, CloseForUpdateReportsNotClosedAtOnceWhileAShutdownIsAsking)
+{
+    window->close();
+    std::optional<bool> closed;
+    window->closeForUpdate([&closed](bool answer) { closed = answer; });
+
+    EXPECT_EQ(closed, false);
+    EXPECT_EQ(openBoxes(window.get()).size(), 1);
+}
 } // namespace
 
 int main(int argc, char **argv)
 {
     qputenv("QT_QPA_PLATFORM", "offscreen");
-    // A CI container's user has no home it can write to.
+    // The tests write the deck editor settings, and a CI container's user has no home it can write to.
     const QTemporaryDir home;
     qputenv("HOME", home.path().toUtf8());
     QStandardPaths::setTestModeEnabled(true);
@@ -233,5 +758,14 @@ int main(int argc, char **argv)
     QCoreApplication::setOrganizationName(QStringLiteral("CockatriceTest"));
     QCoreApplication::setApplicationName(QStringLiteral("deck-close-test-%1").arg(QCoreApplication::applicationPid()));
     ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    // CMake lists the cases at build time, where LeakSanitizer is on: the settings singleton leaks at exit.
+    if (::testing::GTEST_FLAG(list_tests)) {
+        return RUN_ALL_TESTS();
+    }
+
+    const int result = RUN_ALL_TESTS();
+
+    QDir(SettingsCache::instance().getDataPath()).removeRecursively();
+    QDir(SettingsCache::instance().getCachePath()).removeRecursively();
+    return result;
 }

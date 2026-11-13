@@ -418,6 +418,7 @@ set(cockatrice_SOURCES
     src/interface/widgets/tabs/tab_server.cpp
     src/interface/widgets/tabs/tab_supervisor.cpp
     src/interface/widgets/tabs/tab_visual_database_display.cpp
+    src/interface/widgets/tabs/unsaved_deck_guard.cpp
     src/interface/widgets/tabs/visual_deck_editor/tab_deck_editor_visual.cpp
     src/interface/widgets/tabs/visual_deck_editor/tab_deck_editor_visual_tab_widget.cpp
     src/interface/widgets/tabs/visual_deck_storage/tab_deck_storage_visual.cpp

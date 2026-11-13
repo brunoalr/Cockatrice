@@ -29,6 +29,7 @@
 #include "../interface/widgets/dialogs/dlg_share_deck.h"
 #include "../menus/deck_editor_menu.h"
 #include "../printing_selector/printing_selector.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "../utility/visibility_change_listener.h"
 #include "libcockatrice/card/database/card_database_querier.h"
 #include "libcockatrice/card/printing/exact_card.h"
@@ -67,6 +68,16 @@
 #include <optional>
 #include <string>
 
+namespace
+{
+void reportSaved(const std::function<void(bool saved)> &then, bool saved)
+{
+    if (then) {
+        then(saved);
+    }
+}
+} // namespace
+
 /**
  * @brief Constructs the AbstractTabDeckEditor.
  * Initializes all dock widgets and connects signals/slots.
@@ -77,6 +88,9 @@ AbstractTabDeckEditor::AbstractTabDeckEditor(TabSupervisor *_tabSupervisor) : Ta
     setDockOptions(QMainWindow::AnimatedDocks | QMainWindow::AllowNestedDocks | QMainWindow::AllowTabbedDocks);
 
     deckStateManager = new DeckStateManager(this);
+    unsavedDeckGuard = std::make_unique<UnsavedDeckGuard>(
+        this, deckStateManager, [this] { tabSupervisor->setCurrentWidget(this); },
+        [this](std::function<void(bool saved)> then) { actSaveDeck(std::move(then)); });
 
     databaseModel = new CardDatabaseModel(CardDatabaseManager::getInstance(), true, this);
     databaseModel->setObjectName("databaseModel");
@@ -194,17 +208,18 @@ void AbstractTabDeckEditor::setDeck(const LoadedDeck &_deck)
 /** @brief Creates a new deck. Handles opening in new tab if needed. */
 void AbstractTabDeckEditor::actNewDeck()
 {
-    auto deckOpenLocation = confirmOpen(false);
-    if (deckOpenLocation == CANCELLED) {
-        return;
-    }
+    confirmOpen(false, [this](DeckOpenLocation deckOpenLocation) {
+        if (deckOpenLocation == CANCELLED) {
+            return;
+        }
 
-    if (deckOpenLocation == NEW_TAB) {
-        emit openDeckEditor(LoadedDeck());
-        return;
-    }
+        if (deckOpenLocation == NEW_TAB) {
+            emit openDeckEditor(LoadedDeck());
+            return;
+        }
 
-    cleanDeckAndResetModified();
+        cleanDeckAndResetModified();
+    });
 }
 
 /** @brief Clears the current deck and resets modified flag. */
@@ -217,53 +232,12 @@ void AbstractTabDeckEditor::cleanDeckAndResetModified()
 /**
  * @brief Displays the save confirmation dialog before loading a deck.
  * @param openInSameTabIfBlank Open in same tab if current tab is blank.
- * @return DeckOpenLocation enum indicating where to open the deck.
+ * @param then Told where to open the deck, once the user answered.
  */
-AbstractTabDeckEditor::DeckOpenLocation AbstractTabDeckEditor::confirmOpen(const bool openInSameTabIfBlank)
+void AbstractTabDeckEditor::confirmOpen(const bool openInSameTabIfBlank,
+                                        std::function<void(DeckOpenLocation location)> then)
 {
-    if (SettingsCache::instance().deckEditor().getOpenDeckInNewTab()) {
-        if (openInSameTabIfBlank && deckStateManager->isBlankNewDeck()) {
-            return SAME_TAB;
-        } else {
-            return NEW_TAB;
-        }
-    }
-
-    if (!deckStateManager->isModified()) {
-        return SAME_TAB;
-    }
-
-    tabSupervisor->setCurrentWidget(this);
-    QMessageBox *msgBox = createSaveConfirmationWindow();
-    QPushButton *newTabButton = msgBox->addButton(tr("Open in new tab"), QMessageBox::ApplyRole);
-    int ret = msgBox->exec();
-
-    if (msgBox->clickedButton() == newTabButton) {
-        return NEW_TAB;
-    }
-
-    switch (ret) {
-        case QMessageBox::Save:
-            return actSaveDeck() ? SAME_TAB : CANCELLED;
-        case QMessageBox::Discard:
-            return SAME_TAB;
-        default:
-            return CANCELLED;
-    }
-}
-
-/**
- * @brief Creates the base save confirmation dialog.
- * @return Pointer to a QMessageBox.
- */
-QMessageBox *AbstractTabDeckEditor::createSaveConfirmationWindow()
-{
-    QMessageBox *msgBox = new QMessageBox(this);
-    msgBox->setIcon(QMessageBox::Warning);
-    msgBox->setWindowTitle(tr("Are you sure?"));
-    msgBox->setText(tr("The decklist has been modified.\nDo you want to save the changes?"));
-    msgBox->setStandardButtons(QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-    return msgBox;
+    unsavedDeckGuard->confirmOpen(openInSameTabIfBlank, std::move(then));
 }
 
 /**
@@ -272,18 +246,18 @@ QMessageBox *AbstractTabDeckEditor::createSaveConfirmationWindow()
  */
 void AbstractTabDeckEditor::actLoadDeck()
 {
-    auto deckOpenLocation = confirmOpen();
-    if (deckOpenLocation == CANCELLED) {
-        return;
-    }
+    confirmOpen(true, [this](DeckOpenLocation deckOpenLocation) {
+        if (deckOpenLocation == CANCELLED) {
+            return;
+        }
 
-    DlgLoadDeck dialog(this);
-    if (!dialog.exec()) {
-        return;
-    }
-
-    QString fileName = dialog.selectedFiles().at(0);
-    openDeckFromFile(fileName, deckOpenLocation);
+        auto *dialog = new DlgLoadDeck(this);
+        Dialogs::open(dialog, [this, dialog, deckOpenLocation](int result) {
+            if (result == QDialog::Accepted) {
+                openDeckFromFile(dialog->selectedFiles().at(0), deckOpenLocation);
+            }
+        });
+    });
 }
 
 /**
@@ -292,12 +266,11 @@ void AbstractTabDeckEditor::actLoadDeck()
  */
 void AbstractTabDeckEditor::actOpenRecent(const QString &fileName)
 {
-    auto deckOpenLocation = confirmOpen();
-    if (deckOpenLocation == CANCELLED) {
-        return;
-    }
-
-    openDeckFromFile(fileName, deckOpenLocation);
+    confirmOpen(true, [this, fileName](DeckOpenLocation deckOpenLocation) {
+        if (deckOpenLocation != CANCELLED) {
+            openDeckFromFile(fileName, deckOpenLocation);
+        }
+    });
 }
 
 /**
@@ -318,7 +291,7 @@ void AbstractTabDeckEditor::openDeckFromFile(const QString &fileName, DeckOpenLo
             openDeck(deckOpt.value());
         }
     } else {
-        QMessageBox::critical(this, tr("Error"), tr("Could not open deck at %1").arg(fileName));
+        Dialogs::critical(this, tr("Error"), tr("Could not open deck at %1").arg(fileName));
     }
     deckMenu->setSaveStatus(true);
 }
@@ -326,16 +299,20 @@ void AbstractTabDeckEditor::openDeckFromFile(const QString &fileName, DeckOpenLo
 /**
  * @brief Saves the current deck.
  * If remote deck, sends upload command.
- * @return True if save succeeded, false otherwise.
+ * @param then Told whether the save succeeded; a remote deck counts as saved once it is sent.
  */
-bool AbstractTabDeckEditor::actSaveDeck()
+void AbstractTabDeckEditor::actSaveDeck(std::function<void(bool saved)> then)
 {
+    if (unsavedDeckGuard->raiseOpenDialog()) {
+        reportSaved(then, false);
+        return;
+    }
     const auto loadedDeck = deckStateManager->toLoadedDeck();
     if (loadedDeck.lastLoadInfo.remoteDeckId != LoadedDeck::LoadInfo::NON_REMOTE_ID) {
         QString deckString = loadedDeck.deckList.writeToString_Native();
         if (deckString.length() > MAX_FILE_LENGTH) {
-            QMessageBox::critical(this, tr("Error"), tr("Could not save remote deck"));
-            return false;
+            Dialogs::critical(this, tr("Error"), tr("Could not save remote deck"), [then] { reportSaved(then, false); });
+            return;
         }
 
         Command_DeckUpload cmd;
@@ -347,58 +324,74 @@ bool AbstractTabDeckEditor::actSaveDeck()
         connect(pend, &PendingCommand::finished, this, &AbstractTabDeckEditor::saveDeckRemoteFinished);
         tabSupervisor->getClient()->sendCommand(pend);
 
-        return true;
+        reportSaved(then, true);
+        return;
     }
     if (loadedDeck.lastLoadInfo.fileName.isEmpty()) {
-        return actSaveDeckAs();
+        actSaveDeckAs(std::move(then));
+        return;
     }
 
     if (DeckLoader::saveToFile(loadedDeck)) {
         deckStateManager->setModified(false);
-        return true;
+        reportSaved(then, true);
+        return;
     }
 
-    QMessageBox::critical(
+    Dialogs::critical(
         this, tr("Error"),
-        tr("The deck could not be saved.\nPlease check that the directory is writable and try again."));
-    return false;
+        tr("The deck could not be saved.\nPlease check that the directory is writable and try again."),
+        [then] { reportSaved(then, false); });
 }
 
 /**
  * @brief Saves the deck to a user-selected file.
- * @return True if save succeeded.
+ * @param then Told whether the save succeeded.
  */
-bool AbstractTabDeckEditor::actSaveDeckAs()
+void AbstractTabDeckEditor::actSaveDeckAs(std::function<void(bool saved)> then)
 {
+    if (unsavedDeckGuard->raiseOpenDialog()) {
+        reportSaved(then, false);
+        return;
+    }
     DeckList deckList = deckStateManager->getDeckList();
 
-    QFileDialog dialog(this, tr("Save deck"));
-    dialog.setDirectory(SettingsCache::instance().paths().getDeckPath());
-    dialog.setAcceptMode(QFileDialog::AcceptSave);
-    dialog.setDefaultSuffix("cod");
-    dialog.setNameFilters(DeckLoader::FILE_NAME_FILTERS);
-    dialog.selectFile(deckList.getName().trimmed());
+    auto *dialog = new QFileDialog(this, tr("Save deck"));
+    dialog->setDirectory(SettingsCache::instance().paths().getDeckPath());
+    dialog->setAcceptMode(QFileDialog::AcceptSave);
+    dialog->setDefaultSuffix("cod");
+    dialog->setNameFilters(DeckLoader::FILE_NAME_FILTERS);
+    dialog->selectFile(deckList.getName().trimmed());
 
-    if (!dialog.exec()) {
-        return false;
-    }
+    Dialogs::open(dialog, [this, dialog, deckList, then = std::move(then)](int result) {
+        if (result == QDialog::Accepted) {
+            saveDeckToFile(deckList, dialog->selectedFiles().at(0), then);
+        } else {
+            reportSaved(then, false);
+        }
+    });
+}
 
-    QString fileName = dialog.selectedFiles().at(0);
+void AbstractTabDeckEditor::saveDeckToFile(const DeckList &deckList,
+                                           const QString &fileName,
+                                           const std::function<void(bool saved)> &then)
+{
     DeckFileFormat::Format fmt = DeckFileFormat::getFormatFromName(fileName);
 
     std::optional<LoadedDeck::LoadInfo> infoOpt = DeckLoader::saveToFile(deckList, fileName, fmt);
     if (!infoOpt) {
-        QMessageBox::critical(
+        Dialogs::critical(
             this, tr("Error"),
-            tr("The deck could not be saved.\nPlease check that the directory is writable and try again."));
-        return false;
+            tr("The deck could not be saved.\nPlease check that the directory is writable and try again."),
+            [then] { reportSaved(then, false); });
+        return;
     }
 
     deckStateManager->setLastLoadInfo(infoOpt.value());
 
     deckStateManager->setModified(false);
     SettingsCache::instance().recents().updateRecentlyOpenedDeckPaths(fileName);
-    return true;
+    reportSaved(then, true);
 }
 
 /**
@@ -441,20 +434,26 @@ void AbstractTabDeckEditor::saveDeckRemoteFinished(const Response &response)
  */
 void AbstractTabDeckEditor::actLoadDeckFromClipboard()
 {
-    auto deckOpenLocation = confirmOpen();
-    if (deckOpenLocation == CANCELLED) {
-        return;
-    }
+    confirmOpen(true, [this](DeckOpenLocation deckOpenLocation) {
+        if (deckOpenLocation == CANCELLED) {
+            return;
+        }
 
-    DlgLoadDeckFromClipboard dlg(this);
-    if (!dlg.exec()) {
-        return;
-    }
+        auto *dlg = new DlgLoadDeckFromClipboard(this);
+        Dialogs::open(dlg, [this, dlg, deckOpenLocation](int result) {
+            if (result == QDialog::Accepted) {
+                openDeckList(dlg->getDeckList(), deckOpenLocation);
+            }
+        });
+    });
+}
 
+void AbstractTabDeckEditor::openDeckList(const DeckList &deckList, DeckOpenLocation deckOpenLocation)
+{
     if (deckOpenLocation == NEW_TAB) {
-        emit openDeckEditor({.deckList = dlg.getDeckList()});
+        emit openDeckEditor({.deckList = deckList});
     } else {
-        setDeck({.deckList = dlg.getDeckList()});
+        setDeck({.deckList = deckList});
         deckStateManager->setModified(true);
     }
 
@@ -528,24 +527,18 @@ void AbstractTabDeckEditor::actPrintDeck()
  */
 void AbstractTabDeckEditor::actLoadDeckFromWebsite()
 {
-    auto deckOpenLocation = confirmOpen();
-    if (deckOpenLocation == CANCELLED) {
-        return;
-    }
+    confirmOpen(true, [this](DeckOpenLocation deckOpenLocation) {
+        if (deckOpenLocation == CANCELLED) {
+            return;
+        }
 
-    DlgLoadDeckFromWebsite dlg(this);
-    if (!dlg.exec()) {
-        return;
-    }
-
-    if (deckOpenLocation == NEW_TAB) {
-        emit openDeckEditor({.deckList = dlg.getDeck()});
-    } else {
-        setDeck({.deckList = dlg.getDeck()});
-        deckStateManager->setModified(true);
-    }
-
-    deckMenu->setSaveStatus(true);
+        auto *dlg = new DlgLoadDeckFromWebsite(this);
+        Dialogs::open(dlg, [this, dlg, deckOpenLocation](int result) {
+            if (result == QDialog::Accepted) {
+                openDeckList(dlg->getDeck(), deckOpenLocation);
+            }
+        });
+    });
 }
 
 /**
@@ -614,28 +607,19 @@ void AbstractTabDeckEditor::closeEvent(QCloseEvent *event)
 }
 
 /** @brief Shows a confirmation dialog before closing. */
-bool AbstractTabDeckEditor::confirmClose()
+void AbstractTabDeckEditor::confirmClose(std::function<void(bool mayClose)> then)
 {
-    if (deckStateManager->isModified()) {
-        tabSupervisor->setCurrentWidget(this);
-        int ret = createSaveConfirmationWindow()->exec();
-        if (ret == QMessageBox::Save) {
-            return actSaveDeck();
-        }
-        if (ret == QMessageBox::Cancel) {
-            return false;
-        }
-    }
-    return true;
+    unsavedDeckGuard->confirmClose(std::move(then));
 }
 
 /** @brief Handles close requests from outside (tab manager). */
-bool AbstractTabDeckEditor::closeRequest()
+void AbstractTabDeckEditor::closeRequest()
 {
-    if (!confirmClose()) {
-        return false;
-    }
-    return close();
+    confirmClose([this](bool mayClose) {
+        if (mayClose) {
+            close();
+        }
+    });
 }
 
 void AbstractTabDeckEditor::showPrintingSelector()
