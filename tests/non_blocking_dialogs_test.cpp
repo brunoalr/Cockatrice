@@ -83,7 +83,7 @@ TEST_F(NonBlockingDialogs, ConfirmReturnsBeforeTheCallbackRuns)
 
 TEST_F(NonBlockingDialogs, ADialogWithAParentBlocksTheWholeApplication)
 {
-    Dialogs::getText(parent.get(), "Title", "Label", "", [](const QString &) {});
+    Dialogs::getText(parent.get(), "Title", "Label", "", {});
 
     QInputDialog *dialog = onlyInputDialog();
     ASSERT_NE(dialog, nullptr);
@@ -806,7 +806,7 @@ TEST_F(NonBlockingDialogs, WhileAliveFitsTheMessageBoxOverload)
     auto *box = new QMessageBox(parent.get());
     QPushButton *keep = box->addButton("Keep", QMessageBox::YesRole);
     QAbstractButton *clicked = nullptr;
-    Dialogs::open(box, Dialogs::whileAlive(parent.get(), [&](QAbstractButton *button) { clicked = button; }));
+    Dialogs::open(box, Dialogs::whileAlive(parent.get(), [&clicked](QAbstractButton *button) { clicked = button; }));
 
     keep->click();
     settle();
