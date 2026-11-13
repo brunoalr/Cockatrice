@@ -796,6 +796,20 @@ if(WITH_CLIENT)
   )
   cockatrice_add_test(
     NAME
+    game_dialogs_test
+    SOURCES
+    ${CLIENT_SRC}/game_graphics/dialogs/dlg_move_top_cards_until.cpp
+    ${SETTINGS_SOURCES}
+    game_dialogs_test.cpp
+    LIBS
+    libcockatrice_game
+    libcockatrice_filters
+    ${SETTINGS_LIBS}
+    INCLUDE_DIRS
+    ${SETTINGS_INCLUDE_DIRS}
+  )
+  cockatrice_add_test(
+    NAME
     crash_report_dialog_test
     SOURCES
     ${CLIENT_SRC}/client/crash/crash_reporter.cpp
