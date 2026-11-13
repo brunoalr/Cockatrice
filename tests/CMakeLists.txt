@@ -740,11 +740,14 @@ if(WITH_CLIENT)
     connection_controller_test
     SOURCES
     ${CLIENT_SRC}/client/network/connection_controller/remote_connection_controller.cpp
+    ${CLIENT_SRC}/interface/intents/intent.cpp
+    ${CLIENT_SRC}/interface/intents/intent_login.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_connect.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_password.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_forgot_password_challenge.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_forgot_password_request.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_forgot_password_reset.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_login_prompt.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_register.cpp
     ${CLIENT_SRC}/interface/widgets/server/handle_public_servers.cpp
     ${CLIENT_SRC}/interface/widgets/server/user/user_info_connection.cpp

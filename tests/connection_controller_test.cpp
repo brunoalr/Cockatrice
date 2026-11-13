@@ -1,13 +1,17 @@
 #include "client/network/connection_controller/remote_connection_controller.h"
 #include "client/settings/cache_settings.h"
+#include "interface/intents/contexts/context_connect_to_server.h"
+#include "interface/intents/intent_login.h"
 #include "interface/theme_manager.h"
 #include "interface/widgets/dialogs/dlg_connect.h"
 #include "interface/widgets/dialogs/dlg_edit_password.h"
 #include "interface/widgets/dialogs/dlg_forgot_password_request.h"
 #include "interface/widgets/dialogs/dlg_forgot_password_reset.h"
+#include "interface/widgets/dialogs/dlg_login_prompt.h"
 #include "interface/widgets/dialogs/dlg_register.h"
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QDir>
 #include <QInputDialog>
 #include <QLineEdit>
@@ -79,6 +83,18 @@ protected:
     template <typename Dialog> Dialog *onlyOpen() const
     {
         const auto open = openDialogs<Dialog>();
+        EXPECT_EQ(open.size(), 1);
+        return open.value(0);
+    }
+
+    static DlgLoginPrompt *openLoginPrompt()
+    {
+        QList<DlgLoginPrompt *> open;
+        for (QWidget *widget : QApplication::topLevelWidgets()) {
+            if (auto *prompt = qobject_cast<DlgLoginPrompt *>(widget); prompt && prompt->isVisible()) {
+                open.append(prompt);
+            }
+        }
         EXPECT_EQ(open.size(), 1);
         return open.value(0);
     }
@@ -365,6 +381,50 @@ TEST_F(ConnectionControllerDialogs, ANoticeOutlivingTheControllerReopensNothing)
     settle();
 
     EXPECT_TRUE(openDialogs<DlgConnect>().isEmpty());
+}
+TEST_F(ConnectionControllerDialogs, ALinkToAServerWithoutALoginAsksForOneAndSavesIt)
+{
+    ContextConnectToServer context{"unsaved.example", "4747", {}, {}};
+    auto *intent = new IntentGetLoginCredentials(&context, true);
+    bool finished = false;
+    QObject::connect(intent, &Intent::finished, [&] { finished = true; });
+    intent->execute();
+
+    DlgLoginPrompt *prompt = openLoginPrompt();
+    ASSERT_NE(prompt, nullptr);
+    EXPECT_EQ(prompt->windowModality(), Qt::ApplicationModal);
+    EXPECT_FALSE(finished);
+    const auto edits = prompt->findChildren<QLineEdit *>();
+    for (int i = 0; i < edits.size(); ++i) {
+        edits[i]->setText(QString("field %1").arg(i));
+    }
+    prompt->findChild<QCheckBox *>()->setChecked(true);
+    const QString user = prompt->username();
+    const QString password = prompt->password();
+    prompt->accept();
+    settle();
+
+    EXPECT_TRUE(finished);
+    EXPECT_EQ(context.username, user);
+    EXPECT_EQ(context.password, password);
+    EXPECT_TRUE(SettingsCache::instance().servers().hasLoginData("unsaved.example", "4747"));
+}
+
+TEST_F(ConnectionControllerDialogs, CancellingTheLoginPromptCancelsTheLink)
+{
+    ContextConnectToServer context{"cancelled.example", "4747", {}, {}};
+    auto *intent = new IntentGetLoginCredentials(&context, true);
+    bool cancelled = false;
+    QObject::connect(intent, &Intent::cancelled, [&] { cancelled = true; });
+    intent->execute();
+
+    DlgLoginPrompt *prompt = openLoginPrompt();
+    ASSERT_NE(prompt, nullptr);
+    prompt->reject();
+    settle();
+
+    EXPECT_TRUE(cancelled);
+    EXPECT_TRUE(context.username.isEmpty());
 }
 } // namespace
 
