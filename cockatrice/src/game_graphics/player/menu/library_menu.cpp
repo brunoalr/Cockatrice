@@ -3,12 +3,12 @@
 #include "../../../client/settings/cache_settings.h"
 #include "../../../client/settings/shortcuts_settings.h"
 #include "../../../interface/widgets/menus/tearoff_menu.h"
+#include "../../../interface/widgets/utility/non_blocking_dialogs.h"
 #include "../player_graphics_item.h"
 
 #include <QAction>
 #include <QGraphicsScene>
 #include <QGraphicsView>
-#include <QInputDialog>
 #include <QKeySequence>
 #include <QList>
 #include <QMap>
@@ -347,18 +347,15 @@ void LibraryMenu::onRevealTopCardTriggered()
     if (auto *view = player->scene() ? player->scene()->views().value(0) : nullptr) {
         parent = view->window();
     }
-    if (auto *a = qobject_cast<QAction *>(sender())) {
-
+    if (const auto *a = qobject_cast<QAction *>(sender())) {
+        const int targetPlayerId = a->data().toInt();
         int deckSize = player->getLogic()->getDeckZone()->getCards().size();
-        bool ok = true;
-        int number = QInputDialog::getInt(parent, tr("Reveal top cards of library"),
-                                          tr("Number of cards: (max. %1)").arg(deckSize), defaultNumberTopCards, 1,
-                                          deckSize, 1, &ok);
-
-        if (ok) {
-            player->getLogic()->getPlayerActions()->actRevealTopCards(a->data().toInt(), number);
-            defaultNumberTopCards = number;
-        }
+        Dialogs::getInt(parent, tr("Reveal top cards of library"), tr("Number of cards: (max. %1)").arg(deckSize),
+                        defaultNumberTopCards, 1, deckSize,
+                        Dialogs::whileAlive(this, [this, targetPlayerId](int number) {
+                            player->getLogic()->getPlayerActions()->actRevealTopCards(targetPlayerId, number);
+                            defaultNumberTopCards = number;
+                        }));
     }
 }
 
