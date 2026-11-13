@@ -281,31 +281,31 @@ void UserInfoBox::actPassword()
 {
     auto *dlg = new DlgEditPassword(this);
     Dialogs::open(dlg, [this, dlg](int result) {
-        if (result != QDialog::Accepted) {
-            return;
-        }
-
-        auto oldPassword = dlg->getOldPassword();
-        auto newPassword = dlg->getNewPassword();
-
-        if (client->getServerSupportsPasswordHash()) {
-            Command_RequestPasswordSalt cmd;
-            cmd.set_user_name(client->getUserName().toStdString());
-
-            PendingCommand *pend = client->prepareSessionCommand(cmd);
-            connect(pend, &PendingCommand::finished, this, [=, this](const Response &response) {
-                if (response.response_code() == Response::RespOk) {
-                    changePassword(oldPassword, newPassword);
-                } else {
-                    Dialogs::critical(this, tr("Error"),
-                                      tr("An error occurred while trying to update your user information."));
-                }
-            });
-            client->sendCommand(pend);
-        } else {
-            changePassword(oldPassword, newPassword);
+        if (result == QDialog::Accepted) {
+            requestPasswordChange(dlg->getOldPassword(), dlg->getNewPassword());
         }
     });
+}
+
+void UserInfoBox::requestPasswordChange(const QString &oldPassword, const QString &newPassword)
+{
+    if (!client->getServerSupportsPasswordHash()) {
+        changePassword(oldPassword, newPassword);
+        return;
+    }
+
+    Command_RequestPasswordSalt cmd;
+    cmd.set_user_name(client->getUserName().toStdString());
+
+    PendingCommand *pend = client->prepareSessionCommand(cmd);
+    connect(pend, &PendingCommand::finished, this, [=, this](const Response &response) {
+        if (response.response_code() == Response::RespOk) {
+            changePassword(oldPassword, newPassword);
+        } else {
+            Dialogs::critical(this, tr("Error"), tr("An error occurred while trying to update your user information."));
+        }
+    });
+    client->sendCommand(pend);
 }
 
 void UserInfoBox::changePassword(const QString &oldPassword, const QString &newPassword)
