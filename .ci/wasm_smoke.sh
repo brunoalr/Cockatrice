@@ -62,6 +62,8 @@ if [[ $result == started ]]; then
     sleep "$settle_seconds"
     if grep -aqE "$fatal" "$log"; then
       result="the page aborted after the connect dialog opened"
+    elif ! kill -0 "$browser" 2>/dev/null; then
+      result="the browser exited after the connect dialog opened"
     fi
   fi
 fi

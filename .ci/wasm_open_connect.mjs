@@ -1,5 +1,9 @@
 // usage: node --experimental-websocket wasm_open_connect.mjs <devtools port> <seconds>
 const [, , port, seconds] = process.argv
+setTimeout(() => {
+  console.log('the page stopped answering')
+  process.exit(1)
+}, seconds * 2000)
 const page = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find(target => target.type === 'page')
 const socket = new WebSocket(page.webSocketDebuggerUrl)
 await new Promise(resolve => (socket.onopen = resolve))
