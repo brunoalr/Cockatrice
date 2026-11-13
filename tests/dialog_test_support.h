@@ -10,7 +10,6 @@
 #include <QThread>
 #include <QTimer>
 #include <QWidget>
-#include <functional>
 #include <gtest/gtest.h>
 #include <memory>
 
@@ -73,11 +72,7 @@ private:
     NestedLoopWatchdog nestedLoopWatchdog;
 };
 
-inline int run(
-    int argc,
-    char **argv,
-    const QString &applicationName,
-    const std::function<int()> &runTests = [] { return RUN_ALL_TESTS(); })
+template <typename RunTests> int run(int argc, char **argv, const QString &applicationName, RunTests runTests)
 {
     qputenv("QT_QPA_PLATFORM", "offscreen");
     // A CI container's user has no home it can write to: saved settings and file dialogs both use it.
@@ -94,6 +89,11 @@ inline int run(
         return RUN_ALL_TESTS();
     }
     return runTests();
+}
+
+inline int run(int argc, char **argv, const QString &applicationName)
+{
+    return run(argc, argv, applicationName, [] { return RUN_ALL_TESTS(); });
 }
 } // namespace DialogTest
 
