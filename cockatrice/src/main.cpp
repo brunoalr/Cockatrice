@@ -607,7 +607,7 @@ int main(int argc, char *argv[])
     });
 #endif
 
-    int ret = app.exec();
+    int ret = app.exec(); // blocking-ok: the application's own event loop
 
     qCInfo(MainLog) << "Event loop finished, terminating...";
     delete rng;
