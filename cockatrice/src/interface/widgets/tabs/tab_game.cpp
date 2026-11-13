@@ -29,6 +29,7 @@
 #include "../menus/tearoff_menu.h"
 #include "../replay/replay_event_sidebar.h"
 #include "../replay/replay_widget.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "../utility/visibility_change_listener.h"
 #include "card/card_completer_proxy_model.h"
 #include "card/card_search_model.h"
@@ -546,11 +547,20 @@ void TabGame::refreshShortcuts()
 
 bool TabGame::closeRequest()
 {
-    if (!leaveGame()) {
-        return false;
+    if (game->getGameState()->isGameClosed() || game->getPlayerManager()->isSpectator()) {
+        return leaveGame();
     }
 
-    return close();
+    tabSupervisor->setCurrentWidget(this);
+    Dialogs::confirm(
+        this, tr("Leave game"), tr("Are you sure you want to leave this game?"),
+        [this](bool confirmed) {
+            if (confirmed) {
+                leaveGame();
+            }
+        },
+        QMessageBox::No);
+    return false;
 }
 
 void TabGame::closeEvent(QCloseEvent *event)
@@ -575,8 +585,7 @@ void TabGame::actGameInfo()
 {
     // Heap-allocated so that destroying this tab while the dialog is open cannot delete a stack object.
     auto *dlg = new DlgCreateGame(game->getGameMetaInfo()->proto(), game->getGameMetaInfo()->getRoomGameTypes(), this);
-    dlg->setAttribute(Qt::WA_DeleteOnClose);
-    dlg->exec();
+    Dialogs::open(dlg, {});
 }
 
 void TabGame::actCopyGameLink()
@@ -625,8 +634,8 @@ void TabGame::actInviteToGame()
         excludeUserNames << QString::fromStdString(it.value().name());
     }
 
-    DlgInviteToGame dlg(tabSupervisor, inviteUrl, metaInfo->proto().only_buddies(), excludeUserNames, this);
-    dlg.exec();
+    Dialogs::open(
+        new DlgInviteToGame(tabSupervisor, inviteUrl, metaInfo->proto().only_buddies(), excludeUserNames, this), {});
 }
 
 void TabGame::actConcede()
@@ -636,17 +645,23 @@ void TabGame::actConcede()
         return;
     }
     if (!player->getConceded()) {
-        if (!QtUtils::confirm(this, tr("Concede"), tr("Are you sure you want to concede this game?"),
-                              QMessageBox::No)) {
-            return;
-        }
-        emit game->getPlayerManager()->activeLocalPlayerConceded();
+        Dialogs::confirm(
+            this, tr("Concede"), tr("Are you sure you want to concede this game?"),
+            [this](bool confirmed) {
+                if (confirmed) {
+                    emit game->getPlayerManager()->activeLocalPlayerConceded();
+                }
+            },
+            QMessageBox::No);
     } else {
-        if (!QtUtils::confirm(this, tr("Unconcede"),
-                              tr("You have already conceded.  Do you want to return to this game?"), QMessageBox::No)) {
-            return;
-        }
-        emit game->getPlayerManager()->activeLocalPlayerUnconceded();
+        Dialogs::confirm(
+            this, tr("Unconcede"), tr("You have already conceded.  Do you want to return to this game?"),
+            [this](bool confirmed) {
+                if (confirmed) {
+                    emit game->getPlayerManager()->activeLocalPlayerUnconceded();
+                }
+            },
+            QMessageBox::No);
     }
 }
 
@@ -678,12 +693,12 @@ void TabGame::actTurnOrder()
         }
     }
 
-    DlgTurnOrder dlg(playerNames, this);
-    if (dlg.exec() != QDialog::Accepted) {
-        return;
-    }
-
-    game->getGameEventHandler()->handleSetPlayerOrder(dlg.order(), dlg.isRandomizeRequested());
+    auto *dlg = new DlgTurnOrder(playerNames, this);
+    Dialogs::open(dlg, [this, dlg](int result) {
+        if (result == QDialog::Accepted) {
+            game->getGameEventHandler()->handleSetPlayerOrder(dlg->order(), dlg->isRandomizeRequested());
+        }
+    });
 }
 
 /**
@@ -718,26 +733,16 @@ void TabGame::updateTurnOrderAction()
 }
 
 /**
- * Confirms the leave game and sends the leave game command, if applicable.
+ * Sends the leave game command, if applicable, and closes the tab.
  *
- * @return True if the leave game is confirmed
+ * @return True if the tab is closed
  */
 bool TabGame::leaveGame()
 {
-    if (!game->getGameState()->isGameClosed()) {
-        if (!game->getPlayerManager()->isSpectator()) {
-            tabSupervisor->setCurrentWidget(this);
-            if (!QtUtils::confirm(this, tr("Leave game"), tr("Are you sure you want to leave this game?"),
-                                  QMessageBox::No)) {
-                return false;
-            }
-        }
-
-        if (!replayDock) {
-            emit gameLeft();
-        }
+    if (!game->getGameState()->isGameClosed() && !replayDock) {
+        emit gameLeft();
     }
-    return true;
+    return close();
 }
 
 void TabGame::actSay()
@@ -849,11 +854,7 @@ void TabGame::notifyPlayerJoin(QString playerName)
 void TabGame::notifyPlayerKicked()
 {
     tabSupervisor->setCurrentIndex(tabSupervisor->indexOf(this));
-    QMessageBox msgBox(this);
-    msgBox.setWindowTitle(getTabText());
-    msgBox.setText(tr("You have been kicked out of the game."));
-    msgBox.setIcon(QMessageBox::Information);
-    msgBox.exec();
+    Dialogs::information(this, getTabText(), tr("You have been kicked out of the game."));
 }
 
 PlayerLogic *TabGame::addPlayer(PlayerLogic *newPlayer)
