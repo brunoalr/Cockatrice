@@ -5,6 +5,7 @@
 #include <QMetaObject>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QUrlQuery>
 #include <qtmetamacros.h>
 
@@ -57,7 +58,11 @@ signals:
     void urlChainFinished(bool connected);
 
 private:
-    Intent *createJoinGameIntent(const QUrlQuery &query, PendingIntentChain &chain);
+    void parseFirstLink();
+    void queueChain(const PendingIntentChain &chain, Intent *firstIntent);
+    void finishLink();
+    void askToJoinGame(const QUrlQuery &query);
+    Intent *createJoinGameIntent(const ContextJoinGame &context, PendingIntentChain &chain);
     Intent *createOpenDeckIntent(const QUrlQuery &query, PendingIntentChain &chain);
     QString generateJoinGameMessage(const ContextJoinGame &context, const QString &gameDescription);
     [[nodiscard]] bool isConnectedTo(const QString &hostname, const QString &port) const;
@@ -68,6 +73,8 @@ private:
     void restoreToPreviousServer(const PendingIntentChain &chain);
 
     MainWindow *mainWindow;
+    // A link waits here until the one before it is parsed and answered, so their questions come one at a time.
+    QStringList pendingLinks;
     QList<PendingIntentChain> pendingChains;
     bool chainRunning = false;
     // Disconnects the destroyed-signal backstop once a chain ends, so an old
