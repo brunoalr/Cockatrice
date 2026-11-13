@@ -23,6 +23,7 @@ class AbstractClient;
 class TabSupervisor;
 class TabRoom;
 class ServerInfo_Game;
+class Command_JoinGame;
 class Response;
 class Event_AddToList;
 class Event_RemoveFromList;
@@ -246,6 +247,7 @@ private:
      * visible in the filtered game list.
      */
     void joinGame(const ServerInfo_Game &game, bool asSpectator = false, bool asJudge = false);
+    void sendJoinGame(int roomId, Command_JoinGame cmd, const QString &password);
 
 public:
     /**
