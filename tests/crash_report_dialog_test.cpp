@@ -10,8 +10,11 @@
 #include <QThread>
 #include <QTimer>
 #include <gtest/gtest.h>
+#include <libcockatrice/rng/rng_abstract.h>
 #include <memory>
 #include <optional>
+
+RNG_Abstract *rng = nullptr;
 
 namespace
 {

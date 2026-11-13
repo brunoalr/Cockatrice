@@ -18,17 +18,20 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QStandardPaths>
+#include <QTemporaryDir>
 #include <QThread>
 #include <QTimer>
 #include <gtest/gtest.h>
 #include <libcockatrice/network/client/remote/remote_client.h>
 #include <libcockatrice/protocol/pb/response.pb.h>
+#include <libcockatrice/rng/rng_abstract.h>
 #include <libcockatrice/settings/servers_settings.h>
 #include <libcockatrice/utility/string_limits.h>
 #include <memory>
 #include <optional>
 
 ThemeManager *themeManager = nullptr;
+RNG_Abstract *rng = nullptr;
 
 namespace
 {
@@ -431,6 +434,9 @@ TEST_F(ConnectionControllerDialogs, CancellingTheLoginPromptCancelsTheLink)
 int main(int argc, char **argv)
 {
     qputenv("QT_QPA_PLATFORM", "offscreen");
+    // The tests read saved logins back, and a CI container's user has no home it can write to.
+    const QTemporaryDir home;
+    qputenv("HOME", home.path().toUtf8());
     QStandardPaths::setTestModeEnabled(true);
     QApplication app(argc, argv);
     QCoreApplication::setOrganizationName(QStringLiteral("CockatriceTest"));
