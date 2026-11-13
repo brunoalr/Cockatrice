@@ -4,6 +4,7 @@
 #include "../client/network/update/client/client_update_checker.h"
 #include "../client/network/update/client/release_channel.h"
 #include "../interface/window_main.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "update/client/update_downloader.h"
 
 #include <QApplication>
@@ -30,7 +31,6 @@
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
-#include <libcockatrice/utility/qt_utils.h>
 #include <qnamespace.h>
 #include <version_string.h>
 
@@ -84,19 +84,27 @@ DlgUpdate::DlgUpdate(QWidget *parent) : QDialog(parent)
     setFixedHeight(this->sizeHint().height());
     setFixedWidth(this->sizeHint().width());
 
-    // Check for SSL (this probably isn't necessary)
-    if (!QSslSocket::supportsSsl()) {
-        enableUpdateButton(false);
-        QMessageBox::critical(this, tr("Error"),
-                              tr("Cockatrice was not built with SSL support, therefore you cannot download updates "
-                                 "automatically! \nPlease visit the download page to update manually."));
-    }
-
     // Initialize the checker and downloader class
     uDownloader = new UpdateDownloader(this);
     connect(uDownloader, &UpdateDownloader::downloadSuccessful, this, &DlgUpdate::downloadSuccessful);
     connect(uDownloader, &UpdateDownloader::progressMade, this, &DlgUpdate::downloadProgressMade);
     connect(uDownloader, &UpdateDownloader::error, this, &DlgUpdate::downloadError);
+
+    // Check for SSL (this probably isn't necessary)
+    if (!QSslSocket::supportsSsl()) {
+        enableUpdateButton(false);
+        // Queued until this dialog is shown, so that the notice opens in front of it.
+        QMetaObject::invokeMethod(
+            this,
+            [this] {
+                Dialogs::critical(this, tr("Error"),
+                                  tr("Cockatrice was not built with SSL support, therefore you cannot download "
+                                     "updates automatically! \nPlease visit the download page to update manually."),
+                                  [this] { beginUpdateCheck(); });
+            },
+            Qt::QueuedConnection);
+        return;
+    }
 
     // Check for updates
     beginUpdateCheck();
@@ -160,7 +168,7 @@ void DlgUpdate::finishedUpdateCheck(bool needToUpdate, bool isCompatible, Releas
     if (!needToUpdate) {
         // If there's no need to update, tell them that. However we still allow them to run the
         // downloader themselves if there's a compatible build
-        QMessageBox::information(
+        Dialogs::information(
             window(), tr("No Update Available"),
             tr("Cockatrice is up to date!") + "<br><br>" +
                 tr("You are already running the latest version available in the chosen release channel.") + "<br>" +
@@ -178,13 +186,16 @@ void DlgUpdate::finishedUpdateCheck(bool needToUpdate, bool isCompatible, Releas
                                 QString(":</b> %1 (<a href=\"%2\">").arg(publishDate, release->getDescriptionUrl()) +
                                 tr("Changelog") + "</a>)<br><br>" + tr("Do you want to update now?");
 
-        if (QtUtils::confirm(window(), tr("Update Available"), message)) {
-            downloadUpdate(release->getName());
-        } else {
-            closeDialog();
-        }
+        Dialogs::confirm(window(), tr("Update Available"), message,
+                         [this, releaseName = release->getName()](bool confirmed) {
+                             if (confirmed) {
+                                 downloadUpdate(releaseName);
+                             } else {
+                                 closeDialog();
+                             }
+                         });
     } else {
-        QMessageBox::information(
+        Dialogs::information(
             window(), tr("Update Available"),
             tr("A new version of Cockatrice is available!") + "<br><br>" + "<b>" + tr("New version") +
                 QString(":</b> %1<br>").arg(release->getName()) + "<b>" + tr("Released") +
@@ -248,16 +259,16 @@ void DlgUpdate::warnInstallerIsWaiting(QWidget *parent)
 void DlgUpdate::updateCheckError(const QString &errorString)
 {
     setLabel(tr("Error"));
-    QMessageBox::critical(this, tr("Update Error"),
-                          tr("An error occurred while checking for updates:") + QString(" ") + errorString);
+    Dialogs::critical(this, tr("Update Error"),
+                      tr("An error occurred while checking for updates:") + QString(" ") + errorString);
 }
 
 void DlgUpdate::downloadError(const QString &errorString)
 {
     setLabel(tr("Error"));
     enableUpdateButton(true);
-    QMessageBox::critical(this, tr("Update Error"),
-                          tr("An error occurred while downloading an update:") + QString(" ") + errorString);
+    Dialogs::critical(this, tr("Update Error"),
+                      tr("An error occurred while downloading an update:") + QString(" ") + errorString);
 }
 
 void DlgUpdate::downloadSuccessful(const QUrl &filepath)
@@ -325,7 +336,7 @@ void DlgUpdate::downloadSuccessful(const QUrl &filepath)
         close();
     } else {
         setLabel(tr("Error"));
-        QMessageBox::critical(this, tr("Update Error"),
+        Dialogs::critical(this, tr("Update Error"),
                               tr("Cockatrice is unable to open the installer.") + "<br><br>" +
                                   tr("Try to update manually by closing Cockatrice and running the installer.") +
                                   "<br>" + tr("Download location") + QString(": %1").arg(filepath.toLocalFile()));
