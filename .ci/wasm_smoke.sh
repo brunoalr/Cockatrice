@@ -9,6 +9,7 @@ dir=$1
 page=${2:-index.html}
 chrome=${CHROME:-google-chrome}
 port=${WASM_SMOKE_PORT:-8137}
+devtools_port=${WASM_SMOKE_DEVTOOLS_PORT:-9237}
 start_seconds=${START_SECONDS:-120}
 settle_seconds=${SETTLE_SECONDS:-15}
 started='ui\.show\(\) finished'
@@ -27,7 +28,7 @@ for ((attempt = 0; attempt < 20; attempt++)); do
 done
 # shellcheck disable=SC2086
 "$chrome" --headless=new --no-first-run --disable-extensions --enable-logging=stderr --v=0 ${CHROME_FLAGS:-} \
-  --user-data-dir="$work/profile" "http://127.0.0.1:$port/$page" >"$log" 2>&1 &
+  --remote-debugging-port="$devtools_port" --user-data-dir="$work/profile" "http://127.0.0.1:$port/$page" >"$log" 2>&1 &
 browser=$!
 
 result="no start-up within $start_seconds s"
@@ -53,6 +54,17 @@ for ((second = 0; second <= start_seconds + settle_seconds; second++)); do
   fi
   sleep 1
 done
+
+if [[ $result == started ]]; then
+  if ! node --experimental-websocket "$(dirname "$0")/wasm_open_connect.mjs" "$devtools_port" "$settle_seconds"; then
+    result="the connect dialog did not open"
+  else
+    sleep "$settle_seconds"
+    if grep -aqE "$fatal" "$log"; then
+      result="the page aborted after the connect dialog opened"
+    fi
+  fi
+fi
 
 kill "$browser" "$server" 2>/dev/null
 wait "$browser" "$server" 2>/dev/null
