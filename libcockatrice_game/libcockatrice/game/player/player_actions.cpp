@@ -32,6 +32,7 @@
 #include <QMetaType>
 #include <QPoint>
 #include <QPointF>
+#include <QPointer>
 #include <QSharedPointer>
 #include <QTimer>
 #include <QVariant>
@@ -1039,6 +1040,15 @@ void PlayerActions::actCreateAllRelatedCards(const CardState *sourceCard)
         return;
     }
 
+    // The answer comes later: this object and the relation may be gone by then.
+    const auto thenRememberToken = [this](const CardRelation *relation) -> std::function<void()> {
+        return [self = QPointer<PlayerActions>(this), created = QPointer<const CardRelation>(relation)] {
+            if (self && created) {
+                self->setLastTokenFromRelation(created);
+            }
+        };
+    };
+
     auto relatedCards = sourceCard->getCardInfo().getAllRelatedCards();
     if (relatedCards.isEmpty()) {
         return;
@@ -1049,8 +1059,7 @@ void PlayerActions::actCreateAllRelatedCards(const CardState *sourceCard)
 
     if (relatedCards.length() == 1) {
         cardRelation = relatedCards.at(0);
-        actRequestCreateRelatedFromRelationDialog(sourceCard, cardRelation,
-                                                  [this, cardRelation] { setLastTokenFromRelation(cardRelation); });
+        actRequestCreateRelatedFromRelationDialog(sourceCard, cardRelation, thenRememberToken(cardRelation));
         return;
     }
 
@@ -1064,8 +1073,7 @@ void PlayerActions::actCreateAllRelatedCards(const CardState *sourceCard)
     switch (nonExcludedRelatedCards.length()) {
         case 1:
             cardRelation = nonExcludedRelatedCards.at(0);
-            actRequestCreateRelatedFromRelationDialog(sourceCard, cardRelation,
-                                                      [this, cardRelation] { setLastTokenFromRelation(cardRelation); });
+            actRequestCreateRelatedFromRelationDialog(sourceCard, cardRelation, thenRememberToken(cardRelation));
             return;
 
         // If all are marked "Exclude", then treat the situation as if none of them are.
