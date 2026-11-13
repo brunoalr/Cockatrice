@@ -1,5 +1,6 @@
 #include "client/network/connection_controller/remote_connection_controller.h"
 #include "client/settings/cache_settings.h"
+#include "dialog_test_support.h"
 #include "interface/intents/contexts/context_connect_to_server.h"
 #include "interface/intents/intent_login.h"
 #include "interface/theme_manager.h"
@@ -17,10 +18,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QStandardPaths>
-#include <QTemporaryDir>
 #include <QThread>
-#include <QTimer>
 #include <gtest/gtest.h>
 #include <libcockatrice/network/client/remote/remote_client.h>
 #include <libcockatrice/protocol/pb/response.pb.h>
@@ -35,59 +33,21 @@ RNG_Abstract *rng = nullptr;          // NOSONAR: the client declares it extern 
 
 namespace
 {
-void settle()
-{
-    QCoreApplication::processEvents();
-    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-}
+using DialogTest::settle;
 
-class ConnectionControllerDialogs : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
+class ConnectionControllerDialogs : public DialogTest::Fixture // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:
-    std::unique_ptr<QWidget> window = std::make_unique<QWidget>();
     std::unique_ptr<ConnectionController> controller;
     RemoteClient *client = nullptr;
-    QTimer nestedLoopWatchdog;
 
     void SetUp() override
     {
-        // A dialog that blocks runs a nested event loop: fail and close it instead of hanging.
-        QObject::connect(&nestedLoopWatchdog, &QTimer::timeout, [] {
-            if (QThread::currentThread()->loopLevel() == 0) {
-                return;
-            }
-            ADD_FAILURE() << "a nested event loop is running";
-            for (QWidget *widget : QApplication::topLevelWidgets()) {
-                if (auto *dialog = qobject_cast<QDialog *>(widget); dialog && dialog->isVisible()) {
-                    dialog->reject();
-                }
-            }
-        });
-        nestedLoopWatchdog.start(10);
-
         controller = std::make_unique<ConnectionController>(window.get());
         client = controller->client();
         // Stopped, the client thread leaves every request queued: the tests only see the request signals.
         client->thread()->quit();
         client->thread()->wait();
-    }
-
-    template <typename Dialog> QList<Dialog *> openDialogs() const
-    {
-        QList<Dialog *> open;
-        for (Dialog *dialog : window->findChildren<Dialog *>()) {
-            if (dialog->isVisible()) {
-                open.append(dialog);
-            }
-        }
-        return open;
-    }
-
-    template <typename Dialog> Dialog *onlyOpen() const
-    {
-        const auto open = openDialogs<Dialog>();
-        EXPECT_EQ(open.size(), 1);
-        return open.value(0);
     }
 
     static DlgLoginPrompt *openLoginPrompt()
@@ -434,34 +394,21 @@ TEST_F(ConnectionControllerDialogs, CancellingTheLoginPromptCancelsTheLink)
 
 int main(int argc, char **argv)
 {
-    qputenv("QT_QPA_PLATFORM", "offscreen");
-    // The tests read saved logins back, and a CI container's user has no home it can write to.
-    const QTemporaryDir home;
-    qputenv("HOME", home.path().toUtf8());
-    QStandardPaths::setTestModeEnabled(true);
-    QApplication app(argc, argv);
-    QCoreApplication::setOrganizationName(QStringLiteral("CockatriceTest"));
-    QCoreApplication::setApplicationName(
-        QStringLiteral("connection-controller-test-%1").arg(QCoreApplication::applicationPid()));
-    ::testing::InitGoogleTest(&argc, argv);
-    // CMake lists the cases at build time, where LeakSanitizer is on: the settings singleton leaks at exit.
-    if (::testing::GTEST_FLAG(list_tests)) {
-        return RUN_ALL_TESTS();
-    }
+    return DialogTest::run(argc, argv, QStringLiteral("connection-controller-test"), [] {
+        ThemeManager theme;
+        themeManager = &theme;
+        ServersSettings &servers = SettingsCache::instance().servers();
+        // With a single saved server the connect and register dialogs download the public server list.
+        servers.addNewServer("First", "first.example", "4747", "first player", QString(), false);
+        servers.addNewServer("Second", "second.example", "4747", "second player", QString(), false);
+        servers.setFPHostName("first.example");
+        servers.setFPPort("4747");
+        servers.setFPPlayerName("first player");
 
-    ThemeManager theme;
-    themeManager = &theme;
-    ServersSettings &servers = SettingsCache::instance().servers();
-    // With a single saved server the connect and register dialogs download the public server list.
-    servers.addNewServer("First", "first.example", "4747", "first player", QString(), false);
-    servers.addNewServer("Second", "second.example", "4747", "second player", QString(), false);
-    servers.setFPHostName("first.example");
-    servers.setFPPort("4747");
-    servers.setFPPlayerName("first player");
+        const int result = RUN_ALL_TESTS();
 
-    const int result = RUN_ALL_TESTS();
-
-    QDir(SettingsCache::instance().getDataPath()).removeRecursively();
-    QDir(SettingsCache::instance().getCachePath()).removeRecursively();
-    return result;
+        QDir(SettingsCache::instance().getDataPath()).removeRecursively();
+        QDir(SettingsCache::instance().getCachePath()).removeRecursively();
+        return result;
+    });
 }

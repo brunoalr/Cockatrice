@@ -1,14 +1,11 @@
 #include "client/crash/crash_reporter.h"
+#include "dialog_test_support.h"
 #include "interface/widgets/dialogs/dlg_crash_report.h"
 #include "interface/widgets/utility/non_blocking_dialogs.h"
 
-#include <QApplication>
 #include <QFile>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QStandardPaths>
-#include <QThread>
-#include <QTimer>
 #include <gtest/gtest.h>
 #include <libcockatrice/rng/rng_abstract.h>
 #include <memory>
@@ -18,11 +15,7 @@ RNG_Abstract *rng = nullptr; // NOSONAR: the client declares it extern and assig
 
 namespace
 {
-void settle()
-{
-    QCoreApplication::processEvents();
-    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-}
+using DialogTest::settle;
 
 void settleBoxThenDialog()
 {
@@ -31,31 +24,15 @@ void settleBoxThenDialog()
 }
 
 // Built without crash reporting, the reporter fails every send.
-class CrashReportDialog : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
+class CrashReportDialog : public DialogTest::Fixture // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:
-    std::unique_ptr<QWidget> window = std::make_unique<QWidget>();
     CrashReporter reporter;
     DlgCrashReport *dialog = nullptr;
     std::optional<int> result;
-    QTimer nestedLoopWatchdog;
 
     void SetUp() override
     {
-        // A dialog that blocks runs a nested event loop: fail and close it instead of hanging.
-        QObject::connect(&nestedLoopWatchdog, &QTimer::timeout, [] {
-            if (QThread::currentThread()->loopLevel() == 0) {
-                return;
-            }
-            ADD_FAILURE() << "a nested event loop is running";
-            for (QWidget *widget : QApplication::topLevelWidgets()) {
-                if (auto *open = qobject_cast<QDialog *>(widget); open && open->isVisible()) {
-                    open->reject();
-                }
-            }
-        });
-        nestedLoopWatchdog.start(10);
-
         dialog = new DlgCrashReport(window.get(), true, &reporter);
         Dialogs::open(dialog, [this](int finished) { result = finished; });
     }
@@ -140,12 +117,5 @@ TEST_F(CrashReportDialog, SavingAFailedReportClosesTheDialogAfterTheSavedNotice)
 
 int main(int argc, char **argv)
 {
-    qputenv("QT_QPA_PLATFORM", "offscreen");
-    QStandardPaths::setTestModeEnabled(true);
-    QApplication app(argc, argv);
-    QCoreApplication::setOrganizationName(QStringLiteral("CockatriceTest"));
-    QCoreApplication::setApplicationName(
-        QStringLiteral("crash-report-dialog-test-%1").arg(QCoreApplication::applicationPid()));
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    return DialogTest::run(argc, argv, QStringLiteral("crash-report-dialog-test"));
 }
