@@ -1260,7 +1260,11 @@ void MainWindow::cardDatabaseNewSetsFound(int numUnknownSets, QStringList unknow
         return;
     }
 
+    // The answer applies to every unknown set, so only the prompt that lists the current ones may stay open.
+    const QString promptName = QStringLiteral("newSetsPrompt");
+    delete findChild<QMessageBox *>(promptName, Qt::FindDirectChildrenOnly);
     auto *msgBox = new QMessageBox(this);
+    msgBox->setObjectName(promptName);
     msgBox->setWindowTitle(tr("New sets found"));
     msgBox->setIcon(QMessageBox::Question);
     msgBox->setText(tr("%n new set(s) found in the card database\n"
