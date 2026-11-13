@@ -69,6 +69,12 @@ private:
     PlayerGraphicsItem *player;
     PlayerActions *playerActions;
 
+    void getNumber(const QString &title,
+                   const QString &label,
+                   int value,
+                   int minimum,
+                   int maximum,
+                   const std::function<void(int number)> &thenAccepted);
     void openHoldingDialogSemaphore(QDialog *dialog, const std::function<void(int result)> &thenFinished);
     void createRelated(const CardState *sourceCard,
                        const CardRelation *cardRelation,

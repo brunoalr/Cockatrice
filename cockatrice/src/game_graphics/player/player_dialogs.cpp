@@ -22,6 +22,26 @@
 #include <libcockatrice/game/player/player_logic.h>
 #include <libcockatrice/utility/string_limits.h>
 
+namespace
+{
+// Server events can destroy a selected card while its dialog is open.
+QList<QPointer<CardState>> guarded(const QList<CardState *> &cards)
+{
+    return {cards.cbegin(), cards.cend()};
+}
+
+QList<CardState *> stillAlive(const QList<QPointer<CardState>> &cards)
+{
+    QList<CardState *> alive;
+    for (CardState *card : cards) {
+        if (card != nullptr) {
+            alive.append(card);
+        }
+    }
+    return alive;
+}
+} // namespace
+
 PlayerDialogs::PlayerDialogs(PlayerGraphicsItem *_player, PlayerActions *_playerActions)
     : QObject(_player), player(_player), playerActions(_playerActions)
 {
@@ -74,59 +94,34 @@ PlayerDialogs::PlayerDialogs(PlayerGraphicsItem *_player, PlayerActions *_player
 
 void PlayerDialogs::onViewTopCardsDialogRequested(int defaultNumberTopCards, int deckSize)
 {
-    bool ok;
-    int number = QInputDialog::getInt(dialogParent(), tr("View top cards of library"),
-                                      tr("Number of cards: (max. %1)").arg(deckSize), defaultNumberTopCards, 1,
-                                      deckSize, 1, &ok);
-    if (ok) {
-        playerActions->actViewTopCards(number);
-    }
+    getNumber(tr("View top cards of library"), tr("Number of cards: (max. %1)").arg(deckSize), defaultNumberTopCards, 1,
+              deckSize, [this](int number) { playerActions->actViewTopCards(number); });
 }
 
 void PlayerDialogs::onViewBottomCardsDialogRequested(int defaultNumberBottomCards, int deckSize)
 {
-    bool ok;
-    int number = QInputDialog::getInt(dialogParent(), tr("View bottom cards of library"),
-                                      tr("Number of cards: (max. %1)").arg(deckSize), defaultNumberBottomCards, 1,
-                                      deckSize, 1, &ok);
-    if (ok) {
-        playerActions->actViewBottomCards(number);
-    }
+    getNumber(tr("View bottom cards of library"), tr("Number of cards: (max. %1)").arg(deckSize),
+              defaultNumberBottomCards, 1, deckSize, [this](int number) { playerActions->actViewBottomCards(number); });
 }
 
 void PlayerDialogs::onShuffleTopDialogRequested(int defaultNumberTopCards, int maxCards)
 {
-    bool ok;
-    int number = QInputDialog::getInt(dialogParent(), tr("Shuffle top cards of library"),
-                                      tr("Number of cards: (max. %1)").arg(maxCards), defaultNumberTopCards, 1,
-                                      maxCards, 1, &ok);
-    if (ok) {
-        playerActions->actShuffleTop(number);
-    }
+    getNumber(tr("Shuffle top cards of library"), tr("Number of cards: (max. %1)").arg(maxCards), defaultNumberTopCards,
+              1, maxCards, [this](int number) { playerActions->actShuffleTop(number); });
 }
 
 void PlayerDialogs::onShuffleBottomDialogRequested(int defaultNumberBottomCards, int maxCards)
 {
-    bool ok;
-    int number = QInputDialog::getInt(dialogParent(), tr("Shuffle bottom cards of library"),
-                                      tr("Number of cards: (max. %1)").arg(maxCards), defaultNumberBottomCards, 1,
-                                      maxCards, 1, &ok);
-    if (ok) {
-        playerActions->actShuffleBottom(number);
-    }
+    getNumber(tr("Shuffle bottom cards of library"), tr("Number of cards: (max. %1)").arg(maxCards),
+              defaultNumberBottomCards, 1, maxCards, [this](int number) { playerActions->actShuffleBottom(number); });
 }
 
 void PlayerDialogs::onMulliganDialogRequested(int startSize, int handSize, int deckSize)
 {
-    bool ok;
-    int number = QInputDialog::getInt(dialogParent(), tr("Draw hand"),
-                                      tr("Number of cards: (max. %1)").arg(deckSize) + '\n' +
-                                          tr("0 and lower are in comparison to current hand size"),
-                                      startSize, -handSize, deckSize, 1, &ok);
-
-    if (ok) {
-        playerActions->actMulligan(number);
-    }
+    getNumber(tr("Draw hand"),
+              tr("Number of cards: (max. %1)").arg(deckSize) + '\n' +
+                  tr("0 and lower are in comparison to current hand size"),
+              startSize, -handSize, deckSize, [this](int number) { playerActions->actMulligan(number); });
 }
 
 void PlayerDialogs::onStartingHandSizeChosen(int number)
@@ -136,13 +131,8 @@ void PlayerDialogs::onStartingHandSizeChosen(int number)
 
 void PlayerDialogs::onDrawCardsDialogRequested(int defaultNumberTopCards, int deckSize)
 {
-    bool ok;
-    int number = QInputDialog::getInt(dialogParent(), tr("Draw cards"), tr("Number of cards: (max. %1)").arg(deckSize),
-                                      defaultNumberTopCards, 1, deckSize, 1, &ok);
-
-    if (ok) {
-        playerActions->actDrawCards(number);
-    }
+    getNumber(tr("Draw cards"), tr("Number of cards: (max. %1)").arg(deckSize), defaultNumberTopCards, 1, deckSize,
+              [this](int number) { playerActions->actDrawCards(number); });
 }
 
 void PlayerDialogs::onMoveTopCardsToDialogRequested(int defaultNumberTopCards,
@@ -151,22 +141,20 @@ void PlayerDialogs::onMoveTopCardsToDialogRequested(int defaultNumberTopCards,
                                                     const QString &zoneDisplayName,
                                                     bool faceDown)
 {
-    bool ok;
-    int number = QInputDialog::getInt(dialogParent(), tr("Move top cards to %1").arg(zoneDisplayName),
-                                      tr("Number of cards: (max. %1)").arg(maxCards), defaultNumberTopCards, 1,
-                                      maxCards, 1, &ok);
-    if (ok) {
-        playerActions->moveTopCardsTo(number, targetZone, faceDown);
-    }
+    getNumber(tr("Move top cards to %1").arg(zoneDisplayName), tr("Number of cards: (max. %1)").arg(maxCards),
+              defaultNumberTopCards, 1, maxCards, [this, targetZone, faceDown](int number) {
+                  playerActions->moveTopCardsTo(number, targetZone, faceDown);
+              });
 }
 
 void PlayerDialogs::onMoveTopCardsUntilDialogRequested(MoveTopCardsUntilOptions options)
 {
-    DlgMoveTopCardsUntil dlg(dialogParent(), options);
-    if (!dlg.exec()) {
-        return;
-    }
-    playerActions->moveTopCardsUntil(dlg.getExpr(), dlg.getOptions());
+    auto *dlg = new DlgMoveTopCardsUntil(dialogParent(), options);
+    Dialogs::open(dlg, Dialogs::whileAlive(this, [this, dlg](int result) {
+                      if (result == QDialog::Accepted) {
+                          playerActions->moveTopCardsUntil(dlg->getExpr(), dlg->getOptions());
+                      }
+                  }));
 }
 
 void PlayerDialogs::onMoveBottomCardsToDialogRequested(int defaultNumberBottomCards,
@@ -175,33 +163,26 @@ void PlayerDialogs::onMoveBottomCardsToDialogRequested(int defaultNumberBottomCa
                                                        const QString &zoneDisplayName,
                                                        bool faceDown)
 {
-    bool ok;
-    int number = QInputDialog::getInt(dialogParent(), tr("Move bottom cards to %1").arg(zoneDisplayName),
-                                      tr("Number of cards: (max. %1)").arg(maxCards), defaultNumberBottomCards, 1,
-                                      maxCards, 1, &ok);
-    if (ok) {
-        playerActions->moveBottomCardsTo(number, targetZone, faceDown);
-    }
+    getNumber(tr("Move bottom cards to %1").arg(zoneDisplayName), tr("Number of cards: (max. %1)").arg(maxCards),
+              defaultNumberBottomCards, 1, maxCards, [this, targetZone, faceDown](int number) {
+                  playerActions->moveBottomCardsTo(number, targetZone, faceDown);
+              });
 }
 
 void PlayerDialogs::onDrawBottomCardsDialogRequested(int defaultNumberBottomCards, int maxCards)
 {
-    bool ok;
-    int number =
-        QInputDialog::getInt(dialogParent(), tr("Draw bottom cards"), tr("Number of cards: (max. %1)").arg(maxCards),
-                             defaultNumberBottomCards, 1, maxCards, 1, &ok);
-    if (ok) {
-        playerActions->actDrawBottomCards(number);
-    }
+    getNumber(tr("Draw bottom cards"), tr("Number of cards: (max. %1)").arg(maxCards), defaultNumberBottomCards, 1,
+              maxCards, [this](int number) { playerActions->actDrawBottomCards(number); });
 }
 
 void PlayerDialogs::onRollDieDialogRequested()
 {
-    DlgRollDice dlg(dialogParent());
-    if (!dlg.exec()) {
-        return;
-    }
-    playerActions->actRollDie(dlg.getDieSideCount(), dlg.getDiceToRollCount());
+    auto *dlg = new DlgRollDice(dialogParent());
+    Dialogs::open(dlg, Dialogs::whileAlive(this, [this, dlg](int result) {
+                      if (result == QDialog::Accepted) {
+                          playerActions->actRollDie(dlg->getDieSideCount(), dlg->getDiceToRollCount());
+                      }
+                  }));
 }
 
 void PlayerDialogs::onCreateRelatedFromRelationDialogRequested(const CardState *sourceCard,
@@ -254,78 +235,79 @@ void PlayerDialogs::createRelated(const CardState *sourceCard,
 
 void PlayerDialogs::onCreateTokenDialogRequested(const QStringList &predefinedTokens)
 {
-    DlgCreateToken dlg(predefinedTokens, dialogParent());
-    if (!dlg.exec()) {
-        return;
-    }
-
-    playerActions->actCreateToken(dlg.getTokenInfo());
+    auto *dlg = new DlgCreateToken(predefinedTokens, dialogParent());
+    Dialogs::open(dlg, Dialogs::whileAlive(this, [this, dlg](int result) {
+                      if (result == QDialog::Accepted) {
+                          playerActions->actCreateToken(dlg->getTokenInfo());
+                      }
+                  }));
 }
 
 void PlayerDialogs::onMoveCardXCardsFromTopDialogRequested(int defaultNumberTopCardsToPlaceBelow, int deckSize)
 {
-    bool ok;
-    int number =
-        QInputDialog::getInt(dialogParent(), tr("Place card X cards from top of library"),
-                             tr("Which position should this card be placed:") + "\n" + tr("(max. %1)").arg(deckSize),
-                             defaultNumberTopCardsToPlaceBelow, 1, deckSize, 1, &ok);
-    number -= 1; // indexes start at 0
-
-    if (ok) {
-        playerActions->actMoveCardXCardsFromTop(player->getGameScene()->selectedCardStates(), number);
-    }
+    getNumber(tr("Place card X cards from top of library"),
+              tr("Which position should this card be placed:") + "\n" + tr("(max. %1)").arg(deckSize),
+              defaultNumberTopCardsToPlaceBelow, 1, deckSize, [this](int number) {
+                  number -= 1; // indexes start at 0
+                  playerActions->actMoveCardXCardsFromTop(player->getGameScene()->selectedCardStates(), number);
+              });
 }
 
 void PlayerDialogs::onSetPTDialogRequested(const QString &oldPT)
 {
-    bool ok;
-    auto cards = player->getGameScene()->selectedCardStates();
-    emit requestDialogSemaphore(true);
-    QString pt = getTextWithMax(dialogParent(), tr("Change power/toughness"), tr("Change stats to:"), QLineEdit::Normal,
-                                oldPT, &ok);
-    emit requestDialogSemaphore(false);
+    const auto cards = guarded(player->getGameScene()->selectedCardStates());
+    QInputDialog *dialog = newTextDialogWithMax(dialogParent(), tr("Change power/toughness"), tr("Change stats to:"),
+                                                QLineEdit::Normal, oldPT);
+    openHoldingDialogSemaphore(dialog, [this, dialog, cards](int result) {
+        if (result != QDialog::Accepted || player->getLogic()->clearCardsToDelete()) {
+            return;
+        }
 
-    if (!ok || player->getLogic()->clearCardsToDelete()) {
-        return;
-    }
-
-    playerActions->actSetPT(cards, pt);
+        playerActions->actSetPT(stillAlive(cards), dialog->textValue());
+    });
 }
 
 void PlayerDialogs::onSetAnnotationDialogRequested(const QString &oldAnnotation)
 {
-    auto cards = player->getGameScene()->selectedCardStates();
-    emit requestDialogSemaphore(true);
-    AnnotationDialog *dialog = new AnnotationDialog(dialogParent());
+    const auto cards = guarded(player->getGameScene()->selectedCardStates());
+    auto *dialog = new AnnotationDialog(dialogParent());
     dialog->setOptions(QInputDialog::UsePlainTextEditForTextInput);
     dialog->setWindowTitle(tr("Set annotation"));
     dialog->setLabelText(tr("Please enter the new annotation:"));
     dialog->setTextValue(oldAnnotation);
-    bool ok = dialog->exec();
-    emit requestDialogSemaphore(false);
-    if (!ok || player->getLogic()->clearCardsToDelete()) {
-        return;
-    }
-    QString annotation = dialog->textValue().left(MAX_NAME_LENGTH);
-    playerActions->actSetAnnotation(cards, annotation);
+    openHoldingDialogSemaphore(dialog, [this, dialog, cards](int result) {
+        if (result != QDialog::Accepted || player->getLogic()->clearCardsToDelete()) {
+            return;
+        }
+        QString annotation = dialog->textValue().left(MAX_NAME_LENGTH);
+        playerActions->actSetAnnotation(stillAlive(cards), annotation);
+    });
 }
 
 void PlayerDialogs::onSetCardCounterDialogRequested(int counterId, const QString &oldValueForDlg)
 {
-    auto cards = player->getGameScene()->selectedCardStates();
-    emit requestDialogSemaphore(true);
+    const auto cards = guarded(player->getGameScene()->selectedCardStates());
 
     auto &cardCounterSettings = SettingsCache::instance().cardCounters();
     QString counterName = cardCounterSettings.displayName(counterId);
 
-    AbstractCounterDialog dialog(counterName, oldValueForDlg, dialogParent());
-    int ok = dialog.exec();
+    auto *dialog = new AbstractCounterDialog(counterName, oldValueForDlg, dialogParent());
+    openHoldingDialogSemaphore(dialog, [this, dialog, cards, counterId](int result) {
+        if (result != QDialog::Accepted || player->getLogic()->clearCardsToDelete()) {
+            return;
+        }
+        playerActions->actSetCardCounter(stillAlive(cards), counterId, dialog->textValue());
+    });
+}
 
-    emit requestDialogSemaphore(false);
-    if (!ok || player->getLogic()->clearCardsToDelete()) {
-        return;
-    }
-    playerActions->actSetCardCounter(cards, counterId, dialog.textValue());
+void PlayerDialogs::getNumber(const QString &title,
+                              const QString &label,
+                              int value,
+                              int minimum,
+                              int maximum,
+                              const std::function<void(int number)> &thenAccepted)
+{
+    Dialogs::getInt(dialogParent(), title, label, value, minimum, maximum, Dialogs::whileAlive(this, thenAccepted));
 }
 
 void PlayerDialogs::openHoldingDialogSemaphore(QDialog *dialog, const std::function<void(int result)> &thenFinished)
