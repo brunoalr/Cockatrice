@@ -6,6 +6,7 @@
 #include "../../interface/widgets/dialogs/dlg_edit_password.h"
 #include "../../interface/widgets/dialogs/dlg_edit_user.h"
 #include "../../interface/widgets/utility/get_text_with_max.h"
+#include "../../interface/widgets/utility/non_blocking_dialogs.h"
 #include "libcockatrice/protocol/pb/response.pb.h"
 #include "libcockatrice/utility/days_years_between.h"
 #include "user_card_settings_dialog.h"
@@ -278,31 +279,33 @@ void UserInfoBox::actEditInternal(const Response &r)
 
 void UserInfoBox::actPassword()
 {
-    DlgEditPassword dlg(this);
-    if (!dlg.exec()) {
-        return;
-    }
+    auto *dlg = new DlgEditPassword(this);
+    Dialogs::open(dlg, [this, dlg](int result) {
+        if (result != QDialog::Accepted) {
+            return;
+        }
 
-    auto oldPassword = dlg.getOldPassword();
-    auto newPassword = dlg.getNewPassword();
+        auto oldPassword = dlg->getOldPassword();
+        auto newPassword = dlg->getNewPassword();
 
-    if (client->getServerSupportsPasswordHash()) {
-        Command_RequestPasswordSalt cmd;
-        cmd.set_user_name(client->getUserName().toStdString());
+        if (client->getServerSupportsPasswordHash()) {
+            Command_RequestPasswordSalt cmd;
+            cmd.set_user_name(client->getUserName().toStdString());
 
-        PendingCommand *pend = client->prepareSessionCommand(cmd);
-        connect(pend, &PendingCommand::finished, this, [=, this](const Response &response) {
-            if (response.response_code() == Response::RespOk) {
-                changePassword(oldPassword, newPassword);
-            } else {
-                QMessageBox::critical(this, tr("Error"),
+            PendingCommand *pend = client->prepareSessionCommand(cmd);
+            connect(pend, &PendingCommand::finished, this, [=, this](const Response &response) {
+                if (response.response_code() == Response::RespOk) {
+                    changePassword(oldPassword, newPassword);
+                } else {
+                    Dialogs::critical(this, tr("Error"),
                                       tr("An error occurred while trying to update your user information."));
-            }
-        });
-        client->sendCommand(pend);
-    } else {
-        changePassword(oldPassword, newPassword);
-    }
+                }
+            });
+            client->sendCommand(pend);
+        } else {
+            changePassword(oldPassword, newPassword);
+        }
+    });
 }
 
 void UserInfoBox::changePassword(const QString &oldPassword, const QString &newPassword)
@@ -401,21 +404,20 @@ void UserInfoBox::processPasswordResponse(const Response &r)
 {
     switch (r.response_code()) {
         case Response::RespOk:
-            QMessageBox::information(this, tr("Information"), tr("Password changed."));
+            Dialogs::information(this, tr("Information"), tr("Password changed."));
             break;
         case Response::RespFunctionNotAllowed:
-            QMessageBox::critical(this, tr("Error"), tr("This server does not permit you to change your password."));
+            Dialogs::critical(this, tr("Error"), tr("This server does not permit you to change your password."));
             break;
         case Response::RespPasswordTooShort:
-            QMessageBox::critical(this, tr("Error"), tr("The new password is too short."));
+            Dialogs::critical(this, tr("Error"), tr("The new password is too short."));
             break;
         case Response::RespWrongPassword:
-            QMessageBox::critical(this, tr("Error"), tr("The old password is incorrect."));
+            Dialogs::critical(this, tr("Error"), tr("The old password is incorrect."));
             break;
         case Response::RespInternalError:
         default:
-            QMessageBox::critical(this, tr("Error"),
-                                  tr("An error occurred while trying to update your user information."));
+            Dialogs::critical(this, tr("Error"), tr("An error occurred while trying to update your user information."));
             break;
     }
 }
