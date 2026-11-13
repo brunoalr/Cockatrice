@@ -11,6 +11,7 @@
 #include <QSharedPointer>
 #include <QStringList>
 #include <QVariant>
+#include <memory>
 
 ShortcutKey::ShortcutKey(const QString &_name, QList<QKeySequence> _sequence, ShortcutGroup::Groups _group)
     : QList<QKeySequence>(_sequence), name(_name), group(_group)
@@ -55,7 +56,7 @@ ShortcutsSettings::ShortcutsSettings(const QString &settingsPath, QObject *paren
 
         if (!invalidItems.isEmpty()) {
             // warning message in case of invalid items
-            auto *msgBox = new QMessageBox;
+            auto msgBox = std::make_unique<QMessageBox>();
             msgBox->setIcon(QMessageBox::Warning);
             msgBox->setText(tr("Your configuration file contained invalid shortcuts.\n"
                                "Please check your shortcut settings!"));
@@ -65,7 +66,7 @@ ShortcutsSettings::ShortcutsSettings(const QString &settingsPath, QObject *paren
                 detailedMessage += item.key() + " - \"" + item.value() + "\"\n";
             }
             msgBox->setDetailedText(detailedMessage);
-            Dialogs::open(msgBox, {});
+            Dialogs::open(msgBox.release(), {});
         }
     }
 }

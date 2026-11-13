@@ -9,6 +9,24 @@
 #include <QDialog>
 #include <QString>
 #include <QVariant>
+#include <memory>
+
+static void saveLogin(const ContextConnectToServer &context)
+{
+    ServersSettings &servers = SettingsCache::instance().servers();
+    // The host may already be saved under a friendly name (e.g. a public-server
+    // list entry) with no credentials; reuse that name instead of overwriting
+    // it with the raw hostname when addNewServer updates the entry in place.
+    QString saveName = context.hostname;
+    const int existingIndex = servers.findServerIndex(context.hostname, context.port);
+    if (const auto existing = servers.getServer(existingIndex)) {
+        saveName = existing->saveName;
+        if (saveName.isEmpty()) {
+            saveName = context.hostname;
+        }
+    }
+    servers.addNewServer(saveName, context.hostname, context.port, context.username, context.password, true);
+}
 
 IntentGetLoginCredentials::IntentGetLoginCredentials(ContextConnectToServer *_context,
                                                      bool _promptForMissingCredentials)
@@ -49,10 +67,10 @@ void IntentGetLoginCredentials::onPreconditionNotSatisfied()
     // No credentials saved for the target server: ask the user for them. They
     // opt into saving them so later links to the same server connect directly.
     const QString serverText = context->hostname + ":" + context->port;
-    // Without a parent (the intent is not a widget) the helper keeps the prompt application-modal.
-    auto *dialog = new DlgLoginPrompt(serverText);
+    auto prompt = std::make_unique<DlgLoginPrompt>(serverText);
+    const DlgLoginPrompt *dialog = prompt.get();
 
-    Dialogs::open(dialog, Dialogs::whileAlive(this, [this, dialog](int result) {
+    Dialogs::open(prompt.release(), Dialogs::whileAlive(this, [this, dialog](int result) {
                       if (result != QDialog::Accepted) {
                           emitCancelled();
                           return;
@@ -60,22 +78,8 @@ void IntentGetLoginCredentials::onPreconditionNotSatisfied()
 
                       context->username = dialog->username();
                       context->password = dialog->password();
-
                       if (dialog->savePassword() && !context->username.isEmpty()) {
-                          ServersSettings &servers = SettingsCache::instance().servers();
-                          // The host may already be saved under a friendly name (e.g. a public-server
-                          // list entry) with no credentials; reuse that name instead of overwriting
-                          // it with the raw hostname when addNewServer updates the entry in place.
-                          QString saveName = context->hostname;
-                          const int existingIndex = servers.findServerIndex(context->hostname, context->port);
-                          if (const auto existing = servers.getServer(existingIndex)) {
-                              saveName = existing->saveName;
-                              if (saveName.isEmpty()) {
-                                  saveName = context->hostname;
-                              }
-                          }
-                          servers.addNewServer(saveName, context->hostname, context->port, context->username,
-                                               context->password, true);
+                          saveLogin(*context);
                       }
 
                       emitFinished();
