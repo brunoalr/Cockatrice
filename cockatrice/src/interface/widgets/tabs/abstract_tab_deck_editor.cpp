@@ -46,10 +46,8 @@
 #include <QList>
 #include <QMainWindow>
 #include <QMenu>
-#include <QMessageBox>
 #include <QPrintPreviewDialog>
 #include <QPrinter>
-#include <QPushButton>
 #include <QSharedPointer>
 #include <QUrl>
 #include <google/protobuf/stubs/port.h>
@@ -401,18 +399,17 @@ void AbstractTabDeckEditor::actShareDeck()
 {
     AbstractClient *client = tabSupervisor->getServerClient();
     if (client->getStatus() != StatusLoggedIn) {
-        QMessageBox::information(this, tr("Share deck"), tr("You must be connected to the server to share a deck."));
+        Dialogs::information(this, tr("Share deck"), tr("You must be connected to the server to share a deck."));
         return;
     }
 
     const QSharedPointer<DeckList> deck = deckStateManager->getDeckListShared();
     if (deck->isBlankDeck()) {
-        QMessageBox::information(this, tr("Share deck"), tr("The deck is empty. Add cards before sharing it."));
+        Dialogs::information(this, tr("Share deck"), tr("The deck is empty. Add cards before sharing it."));
         return;
     }
 
-    DlgShareDeck shareDialog(client, deck, this);
-    shareDialog.exec();
+    Dialogs::open(new DlgShareDeck(client, deck, this), {});
 }
 
 /**
@@ -422,7 +419,7 @@ void AbstractTabDeckEditor::actShareDeck()
 void AbstractTabDeckEditor::saveDeckRemoteFinished(const Response &response)
 {
     if (response.response_code() != Response::RespOk) {
-        QMessageBox::critical(this, tr("Error"), tr("The deck could not be saved."));
+        Dialogs::critical(this, tr("Error"), tr("The deck could not be saved."));
     } else {
         deckStateManager->setModified(false);
     }
@@ -467,14 +464,16 @@ void AbstractTabDeckEditor::openDeckList(const DeckList &deckList, DeckOpenLocat
 void AbstractTabDeckEditor::editDeckInClipboard(bool annotated)
 {
     LoadedDeck loadedDeck = deckStateManager->toLoadedDeck();
-    DlgEditDeckInClipboard dlg(loadedDeck.deckList, annotated, this);
-    if (!dlg.exec()) {
-        return;
-    }
+    auto *dlg = new DlgEditDeckInClipboard(loadedDeck.deckList, annotated, this);
+    Dialogs::open(dlg, [this, dlg, lastLoadInfo = loadedDeck.lastLoadInfo](int result) {
+        if (result != QDialog::Accepted) {
+            return;
+        }
 
-    setDeck({dlg.getDeckList(), loadedDeck.lastLoadInfo});
-    deckStateManager->setModified(true);
-    deckMenu->setSaveStatus(true);
+        setDeck({dlg->getDeckList(), lastLoadInfo});
+        deckStateManager->setModified(true);
+        deckMenu->setSaveStatus(true);
+    });
 }
 
 /** @brief Slot for editing deck in clipboard with annotations. */
@@ -519,7 +518,7 @@ void AbstractTabDeckEditor::actPrintDeck()
     auto *dlg = new QPrintPreviewDialog(this);
     connect(dlg, &QPrintPreviewDialog::paintRequested, this,
             [this](QPrinter *printer) { DeckLoader::printDeckList(printer, deckStateManager->getDeckList()); });
-    dlg->exec();
+    Dialogs::open(dlg, {});
 }
 
 /**
@@ -551,7 +550,7 @@ void AbstractTabDeckEditor::exportToDecklistWebsite(DeckLoader::DecklistWebsite 
     // Check to make sure the string isn't empty.
     if (decklistUrlString.isEmpty()) {
         // Show an error if the deck is empty, and return.
-        QMessageBox::critical(this, tr("Error"), tr("There are no cards in your deck to be exported"));
+        Dialogs::critical(this, tr("Error"), tr("There are no cards in your deck to be exported"));
         return;
     }
 
