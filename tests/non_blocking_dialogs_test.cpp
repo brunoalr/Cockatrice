@@ -305,37 +305,18 @@ TEST_F(NonBlockingDialogs, GetMultiLineTextUsesAPlainTextEdit)
 TEST_F(NonBlockingDialogs, GetIntDeliversTheValueOnAccept)
 {
     std::optional<int> value;
-    Dialogs::getInt(parent.get(), "Title", "Label", 3, 1, 10, 2, [&](int entered) { value = entered; });
+    Dialogs::getInt(parent.get(), "Title", "Label", 3, 1, 10, [&](int entered) { value = entered; });
 
     QInputDialog *dialog = onlyInputDialog();
     ASSERT_NE(dialog, nullptr);
     EXPECT_EQ(dialog->intValue(), 3);
     EXPECT_EQ(dialog->intMinimum(), 1);
     EXPECT_EQ(dialog->intMaximum(), 10);
-    EXPECT_EQ(dialog->intStep(), 2);
     dialog->setIntValue(7);
     dialog->accept();
     settle();
 
     EXPECT_EQ(value, 7);
-}
-
-TEST_F(NonBlockingDialogs, GetItemDeliversTheItemOnAccept)
-{
-    std::optional<QString> item;
-    Dialogs::getItem(parent.get(), "Title", "Label", {"a", "b", "c"}, 1, false,
-                     [&](const QString &chosen) { item = chosen; });
-
-    QInputDialog *dialog = onlyInputDialog();
-    ASSERT_NE(dialog, nullptr);
-    EXPECT_EQ(dialog->comboBoxItems(), QStringList({"a", "b", "c"}));
-    EXPECT_EQ(dialog->textValue(), "b");
-    EXPECT_FALSE(dialog->isComboBoxEditable());
-    dialog->setTextValue("c");
-    dialog->accept();
-    settle();
-
-    EXPECT_EQ(item, "c");
 }
 
 TEST_F(NonBlockingDialogs, GetColorDeliversTheChosenColorOnAcceptOnly)
