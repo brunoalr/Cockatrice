@@ -772,6 +772,15 @@ if(WITH_CLIENT)
   )
   cockatrice_add_test(
     NAME
+    deck_close_test
+    SOURCES
+    ${CLIENT_SRC}/interface/shutdown_chain.cpp
+    deck_close_test.cpp
+    INCLUDE_DIRS
+    ${CLIENT_SRC}
+  )
+  cockatrice_add_test(
+    NAME
     lobby_dialogs_test
     SOURCES
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_avatar.cpp

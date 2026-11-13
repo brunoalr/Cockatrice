@@ -345,6 +345,7 @@ set(cockatrice_SOURCES
     src/interface/widgets/visual_deck_storage/visual_deck_storage_sort_widget.cpp
     src/interface/widgets/visual_deck_storage/visual_deck_storage_tag_filter_widget.cpp
     src/interface/widgets/visual_deck_storage/visual_deck_storage_widget.cpp
+    src/interface/shutdown_chain.cpp
     src/interface/window_main.cpp
     src/main.cpp
     src/interface/widgets/tabs/abstract_tab_deck_editor.cpp

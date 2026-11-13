@@ -8,6 +8,7 @@
 #include "../../intents/contexts/context_join_room.h"
 #include "../../intents/intent.h"
 #include "../../intents/intent_join_server_game.h"
+#include "../deck_editor/deck_state_manager.h"
 #include "../../theme_icon.h"
 #include "../interface/pixel_map_generator.h"
 #include "../interface/widgets/server/game_link.h"
@@ -82,7 +83,7 @@
 #include <libcockatrice/settings/deck_editor_settings.h>
 #include <libcockatrice/settings/interface_settings.h>
 #include <libcockatrice/settings/tabs_settings.h>
-#include <libcockatrice/utility/qt_utils.h>
+#include <algorithm>
 #include <memory>
 #include <qnamespace.h>
 #include <string>
@@ -337,19 +338,32 @@ void TabSupervisor::closeEvent(QCloseEvent *event)
     // This will accept the event, which we may then override.
     QTabWidget::closeEvent(event);
 
-    if (getGameCount()) {
-        if (!QtUtils::confirm(this, tr("Are you sure?"),
-                              tr("There are still open games. Are you sure you want to quit?"), QMessageBox::No)) {
-            event->ignore();
-            return;
-        }
+    // The questions are the window's shutdown steps: closed directly, it must not lose an unsaved deck.
+    if (std::ranges::any_of(deckEditorTabs, [](const AbstractTabDeckEditor *tab) {
+            return tab->deckStateManager->isModified();
+        })) {
+        event->ignore();
     }
+}
 
+QList<ShutdownChain::Step> TabSupervisor::closeSteps()
+{
+    QList<ShutdownChain::Step> steps{
+        {this, [this](const ShutdownChain::Answer &answer) { confirmLeavingGames(answer); }}};
     for (AbstractTabDeckEditor *tab : deckEditorTabs) {
-        if (!tab->confirmClose()) {
-            event->ignore();
-        }
+        steps.append({tab, [tab](const ShutdownChain::Answer &answer) { answer(tab->confirmClose()); }});
     }
+    return steps;
+}
+
+void TabSupervisor::confirmLeavingGames(const ShutdownChain::Answer &answer)
+{
+    if (!getGameCount()) {
+        answer(true);
+        return;
+    }
+    Dialogs::confirm(this, tr("Are you sure?"), tr("There are still open games. Are you sure you want to quit?"),
+                     answer, QMessageBox::No);
 }
 
 AbstractClient *TabSupervisor::getClient() const

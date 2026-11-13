@@ -227,7 +227,7 @@ void DlgUpdate::setLabel(const QString &newText)
     statusLabel->setText(newText);
 }
 
-void DlgUpdate::warnInstallerIsWaiting()
+void DlgUpdate::warnInstallerIsWaiting(QWidget *parent)
 {
     // Modeless on purpose: the installer asks the application to close exactly once (see
     // CloseMatchingApps in NSIS.template.in) and only polls afterwards, while Qt drops spontaneous
@@ -239,7 +239,7 @@ void DlgUpdate::warnInstallerIsWaiting()
                                             "minute for Cockatrice to close. Cockatrice is still busy, so "
                                             "save your work and close it before then. Otherwise the "
                                             "installer gives up and the update is cancelled."),
-                                         QMessageBox::Ok, parentWidget());
+                                         QMessageBox::Ok, parent);
     notification->setWindowModality(Qt::NonModal);
     notification->setAttribute(Qt::WA_DeleteOnClose);
     notification->show();
@@ -297,20 +297,21 @@ void DlgUpdate::downloadSuccessful(const QUrl &filepath)
     // Try to open the installer. If it opens, quit Cockatrice
     if (process.startDetached()) {
         qCInfo(DlgUpdateLog) << "Opened update installer successfully - closing Cockatrice";
-        // Close the main window synchronously so file locks are released before the NSIS installer
+        // Close the main window so file locks are released before the NSIS installer
         // (already launched) starts replacing files. This also flushes settings and shuts down the
         // tabs, but only when the close is actually accepted: MainWindow may veto it for a running
         // card DB update, an open game, or an unsaved deck, and closeForUpdate() also reports a
-        // close already in progress (reached from a nested event loop while a shutdown prompt is
-        // up). Only quit when the shutdown really ran - otherwise keep running so the user can
-        // resolve the blocker, and warn them that the installer only waits about a minute
+        // close already in progress. Only quit once the shutdown really ran - otherwise keep running so
+        // the user can resolve the blocker, and warn them that the installer only waits about a minute
         // before it gives up and cancels the update.
         if (auto *window = qobject_cast<MainWindow *>(parent())) {
-            if (window->closeForUpdate()) {
-                QTimer::singleShot(0, qApp, [] { QCoreApplication::exit(0); });
-            } else {
-                warnInstallerIsWaiting();
-            }
+            window->closeForUpdate([window](bool closed) {
+                if (closed) {
+                    QTimer::singleShot(0, qApp, [] { QCoreApplication::exit(0); });
+                } else {
+                    warnInstallerIsWaiting(window);
+                }
+            });
         } else {
             // Not a MainWindow, so no faithful close can be requested - but the parent still gets
             // its close() call, which is what the code before this change did and lets it flush
