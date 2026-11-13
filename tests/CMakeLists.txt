@@ -767,4 +767,21 @@ if(WITH_CLIENT)
     INCLUDE_DIRS
     ${SETTINGS_INCLUDE_DIRS}
   )
+  cockatrice_add_test(
+    NAME
+    crash_report_dialog_test
+    SOURCES
+    ${CLIENT_SRC}/client/crash/crash_reporter.cpp
+    ${CLIENT_SRC}/interface/logger.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_crash_report.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/non_blocking_dialogs.cpp
+    ${SETTINGS_SOURCES}
+    crash_report_dialog_test.cpp
+    LIBS
+    ${SETTINGS_LIBS}
+    INCLUDE_DIRS
+    ${SETTINGS_INCLUDE_DIRS}
+    DEFINITIONS
+    COCKATRICE_WITH_CRASH_REPORTING=0
+  )
 endif()
