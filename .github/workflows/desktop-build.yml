@@ -1199,6 +1199,16 @@ jobs:
           # The steps below run downloaded tools; none of them needs the checkout's token
           persist-credentials: false
 
+      # A call that opens a nested event loop aborts a Qt for WebAssembly page
+      - name: "Count blocking dialog calls"
+        env:
+          BLOCKING_CALLS_BASE_REF: ${{ github.base_ref }}
+          # Two merged branches can each lower the baseline to the same value, and a failure here skips the cache saves
+          BLOCKING_CALLS_ALLOW_LOWER: ${{ github.event_name == 'push' && '1' || '' }}
+        run: |
+          bash .ci/blocking_calls.sh --self-test
+          bash .ci/blocking_calls.sh --check
+
       - name: "Check the WebAssembly kit is the desktop legs' Qt ${{ needs.resolve-qt.outputs.mac }}"
         env:
           QT_DESKTOP: ${{ needs.resolve-qt.outputs.mac }}
