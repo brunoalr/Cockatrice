@@ -9,16 +9,13 @@ QInputDialog *newTextDialogWithMax(QWidget *parent,
                                    const QString &label,
                                    QLineEdit::EchoMode mode,
                                    const QString &text,
-                                   int max,
-                                   Qt::WindowFlags flags,
-                                   Qt::InputMethodHints inputMethodHints)
+                                   int max)
 {
-    auto *dialog = new QInputDialog(parent, flags);
+    auto *dialog = new QInputDialog(parent);
     dialog->setWindowTitle(title);
     dialog->setLabelText(label);
     dialog->setTextValue(text);
     dialog->setTextEchoMode(mode);
-    dialog->setInputMethodHints(inputMethodHints);
 
     // find the qlineedit that this dialog holds, there should be only one
     dialog->findChild<QLineEdit *>()->setMaxLength(max);
@@ -31,11 +28,9 @@ QString getTextWithMax(QWidget *parent,
                        QLineEdit::EchoMode mode,
                        const QString &text,
                        bool *ok,
-                       int max,
-                       Qt::WindowFlags flags,
-                       Qt::InputMethodHints inputMethodHints)
+                       int max)
 {
-    auto *dialog = newTextDialogWithMax(parent, title, label, mode, text, max, flags, inputMethodHints);
+    auto *dialog = newTextDialogWithMax(parent, title, label, mode, text, max);
 
     const int ret = dialog->exec();
     if (ok != nullptr) {
