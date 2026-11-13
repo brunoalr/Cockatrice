@@ -409,7 +409,8 @@ void AbstractTabDeckEditor::actShareDeck()
         return;
     }
 
-    Dialogs::open(new DlgShareDeck(client, deck, this), {});
+    auto *dialog = new DlgShareDeck(client, deck, this);
+    Dialogs::open(dialog, {});
 }
 
 /**
