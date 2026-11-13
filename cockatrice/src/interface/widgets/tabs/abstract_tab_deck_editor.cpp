@@ -309,7 +309,8 @@ void AbstractTabDeckEditor::actSaveDeck(std::function<void(bool saved)> then)
     if (loadedDeck.lastLoadInfo.remoteDeckId != LoadedDeck::LoadInfo::NON_REMOTE_ID) {
         QString deckString = loadedDeck.deckList.writeToString_Native();
         if (deckString.length() > MAX_FILE_LENGTH) {
-            Dialogs::critical(this, tr("Error"), tr("Could not save remote deck"), [then] { reportSaved(then, false); });
+            Dialogs::critical(this, tr("Error"), tr("Could not save remote deck"),
+                              [then] { reportSaved(then, false); });
             return;
         }
 
@@ -336,10 +337,9 @@ void AbstractTabDeckEditor::actSaveDeck(std::function<void(bool saved)> then)
         return;
     }
 
-    Dialogs::critical(
-        this, tr("Error"),
-        tr("The deck could not be saved.\nPlease check that the directory is writable and try again."),
-        [then] { reportSaved(then, false); });
+    Dialogs::critical(this, tr("Error"),
+                      tr("The deck could not be saved.\nPlease check that the directory is writable and try again."),
+                      [then] { reportSaved(then, false); });
 }
 
 /**

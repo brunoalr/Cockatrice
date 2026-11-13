@@ -8,8 +8,8 @@
 #include "../../intents/contexts/context_join_room.h"
 #include "../../intents/intent.h"
 #include "../../intents/intent_join_server_game.h"
-#include "../deck_editor/deck_state_manager.h"
 #include "../../theme_icon.h"
+#include "../deck_editor/deck_state_manager.h"
 #include "../interface/pixel_map_generator.h"
 #include "../interface/widgets/server/game_link.h"
 #include "../interface/widgets/server/user/user_list_manager.h"
@@ -65,6 +65,7 @@
 #include <QStyleOption>
 #include <QSystemTrayIcon>
 #include <QTabBar>
+#include <algorithm>
 #include <libcockatrice/deck_list/loaded_deck.h>
 #include <libcockatrice/game/abstract_game.h>
 #include <libcockatrice/game/game_event_handler.h>
@@ -83,7 +84,6 @@
 #include <libcockatrice/settings/deck_editor_settings.h>
 #include <libcockatrice/settings/interface_settings.h>
 #include <libcockatrice/settings/tabs_settings.h>
-#include <algorithm>
 #include <memory>
 #include <qnamespace.h>
 #include <string>
@@ -339,9 +339,8 @@ void TabSupervisor::closeEvent(QCloseEvent *event)
     QTabWidget::closeEvent(event);
 
     // The questions are the window's shutdown steps: closed directly, it must not lose an unsaved deck.
-    if (std::ranges::any_of(deckEditorTabs, [](const AbstractTabDeckEditor *tab) {
-            return tab->deckStateManager->isModified();
-        })) {
+    if (std::ranges::any_of(deckEditorTabs,
+                            [](const AbstractTabDeckEditor *tab) { return tab->deckStateManager->isModified(); })) {
         event->ignore();
     }
 }

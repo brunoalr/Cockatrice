@@ -337,9 +337,9 @@ void DlgUpdate::downloadSuccessful(const QUrl &filepath)
     } else {
         setLabel(tr("Error"));
         Dialogs::critical(this, tr("Update Error"),
-                              tr("Cockatrice is unable to open the installer.") + "<br><br>" +
-                                  tr("Try to update manually by closing Cockatrice and running the installer.") +
-                                  "<br>" + tr("Download location") + QString(": %1").arg(filepath.toLocalFile()));
+                          tr("Cockatrice is unable to open the installer.") + "<br><br>" +
+                              tr("Try to update manually by closing Cockatrice and running the installer.") + "<br>" +
+                              tr("Download location") + QString(": %1").arg(filepath.toLocalFile()));
     }
 }
 
