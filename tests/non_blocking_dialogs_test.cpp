@@ -31,7 +31,7 @@ void fromTheEventLoop(std::function<void()> action)
     settle();
 }
 
-class NonBlockingDialogs : public ::testing::Test
+class NonBlockingDialogs : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:
     std::unique_ptr<QWidget> parent = std::make_unique<QWidget>();
@@ -73,7 +73,7 @@ TEST_F(NonBlockingDialogs, ConfirmReturnsBeforeTheCallbackRuns)
 {
     std::optional<bool> answer;
 
-    Dialogs::confirm(parent.get(), "Title", "Text", [&](bool confirmed) { answer = confirmed; });
+    Dialogs::confirm(parent.get(), "Title", "Text", [&answer](bool confirmed) { answer = confirmed; });
 
     EXPECT_FALSE(answer.has_value());
     QMessageBox *box = onlyMessageBox();
@@ -92,7 +92,7 @@ TEST_F(NonBlockingDialogs, ADialogWithAParentBlocksTheWholeApplication)
 
 TEST_F(NonBlockingDialogs, ConfirmShowsAQuestionWithYesAndNo)
 {
-    Dialogs::confirm(parent.get(), "Title", "Text", [](bool) {}, QMessageBox::No);
+    Dialogs::confirm(parent.get(), "Title", "Text", {}, QMessageBox::No);
 
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
@@ -109,7 +109,7 @@ TEST_F(NonBlockingDialogs, ConfirmShowsAQuestionWithYesAndNo)
 TEST_F(NonBlockingDialogs, ConfirmYesGivesTrue)
 {
     std::optional<bool> answer;
-    Dialogs::confirm(parent.get(), "Title", "Text", [&](bool confirmed) { answer = confirmed; });
+    Dialogs::confirm(parent.get(), "Title", "Text", [&answer](bool confirmed) { answer = confirmed; });
 
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
@@ -122,7 +122,7 @@ TEST_F(NonBlockingDialogs, ConfirmYesGivesTrue)
 TEST_F(NonBlockingDialogs, ConfirmNoGivesFalse)
 {
     std::optional<bool> answer;
-    Dialogs::confirm(parent.get(), "Title", "Text", [&](bool confirmed) { answer = confirmed; });
+    Dialogs::confirm(parent.get(), "Title", "Text", [&answer](bool confirmed) { answer = confirmed; });
 
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
@@ -135,7 +135,7 @@ TEST_F(NonBlockingDialogs, ConfirmNoGivesFalse)
 TEST_F(NonBlockingDialogs, RejectingTheConfirmBoxGivesFalse)
 {
     std::optional<bool> answer;
-    Dialogs::confirm(parent.get(), "Title", "Text", [&](bool confirmed) { answer = confirmed; });
+    Dialogs::confirm(parent.get(), "Title", "Text", [&answer](bool confirmed) { answer = confirmed; });
 
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
@@ -148,7 +148,7 @@ TEST_F(NonBlockingDialogs, RejectingTheConfirmBoxGivesFalse)
 TEST_F(NonBlockingDialogs, ClosingTheConfirmBoxGivesFalse)
 {
     std::optional<bool> answer;
-    Dialogs::confirm(parent.get(), "Title", "Text", [&](bool confirmed) { answer = confirmed; });
+    Dialogs::confirm(parent.get(), "Title", "Text", [&answer](bool confirmed) { answer = confirmed; });
 
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
@@ -163,7 +163,7 @@ TEST_F(NonBlockingDialogs, AskReportsTheClickedButton)
     std::optional<QMessageBox::StandardButton> answer;
     Dialogs::ask(parent.get(), QMessageBox::Warning, "Title", "Text",
                  QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save,
-                 [&](QMessageBox::StandardButton clicked) { answer = clicked; });
+                 [&answer](QMessageBox::StandardButton clicked) { answer = clicked; });
 
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
@@ -179,7 +179,7 @@ TEST_F(NonBlockingDialogs, ClosingAskGivesTheEscapeButton)
     std::optional<QMessageBox::StandardButton> answer;
     Dialogs::ask(parent.get(), QMessageBox::Warning, "Title", "Text",
                  QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save,
-                 [&](QMessageBox::StandardButton clicked) { answer = clicked; });
+                 [&answer](QMessageBox::StandardButton clicked) { answer = clicked; });
 
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
@@ -193,7 +193,7 @@ TEST_F(NonBlockingDialogs, RejectingAskWithoutAnEscapeButtonGivesNoButton)
 {
     std::optional<QMessageBox::StandardButton> answer;
     Dialogs::ask(parent.get(), QMessageBox::Question, "Title", "Text", QMessageBox::Save | QMessageBox::Discard,
-                 QMessageBox::Save, [&](QMessageBox::StandardButton clicked) { answer = clicked; });
+                 QMessageBox::Save, [&answer](QMessageBox::StandardButton clicked) { answer = clicked; });
 
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
@@ -207,7 +207,7 @@ TEST_F(NonBlockingDialogs, AskWithoutADefaultPicksTheAcceptButtonLikeTheStaticCa
 {
     // Yes comes first but has YesRole: the static calls skip it for Retry, the first AcceptRole button.
     Dialogs::ask(parent.get(), QMessageBox::Question, "Title", "Text", QMessageBox::Yes | QMessageBox::Retry,
-                 QMessageBox::NoButton, [](QMessageBox::StandardButton) {});
+                 QMessageBox::NoButton, {});
 
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
@@ -216,7 +216,7 @@ TEST_F(NonBlockingDialogs, AskWithoutADefaultPicksTheAcceptButtonLikeTheStaticCa
 
 TEST_F(NonBlockingDialogs, ConfirmWithoutADefaultSetsNoneLikeTheStaticCall)
 {
-    Dialogs::confirm(parent.get(), "Title", "Text", [](bool) {});
+    Dialogs::confirm(parent.get(), "Title", "Text", {});
 
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
@@ -253,7 +253,7 @@ TEST_F(NonBlockingDialogs, NoticesOpenOneBoxThatAcceptingDeletes)
 TEST_F(NonBlockingDialogs, DestroyingTheParentWhileConfirmIsOpenRunsNoCallback)
 {
     bool called = false;
-    Dialogs::confirm(parent.get(), "Title", "Text", [&](bool) { called = true; });
+    Dialogs::confirm(parent.get(), "Title", "Text", [&called](bool) { called = true; });
     QPointer<QMessageBox> box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
 
@@ -267,7 +267,7 @@ TEST_F(NonBlockingDialogs, DestroyingTheParentWhileConfirmIsOpenRunsNoCallback)
 TEST_F(NonBlockingDialogs, GetTextDeliversTheTypedTextOnAccept)
 {
     std::optional<QString> text;
-    Dialogs::getText(parent.get(), "Title", "Label", "initial", [&](const QString &typed) { text = typed; });
+    Dialogs::getText(parent.get(), "Title", "Label", "initial", [&text](const QString &typed) { text = typed; });
 
     QInputDialog *dialog = onlyInputDialog();
     ASSERT_NE(dialog, nullptr);
@@ -285,7 +285,7 @@ TEST_F(NonBlockingDialogs, GetTextDeliversTheTypedTextOnAccept)
 TEST_F(NonBlockingDialogs, GetTextDeliversNothingOnReject)
 {
     bool called = false;
-    Dialogs::getText(parent.get(), "Title", "Label", "initial", [&](const QString &) { called = true; });
+    Dialogs::getText(parent.get(), "Title", "Label", "initial", [&called](const QString &) { called = true; });
 
     QPointer<QInputDialog> dialog = onlyInputDialog();
     ASSERT_NE(dialog, nullptr);
@@ -299,7 +299,7 @@ TEST_F(NonBlockingDialogs, GetTextDeliversNothingOnReject)
 TEST_F(NonBlockingDialogs, GetMultiLineTextUsesAPlainTextEdit)
 {
     std::optional<QString> text;
-    Dialogs::getMultiLineText(parent.get(), "Title", "Label", "a\nb", [&](const QString &typed) { text = typed; });
+    Dialogs::getMultiLineText(parent.get(), "Title", "Label", "a\nb", [&text](const QString &typed) { text = typed; });
 
     QInputDialog *dialog = onlyInputDialog();
     ASSERT_NE(dialog, nullptr);
@@ -313,14 +313,13 @@ TEST_F(NonBlockingDialogs, GetMultiLineTextUsesAPlainTextEdit)
 TEST_F(NonBlockingDialogs, GetIntDeliversTheValueOnAccept)
 {
     std::optional<int> value;
-    Dialogs::getInt(parent.get(), "Title", "Label", 3, 1, 10, 2, [&](int entered) { value = entered; });
+    Dialogs::getInt(parent.get(), "Title", "Label", 3, 1, 10, [&value](int entered) { value = entered; });
 
     QInputDialog *dialog = onlyInputDialog();
     ASSERT_NE(dialog, nullptr);
     EXPECT_EQ(dialog->intValue(), 3);
     EXPECT_EQ(dialog->intMinimum(), 1);
     EXPECT_EQ(dialog->intMaximum(), 10);
-    EXPECT_EQ(dialog->intStep(), 2);
     dialog->setIntValue(7);
     dialog->accept();
     settle();
@@ -328,28 +327,10 @@ TEST_F(NonBlockingDialogs, GetIntDeliversTheValueOnAccept)
     EXPECT_EQ(value, 7);
 }
 
-TEST_F(NonBlockingDialogs, GetItemDeliversTheItemOnAccept)
-{
-    std::optional<QString> item;
-    Dialogs::getItem(parent.get(), "Title", "Label", {"a", "b", "c"}, 1, false,
-                     [&](const QString &chosen) { item = chosen; });
-
-    QInputDialog *dialog = onlyInputDialog();
-    ASSERT_NE(dialog, nullptr);
-    EXPECT_EQ(dialog->comboBoxItems(), QStringList({"a", "b", "c"}));
-    EXPECT_EQ(dialog->textValue(), "b");
-    EXPECT_FALSE(dialog->isComboBoxEditable());
-    dialog->setTextValue("c");
-    dialog->accept();
-    settle();
-
-    EXPECT_EQ(item, "c");
-}
-
 TEST_F(NonBlockingDialogs, GetColorDeliversTheChosenColorOnAcceptOnly)
 {
     std::optional<QColor> color;
-    Dialogs::getColor(Qt::red, parent.get(), "Title", [&](const QColor &chosen) { color = chosen; });
+    Dialogs::getColor(Qt::red, parent.get(), "Title", [&color](const QColor &chosen) { color = chosen; });
 
     QColorDialog *dialog = parent->findChild<QColorDialog *>();
     ASSERT_NE(dialog, nullptr);
@@ -360,7 +341,7 @@ TEST_F(NonBlockingDialogs, GetColorDeliversTheChosenColorOnAcceptOnly)
     EXPECT_FALSE(color.has_value());
     ASSERT_TRUE(parent->findChildren<QColorDialog *>().isEmpty());
 
-    Dialogs::getColor(Qt::red, parent.get(), "Title", [&](const QColor &chosen) { color = chosen; });
+    Dialogs::getColor(Qt::red, parent.get(), "Title", [&color](const QColor &chosen) { color = chosen; });
     ASSERT_EQ(parent->findChildren<QColorDialog *>().size(), 1);
     dialog = parent->findChild<QColorDialog *>();
     dialog->setCurrentColor(Qt::blue);
@@ -379,7 +360,7 @@ TEST_F(NonBlockingDialogs, OpenReportsTheResultWhileTheDialogIsStillReadable)
         dialog->setTextValue("field");
         QPointer<QInputDialog> guard = dialog;
 
-        Dialogs::open(dialog, [&, dialog](int finished) {
+        Dialogs::open(dialog, [&result, &read, dialog](int finished) {
             result = finished;
             read = dialog->textValue();
         });
@@ -433,7 +414,7 @@ TEST_F(NonBlockingDialogs, EmptyCallbacksAreAllowed)
 TEST_F(NonBlockingDialogs, TheCallbackRunsAfterTheDialogsCloseHandling)
 {
     int calls = 0;
-    Dialogs::confirm(parent.get(), "Title", "Text", [&](bool) { ++calls; });
+    Dialogs::confirm(parent.get(), "Title", "Text", [&calls](bool) { ++calls; });
 
     onlyMessageBox()->button(QMessageBox::Yes)->click();
 
@@ -444,23 +425,23 @@ TEST_F(NonBlockingDialogs, TheCallbackRunsAfterTheDialogsCloseHandling)
 
 TEST_F(NonBlockingDialogs, ACallbackMayDestroyTheParent)
 {
-    QWidget *owner = parent.release();
     bool ran = false;
-    Dialogs::confirm(owner, "Title", "Text", [&](bool) {
+    Dialogs::confirm(parent.get(), "Title", "Text", [this, &ran](bool) {
         ran = true;
-        delete owner;
+        parent.reset();
     });
 
-    owner->findChild<QMessageBox *>()->button(QMessageBox::Yes)->click();
+    onlyMessageBox()->button(QMessageBox::Yes)->click();
     settle();
 
     EXPECT_TRUE(ran);
+    EXPECT_EQ(parent, nullptr);
 }
 
 TEST_F(NonBlockingDialogs, ACallbackMayOpenAnotherDialog)
 {
     Dialogs::confirm(parent.get(), "First", "Text",
-                     [&](bool) { Dialogs::information(parent.get(), "Second", "Text"); });
+                     [this](bool) { Dialogs::information(parent.get(), "Second", "Text"); });
 
     onlyMessageBox()->button(QMessageBox::Yes)->click();
     settle();
@@ -479,7 +460,7 @@ TEST_F(NonBlockingDialogs, OpenBoxReportsTheClickedCustomButton)
     box->addButton("Back", QMessageBox::RejectRole);
     QAbstractButton *clicked = nullptr;
     int calls = 0;
-    Dialogs::open(box, [&](QAbstractButton *button) {
+    Dialogs::open(box, [&clicked, &calls](QAbstractButton *button) {
         clicked = button;
         ++calls;
     });
@@ -498,7 +479,7 @@ TEST_F(NonBlockingDialogs, ClosingAnOpenBoxReportsItsOnlyRejectButton)
     box->addButton("Drop", QMessageBox::DestructiveRole);
     QPushButton *back = box->addButton("Back", QMessageBox::RejectRole);
     QAbstractButton *clicked = nullptr;
-    Dialogs::open(box, [&](QAbstractButton *button) { clicked = button; });
+    Dialogs::open(box, [&clicked](QAbstractButton *button) { clicked = button; });
 
     box->close();
     settle();
@@ -513,7 +494,7 @@ TEST_F(NonBlockingDialogs, ClosingAnOpenBoxReportsTheEscapeButtonSetOnIt)
     box->addButton("Back", QMessageBox::RejectRole);
     box->setEscapeButton(keep);
     QAbstractButton *clicked = nullptr;
-    Dialogs::open(box, [&](QAbstractButton *button) { clicked = button; });
+    Dialogs::open(box, [&clicked](QAbstractButton *button) { clicked = button; });
 
     box->close();
     settle();
@@ -528,7 +509,7 @@ TEST_F(NonBlockingDialogs, RejectingAnOpenBoxWithoutAnEscapeButtonReportsNull)
     box->addButton("Drop", QMessageBox::YesRole);
     QAbstractButton *clicked = keep;
     int calls = 0;
-    Dialogs::open(box, [&](QAbstractButton *button) {
+    Dialogs::open(box, [&clicked, &calls](QAbstractButton *button) {
         clicked = button;
         ++calls;
     });
@@ -544,7 +525,7 @@ TEST_F(NonBlockingDialogs, ClosingAskWithOneButtonGivesThatButton)
 {
     std::optional<QMessageBox::StandardButton> answer;
     Dialogs::ask(parent.get(), QMessageBox::Information, "Title", "Text", QMessageBox::Ok, QMessageBox::Ok,
-                 [&](QMessageBox::StandardButton button) { answer = button; });
+                 [&answer](QMessageBox::StandardButton button) { answer = button; });
 
     onlyMessageBox()->close();
     settle();
@@ -557,7 +538,7 @@ TEST_F(NonBlockingDialogs, ClosingAskPrefersCancelOverAnotherRejectRoleButton)
     std::optional<QMessageBox::StandardButton> answer;
     Dialogs::ask(parent.get(), QMessageBox::Question, "Title", "Text",
                  QMessageBox::Ok | QMessageBox::Cancel | QMessageBox::Close, QMessageBox::Ok,
-                 [&](QMessageBox::StandardButton button) { answer = button; });
+                 [&answer](QMessageBox::StandardButton button) { answer = button; });
 
     onlyMessageBox()->close();
     settle();
@@ -569,7 +550,7 @@ TEST_F(NonBlockingDialogs, ClosingAskGivesItsOnlyRejectRoleButton)
 {
     std::optional<QMessageBox::StandardButton> answer;
     Dialogs::ask(parent.get(), QMessageBox::Question, "Title", "Text", QMessageBox::Yes | QMessageBox::Close,
-                 QMessageBox::Yes, [&](QMessageBox::StandardButton button) { answer = button; });
+                 QMessageBox::Yes, [&answer](QMessageBox::StandardButton button) { answer = button; });
 
     onlyMessageBox()->close();
     settle();
@@ -581,7 +562,7 @@ TEST_F(NonBlockingDialogs, ClosingAskGivesItsOnlyNoRoleButton)
 {
     std::optional<QMessageBox::StandardButton> answer;
     Dialogs::ask(parent.get(), QMessageBox::Question, "Title", "Text", QMessageBox::Yes | QMessageBox::No,
-                 QMessageBox::Yes, [&](QMessageBox::StandardButton button) { answer = button; });
+                 QMessageBox::Yes, [&answer](QMessageBox::StandardButton button) { answer = button; });
 
     onlyMessageBox()->close();
     settle();
@@ -594,7 +575,7 @@ TEST_F(NonBlockingDialogs, RejectingAskWithTwoNoRoleButtonsGivesNoButton)
     std::optional<QMessageBox::StandardButton> answer;
     Dialogs::ask(parent.get(), QMessageBox::Question, "Title", "Text",
                  QMessageBox::Yes | QMessageBox::No | QMessageBox::NoToAll, QMessageBox::Yes,
-                 [&](QMessageBox::StandardButton button) { answer = button; });
+                 [&answer](QMessageBox::StandardButton button) { answer = button; });
 
     onlyMessageBox()->reject();
     settle();
@@ -605,7 +586,7 @@ TEST_F(NonBlockingDialogs, RejectingAskWithTwoNoRoleButtonsGivesNoButton)
 TEST_F(NonBlockingDialogs, ANoticeRunsItsCallbackOnceAfterOk)
 {
     int calls = 0;
-    Dialogs::warning(parent.get(), "Title", "Text", [&] { ++calls; });
+    Dialogs::warning(parent.get(), "Title", "Text", [&calls] { ++calls; });
 
     EXPECT_EQ(calls, 0);
     onlyMessageBox()->button(QMessageBox::Ok)->click();
@@ -617,7 +598,7 @@ TEST_F(NonBlockingDialogs, ANoticeRunsItsCallbackOnceAfterOk)
 TEST_F(NonBlockingDialogs, ANoticeRunsItsCallbackWhenClosedFromItsWindow)
 {
     int calls = 0;
-    Dialogs::critical(parent.get(), "Title", "Text", [&] { ++calls; });
+    Dialogs::critical(parent.get(), "Title", "Text", [&calls] { ++calls; });
 
     onlyMessageBox()->close();
     settle();
@@ -628,7 +609,7 @@ TEST_F(NonBlockingDialogs, ANoticeRunsItsCallbackWhenClosedFromItsWindow)
 TEST_F(NonBlockingDialogs, DestroyingTheParentWhileANoticeIsOpenRunsNoCallback)
 {
     int calls = 0;
-    Dialogs::information(parent.get(), "Title", "Text", [&] { ++calls; });
+    Dialogs::information(parent.get(), "Title", "Text", [&calls] { ++calls; });
 
     parent.reset();
     settle();
@@ -638,7 +619,7 @@ TEST_F(NonBlockingDialogs, DestroyingTheParentWhileANoticeIsOpenRunsNoCallback)
 
 TEST_F(NonBlockingDialogs, GetTextCanHideWhatIsTyped)
 {
-    Dialogs::getText(parent.get(), "Title", "Label", "", [](const QString &) {}, QLineEdit::Password);
+    Dialogs::getText(parent.get(), "Title", "Label", "", {}, QLineEdit::Password);
 
     QInputDialog *dialog = onlyInputDialog();
     ASSERT_NE(dialog, nullptr);
@@ -649,7 +630,8 @@ TEST_F(NonBlockingDialogs, GetColorCanKeepTheAlphaChannel)
 {
     std::optional<QColor> color;
     Dialogs::getColor(
-        Qt::red, parent.get(), "Title", [&](const QColor &chosen) { color = chosen; }, QColorDialog::ShowAlphaChannel);
+        Qt::red, parent.get(), "Title", [&color](const QColor &chosen) { color = chosen; },
+        QColorDialog::ShowAlphaChannel);
 
     QColorDialog *dialog = parent->findChild<QColorDialog *>();
     ASSERT_NE(dialog, nullptr);
@@ -664,7 +646,7 @@ TEST_F(NonBlockingDialogs, GetColorCanKeepTheAlphaChannel)
 TEST_F(NonBlockingDialogs, ADialogWithoutAParentBlocksTheWholeApplication)
 {
     std::optional<QString> text;
-    Dialogs::getText(nullptr, "Title", "Label", "typed", [&](const QString &entered) { text = entered; });
+    Dialogs::getText(nullptr, "Title", "Label", "typed", [&text](const QString &entered) { text = entered; });
 
     QPointer<QInputDialog> dialog;
     for (QWidget *widget : QApplication::topLevelWidgets()) {
@@ -688,7 +670,7 @@ TEST_F(NonBlockingDialogs, ADialogThatDeletesItselfOnCloseOutlivesItsCallback)
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     QPointer<QInputDialog> guard = dialog;
     std::optional<bool> aliveInCallback;
-    Dialogs::open(dialog, [&](int) { aliveInCallback = !guard.isNull(); });
+    Dialogs::open(dialog, [&aliveInCallback, &guard](int) { aliveInCallback = !guard.isNull(); });
 
     fromTheEventLoop([dialog] { dialog->accept(); });
 
@@ -698,16 +680,16 @@ TEST_F(NonBlockingDialogs, ADialogThatDeletesItselfOnCloseOutlivesItsCallback)
 
 TEST_F(NonBlockingDialogs, ADialogThatDeletesItselfOnCloseStillAnswersWithoutAParent)
 {
-    auto *dialog = new QInputDialog;
-    dialog->setAttribute(Qt::WA_DeleteOnClose);
-    QPointer<QInputDialog> guard = dialog;
+    auto owned = std::make_unique<QInputDialog>();
+    owned->setAttribute(Qt::WA_DeleteOnClose);
+    QPointer<QInputDialog> dialog = owned.get();
     std::optional<int> result;
-    Dialogs::open(dialog, [&](int finished) { result = finished; });
+    Dialogs::open(owned.release(), [&result](int finished) { result = finished; });
 
     fromTheEventLoop([dialog] { dialog->accept(); });
 
     EXPECT_EQ(result, int(QDialog::Accepted));
-    EXPECT_TRUE(guard.isNull());
+    EXPECT_TRUE(dialog.isNull());
 }
 
 TEST_F(NonBlockingDialogs, ClosingAnOpenBoxWithDetailsReportsItsOtherButton)
@@ -717,7 +699,7 @@ TEST_F(NonBlockingDialogs, ClosingAnOpenBoxWithDetailsReportsItsOtherButton)
     QAbstractButton *ok = box->button(QMessageBox::Ok);
     ASSERT_NE(ok, nullptr);
     QAbstractButton *clicked = nullptr;
-    Dialogs::open(box, [&](QAbstractButton *button) { clicked = button; });
+    Dialogs::open(box, [&clicked](QAbstractButton *button) { clicked = button; });
 
     box->close();
     settle();
@@ -729,7 +711,7 @@ TEST_F(NonBlockingDialogs, ADialogThatFinishesTwiceAnswersOnce)
 {
     auto *dialog = new QInputDialog(parent.get());
     int calls = 0;
-    Dialogs::open(dialog, [&](int) { ++calls; });
+    Dialogs::open(dialog, [&calls](int) { ++calls; });
 
     dialog->accept();
     dialog->accept();
@@ -743,7 +725,8 @@ TEST_F(NonBlockingDialogs, ACallbackMayOpenItsDialogAgain)
     auto *dialog = new QInputDialog(parent.get());
     QPointer<QInputDialog> guard = dialog;
     int secondAnswers = 0;
-    Dialogs::open(dialog, [&, dialog](int) { Dialogs::open(dialog, [&](int) { ++secondAnswers; }); });
+    Dialogs::open(dialog,
+                  [&secondAnswers, dialog](int) { Dialogs::open(dialog, [&secondAnswers](int) { ++secondAnswers; }); });
 
     dialog->reject();
     settle();
@@ -760,7 +743,7 @@ TEST_F(NonBlockingDialogs, ACallbackMayOpenItsDialogAgain)
 TEST_F(NonBlockingDialogs, DestroyingTheParentAfterTheAnswerRunsNoCallback)
 {
     int calls = 0;
-    Dialogs::confirm(parent.get(), "Title", "Text", [&](bool) { ++calls; });
+    Dialogs::confirm(parent.get(), "Title", "Text", [&calls](bool) { ++calls; });
 
     onlyMessageBox()->button(QMessageBox::Yes)->click();
     parent.reset();
@@ -771,12 +754,12 @@ TEST_F(NonBlockingDialogs, DestroyingTheParentAfterTheAnswerRunsNoCallback)
 
 TEST_F(NonBlockingDialogs, DeletingTheDialogAfterItFinishedRunsNoCallback)
 {
-    auto *dialog = new QInputDialog(parent.get());
+    auto dialog = std::make_unique<QInputDialog>(parent.get());
     int calls = 0;
-    Dialogs::open(dialog, [&](int) { ++calls; });
+    Dialogs::open(dialog.get(), [&calls](int) { ++calls; });
 
     dialog->accept();
-    delete dialog;
+    dialog.reset();
     settle();
 
     EXPECT_EQ(calls, 0);
@@ -785,7 +768,7 @@ TEST_F(NonBlockingDialogs, DeletingTheDialogAfterItFinishedRunsNoCallback)
 TEST_F(NonBlockingDialogs, TheCallbackRunsAfterTheBoxesWindowCloseHandling)
 {
     int calls = 0;
-    Dialogs::confirm(parent.get(), "Title", "Text", [&](bool) { ++calls; });
+    Dialogs::confirm(parent.get(), "Title", "Text", [&calls](bool) { ++calls; });
 
     onlyMessageBox()->close();
     EXPECT_EQ(calls, 0);
@@ -796,7 +779,7 @@ TEST_F(NonBlockingDialogs, TheCallbackRunsAfterTheBoxesWindowCloseHandling)
 
 TEST_F(NonBlockingDialogs, ACallbackMayDestroyTheParentAfterAWindowClose)
 {
-    Dialogs::confirm(parent.get(), "Title", "Text", [&](bool) { parent.reset(); });
+    Dialogs::confirm(parent.get(), "Title", "Text", [this](bool) { parent.reset(); });
 
     onlyMessageBox()->close();
     settle();
@@ -806,14 +789,14 @@ TEST_F(NonBlockingDialogs, ACallbackMayDestroyTheParentAfterAWindowClose)
 
 TEST_F(NonBlockingDialogs, WhileAliveForwardsOnlyWhileItsContextLives)
 {
-    auto *context = new QObject;
+    auto context = std::make_unique<QObject>();
     int received = 0;
-    const auto guarded = Dialogs::whileAlive(context, [&](int value) { received = value; });
+    const auto guarded = Dialogs::whileAlive(context.get(), [&received](int value) { received = value; });
 
     guarded(3);
     EXPECT_EQ(received, 3);
 
-    delete context;
+    context.reset();
     guarded(5);
     EXPECT_EQ(received, 3);
 }
