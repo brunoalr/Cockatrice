@@ -798,6 +798,8 @@ if(WITH_CLIENT)
     NAME
     game_dialogs_test
     SOURCES
+    ${CLIENT_SRC}/game_graphics/board/abstract_counter.cpp
+    ${CLIENT_SRC}/game_graphics/board/translate_counter_name.cpp
     ${CLIENT_SRC}/game_graphics/dialogs/dlg_move_top_cards_until.cpp
     ${SETTINGS_SOURCES}
     game_dialogs_test.cpp
@@ -807,6 +809,7 @@ if(WITH_CLIENT)
     ${SETTINGS_LIBS}
     INCLUDE_DIRS
     ${SETTINGS_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/game
   )
   cockatrice_add_test(
     NAME

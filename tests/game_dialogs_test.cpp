@@ -1,17 +1,24 @@
 #include "client/settings/cache_settings.h"
+#include "game_graphics/board/abstract_counter.h"
 #include "game_graphics/dialogs/dlg_move_top_cards_until.h"
+#include "game_test_fixture.h"
 
+#include <QAction>
 #include <QApplication>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDir>
+#include <QGraphicsRectItem>
 #include <QMessageBox>
+#include <QPointer>
 #include <QPushButton>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QThread>
 #include <QTimer>
 #include <gtest/gtest.h>
+#include <libcockatrice/game/board/counter_state.h>
+#include <libcockatrice/protocol/pb/command_set_counter.pb.h>
 #include <libcockatrice/rng/rng_abstract.h>
 #include <memory>
 
@@ -24,6 +31,21 @@ void settle()
     QCoreApplication::processEvents();
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
 }
+
+class TestCounter : public AbstractCounter
+{
+public:
+    using AbstractCounter::AbstractCounter;
+
+    QRectF boundingRect() const override
+    {
+        return {0, 0, 10, 10};
+    }
+
+    void paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *) override
+    {
+    }
+};
 
 class GameDialogs : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
 {
@@ -113,6 +135,59 @@ TEST_F(GameDialogs, AnExpressionWithoutAMatchIsUsedOnlyAfterYes)
     EXPECT_FALSE(dialog->isVisible());
     EXPECT_EQ(dialog->result(), QDialog::Accepted);
     EXPECT_EQ(dialog->getExpr(), "no such card");
+}
+
+class CounterDialog : public GameDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    GameHarness harness;
+    std::unique_ptr<QGraphicsRectItem> board = std::make_unique<QGraphicsRectItem>();
+    QPointer<TestCounter> counter;
+
+    void SetUp() override
+    {
+        GameDialogs::SetUp();
+        CounterState *state = harness.player()->addCounter(3, "life", Qt::white, 20, 20);
+        counter = new TestCounter(state, harness.player(), true, false, board.get());
+    }
+
+    AbstractCounterDialog *openSetCounter() const
+    {
+        counter->getMenu()->actions().first()->trigger();
+        settle();
+        return onlyOpen<AbstractCounterDialog>();
+    }
+};
+
+TEST_F(CounterDialog, SettingTheCounterSendsTheNewValue)
+{
+    AbstractCounterDialog *dialog = openSetCounter();
+    ASSERT_NE(dialog, nullptr);
+    harness.client()->sent.clear();
+
+    dialog->setTextValue("7");
+    dialog->accept();
+    settle();
+
+    ASSERT_EQ(harness.client()->sent.size(), 1);
+    const auto &command = harness.lastCommand().game_command(0).GetExtension(Command_SetCounter::ext);
+    EXPECT_EQ(command.counter_id(), 3);
+    EXPECT_EQ(command.value(), 7);
+}
+
+TEST_F(CounterDialog, ACounterRemovedWhileItsDialogIsOpenGoesWhenTheDialogCloses)
+{
+    AbstractCounterDialog *dialog = openSetCounter();
+    ASSERT_NE(dialog, nullptr);
+
+    counter->delCounter();
+    settle();
+    EXPECT_FALSE(counter.isNull());
+
+    dialog->reject();
+    settle();
+
+    EXPECT_TRUE(counter.isNull());
 }
 } // namespace
 
