@@ -8,15 +8,17 @@ baseline_file="$(dirname "$0")/blocking_calls.baseline"
 blocking_call='QMessageBox::(information|warning|critical|about|aboutQt|question)\(|QtUtils::confirm\(|QInputDialog::get[A-Za-z]+\(|QFileDialog::get(OpenFile|SaveFile|ExistingDirectory)(Names?|Urls?)?\(|Q(Color|Font)Dialog::get[A-Za-z]+\(|(^|[^A-Za-z0-9_])exec\('
 
 count_blocking_calls() {
-  git -C "$1" ls-files -z -- 'cockatrice/src/*.cpp' 'cockatrice/src/*.h' 'libcockatrice_*/*.cpp' 'libcockatrice_*/*.h' |
-    (cd "$1" && xargs -0 grep -hE "$blocking_call" || true) |
+  local repo=$1
+  git -C "$repo" ls-files -z -- 'cockatrice/src/*.cpp' 'cockatrice/src/*.h' 'libcockatrice_*/*.cpp' 'libcockatrice_*/*.h' |
+    (cd "$repo" && xargs -0 grep -hE "$blocking_call" || true) |
     grep -vE '^[[:space:]]*(//|\*([[:space:]/]|$))' |
     grep -vcE '// blocking-ok: [^[:space:]].*$' || true
 }
 
 require_count() {
-  if [[ ! $1 =~ ^(0|[1-9][0-9]*)$ ]]; then
-    echo "::error::$2 holds '$1', not a count"
+  local value=$1 holder=$2
+  if [[ ! $value =~ ^(0|[1-9][0-9]*)$ ]]; then
+    echo "::error::$holder holds '$value', not a count"
     return 1
   fi
 }
