@@ -1049,71 +1049,71 @@ void PlayerActions::actCreateAllRelatedCards(const CardState *sourceCard)
 
     if (relatedCards.length() == 1) {
         cardRelation = relatedCards.at(0);
-        lastRelatedCreationSucceeded = false; // reset before emit
-        actRequestCreateRelatedFromRelationDialog(sourceCard, cardRelation);
-        if (lastRelatedCreationSucceeded) {
-            ++tokensTypesCreated;
+        actRequestCreateRelatedFromRelationDialog(sourceCard, cardRelation,
+                                                  [this, cardRelation] { setLastTokenFromRelation(cardRelation); });
+        return;
+    }
+
+    QList<CardRelation *> nonExcludedRelatedCards;
+    QString dbName;
+    for (CardRelation *cardRelationTemp : relatedCards) {
+        if (!cardRelationTemp->getIsCreateAllExclusion() && !cardRelationTemp->getDoesAttach()) {
+            nonExcludedRelatedCards.append(cardRelationTemp);
         }
-    } else {
-        QList<CardRelation *> nonExcludedRelatedCards;
-        QString dbName;
-        for (CardRelation *cardRelationTemp : relatedCards) {
-            if (!cardRelationTemp->getIsCreateAllExclusion() && !cardRelationTemp->getDoesAttach()) {
-                nonExcludedRelatedCards.append(cardRelationTemp);
-            }
-        }
-        switch (nonExcludedRelatedCards.length()) {
-            case 1:
-                cardRelation = nonExcludedRelatedCards.at(0);
-                lastRelatedCreationSucceeded = false; // reset before emit
-                actRequestCreateRelatedFromRelationDialog(sourceCard, cardRelation);
-                if (lastRelatedCreationSucceeded) {
+    }
+    switch (nonExcludedRelatedCards.length()) {
+        case 1:
+            cardRelation = nonExcludedRelatedCards.at(0);
+            actRequestCreateRelatedFromRelationDialog(sourceCard, cardRelation,
+                                                      [this, cardRelation] { setLastTokenFromRelation(cardRelation); });
+            return;
+
+        // If all are marked "Exclude", then treat the situation as if none of them are.
+        // We won't accept "garbage in, garbage out", here.
+        case 0:
+            for (CardRelation *cardRelationAll : relatedCards) {
+                if (!cardRelationAll->getDoesAttach() && !cardRelationAll->getIsVariable()) {
+                    dbName = cardRelationAll->getName();
+                    bool persistent = cardRelationAll->getIsPersistent();
+                    bool faceDown = cardRelationAll->getIsFaceDown();
+                    for (int i = 0; i < cardRelationAll->getDefaultCount(); ++i) {
+                        createCard(sourceCard, dbName, CardRelationType::DoesNotAttach, persistent, faceDown);
+                    }
                     ++tokensTypesCreated;
-                }
-                break;
-
-            // If all are marked "Exclude", then treat the situation as if none of them are.
-            // We won't accept "garbage in, garbage out", here.
-            case 0:
-                for (CardRelation *cardRelationAll : relatedCards) {
-                    if (!cardRelationAll->getDoesAttach() && !cardRelationAll->getIsVariable()) {
-                        dbName = cardRelationAll->getName();
-                        bool persistent = cardRelationAll->getIsPersistent();
-                        bool faceDown = cardRelationAll->getIsFaceDown();
-                        for (int i = 0; i < cardRelationAll->getDefaultCount(); ++i) {
-                            createCard(sourceCard, dbName, CardRelationType::DoesNotAttach, persistent, faceDown);
-                        }
-                        ++tokensTypesCreated;
-                        if (tokensTypesCreated == 1) {
-                            cardRelation = cardRelationAll;
-                        }
+                    if (tokensTypesCreated == 1) {
+                        cardRelation = cardRelationAll;
                     }
                 }
-                break;
+            }
+            break;
 
-            default:
-                for (CardRelation *cardRelationNotExcluded : nonExcludedRelatedCards) {
-                    if (!cardRelationNotExcluded->getDoesAttach() && !cardRelationNotExcluded->getIsVariable()) {
-                        dbName = cardRelationNotExcluded->getName();
-                        bool persistent = cardRelationNotExcluded->getIsPersistent();
-                        bool faceDown = cardRelationNotExcluded->getIsFaceDown();
-                        for (int i = 0; i < cardRelationNotExcluded->getDefaultCount(); ++i) {
-                            createCard(sourceCard, dbName, CardRelationType::DoesNotAttach, persistent, faceDown);
-                        }
-                        ++tokensTypesCreated;
-                        if (tokensTypesCreated == 1) {
-                            cardRelation = cardRelationNotExcluded;
-                        }
+        default:
+            for (CardRelation *cardRelationNotExcluded : nonExcludedRelatedCards) {
+                if (!cardRelationNotExcluded->getDoesAttach() && !cardRelationNotExcluded->getIsVariable()) {
+                    dbName = cardRelationNotExcluded->getName();
+                    bool persistent = cardRelationNotExcluded->getIsPersistent();
+                    bool faceDown = cardRelationNotExcluded->getIsFaceDown();
+                    for (int i = 0; i < cardRelationNotExcluded->getDefaultCount(); ++i) {
+                        createCard(sourceCard, dbName, CardRelationType::DoesNotAttach, persistent, faceDown);
+                    }
+                    ++tokensTypesCreated;
+                    if (tokensTypesCreated == 1) {
+                        cardRelation = cardRelationNotExcluded;
                     }
                 }
-                break;
-        }
+            }
+            break;
     }
 
     /*
      * If we made at least one token via "Create All Tokens"
      * then assign the first to the "Create another" shortcut.
      */
+    setLastTokenFromRelation(cardRelation);
+}
+
+void PlayerActions::setLastTokenFromRelation(const CardRelation *cardRelation)
+{
     if (cardRelation != nullptr && cardRelation->getCanCreateAnother()) {
         CardInfoPtr cardInfo = CardDatabaseManager::query()->getCardInfo(cardRelation->getName());
         setLastToken(cardInfo);
@@ -1121,9 +1121,10 @@ void PlayerActions::actCreateAllRelatedCards(const CardState *sourceCard)
 }
 
 void PlayerActions::actRequestCreateRelatedFromRelationDialog(const CardState *sourceCard,
-                                                              const CardRelation *cardRelation)
+                                                              const CardRelation *cardRelation,
+                                                              const std::function<void()> &thenFinished)
 {
-    emit requestCreateRelatedFromRelationDialog(sourceCard, cardRelation);
+    emit requestCreateRelatedFromRelationDialog(sourceCard, cardRelation, thenFinished);
 }
 
 bool PlayerActions::createRelatedFromRelation(const CardState *sourceCard,

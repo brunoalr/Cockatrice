@@ -3,6 +3,7 @@
 #include "../../client/settings/cache_settings.h"
 #include "../../client/settings/card_counter_settings.h"
 #include "../../interface/widgets/utility/get_text_with_max.h"
+#include "../../interface/widgets/utility/non_blocking_dialogs.h"
 #include "../board/abstract_counter.h"
 #include "../board/card_item.h"
 #include "../dialogs/dlg_annotation.h"
@@ -15,6 +16,7 @@
 #include <QChar>
 #include <QInputDialog>
 #include <QLineEdit>
+#include <QPointer>
 #include <libcockatrice/card/relation/card_relation.h>
 #include <libcockatrice/game/player/player_actions.h>
 #include <libcockatrice/game/player/player_logic.h>
@@ -203,37 +205,50 @@ void PlayerDialogs::onRollDieDialogRequested()
 }
 
 void PlayerDialogs::onCreateRelatedFromRelationDialogRequested(const CardState *sourceCard,
-                                                               const CardRelation *cardRelation)
+                                                               const CardRelation *cardRelation,
+                                                               const std::function<void()> &thenFinished)
 {
     if (sourceCard == nullptr || cardRelation == nullptr) {
-        playerActions->setLastRelatedCreationSucceeded(false);
+        if (thenFinished) {
+            thenFinished();
+        }
         return;
     }
 
-    int variableCount = cardRelation->getDefaultCount();
-
-    if (cardRelation->getIsVariable()) {
-        bool ok;
-
-        emit requestDialogSemaphore(true);
-
-        variableCount = QInputDialog::getInt(dialogParent(), tr("Create tokens"), tr("Number:"),
-                                             cardRelation->getDefaultCount(), 1, MAX_TOKENS_PER_DIALOG, 1, &ok);
-
-        emit requestDialogSemaphore(false);
-
-        if (!ok) {
-            playerActions->setLastRelatedCreationSucceeded(false); // cancelled
-            return;
-        }
+    if (!cardRelation->getIsVariable()) {
+        createRelated(sourceCard, cardRelation, cardRelation->getDefaultCount(), thenFinished);
+        return;
     }
 
-    const bool succeeded = playerActions->createRelatedFromRelation(sourceCard, cardRelation, variableCount);
+    auto *dialog = new QInputDialog(dialogParent());
+    dialog->setWindowTitle(tr("Create tokens"));
+    dialog->setLabelText(tr("Number:"));
+    dialog->setIntRange(1, MAX_TOKENS_PER_DIALOG);
+    dialog->setIntValue(cardRelation->getDefaultCount());
+    openHoldingDialogSemaphore(dialog,
+                               [this, dialog, source = QPointer<const CardState>(sourceCard),
+                                relation = QPointer<const CardRelation>(cardRelation), thenFinished](int result) {
+                                   if (!source || !relation) {
+                                       return;
+                                   }
+                                   if (result == QDialog::Accepted) {
+                                       createRelated(source, relation, dialog->intValue(), thenFinished);
+                                   } else if (thenFinished) {
+                                       thenFinished();
+                                   }
+                               });
+}
 
-    playerActions->setLastRelatedCreationSucceeded(succeeded);
-
-    if (succeeded) {
+void PlayerDialogs::createRelated(const CardState *sourceCard,
+                                  const CardRelation *cardRelation,
+                                  int count,
+                                  const std::function<void()> &thenFinished)
+{
+    if (playerActions->createRelatedFromRelation(sourceCard, cardRelation, count)) {
         playerActions->onRelatedCardCreated(sourceCard, cardRelation); // only on confirmed success
+    }
+    if (thenFinished) {
+        thenFinished();
     }
 }
 
@@ -311,4 +326,17 @@ void PlayerDialogs::onSetCardCounterDialogRequested(int counterId, const QString
         return;
     }
     playerActions->actSetCardCounter(cards, counterId, dialog.textValue());
+}
+
+void PlayerDialogs::openHoldingDialogSemaphore(QDialog *dialog, const std::function<void(int result)> &thenFinished)
+{
+    emit requestDialogSemaphore(true);
+    // A dialog destroyed with its parent never reports back.
+    const auto releaseUnanswered =
+        connect(dialog, &QObject::destroyed, this, [this] { emit requestDialogSemaphore(false); });
+    Dialogs::open(dialog, Dialogs::whileAlive(this, [this, releaseUnanswered, thenFinished](int result) {
+                      disconnect(releaseUnanswered);
+                      emit requestDialogSemaphore(false);
+                      thenFinished(result);
+                  }));
 }
