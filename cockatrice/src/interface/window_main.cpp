@@ -58,6 +58,7 @@
 #include "widgets/server/handle_public_servers.h"
 #include "widgets/settings_page/abstract_settings_page.h"
 #include "widgets/tabs/api/commander_spellbook/handle_commander_brackets.h"
+#include "widgets/utility/non_blocking_dialogs.h"
 #ifdef WITH_GUI_TEST
 #include "../game_graphics/pq_cockatrice_event_player.h"
 #include "pqEventObserver.h"
@@ -718,8 +719,13 @@ void MainWindow::startupConfigCheck()
     CardDatabaseManager::getInstance()->checkUnknownSets();
     actCheckCommanderBracketDefinitionUpdates();
 #else
-    AtRiskDataWarning::warnAboutDataPathsInProgramDir(this);
+    AtRiskDataWarning::warnAboutDataPathsInProgramDir(this, [this] { continueStartupConfigCheck(); });
+#endif
+}
 
+#ifndef Q_OS_WASM
+void MainWindow::continueStartupConfigCheck()
+{
     const bool isCleanInstall = SettingsCache::instance().network().getClientVersion() == CLIENT_INFO_NOT_SET;
 
     // The loader never runs checkUnknownSets() itself (see main.cpp): the
@@ -792,46 +798,54 @@ void MainWindow::startupConfigCheck()
         // previous config from this version found
         qCInfo(WindowMainStartupVersionLog) << "Startup: found config with current version";
 
+        // Run the tips dialog only on subsequent startups.
+        // On the first run after an install/update the startup is already crowded enough
+        const auto showTips = [this] {
+            if (tip->successfulInit && SettingsCache::instance().personal().getShowTipsOnStartup() &&
+                tip->newTipsAvailable) {
+                tip->raise();
+                tip->show();
+            }
+        };
+
         if (SettingsCache::instance().updates().getCardUpdateCheckRequired()) {
             if (SettingsCache::instance().updates().getStartupCardUpdateCheckPromptForUpdate()) {
                 auto startupCardCheckDialog = new DlgStartupCardCheck(this);
 
-                if (startupCardCheckDialog->exec() == QDialog::Accepted) {
-                    switch (startupCardCheckDialog->group->checkedId()) {
-                        case 0: // foreground
-                            actCheckCardUpdates();
-                            break;
-                        case 1: // background
-                            actCheckCardUpdatesBackground();
-                            break;
-                        case 2: // background + always
-                            SettingsCache::instance().updates().setStartupCardUpdateCheckPromptForUpdate(false);
-                            SettingsCache::instance().updates().setStartupCardUpdateCheckAlwaysUpdate(true);
-                            actCheckCardUpdatesBackground();
-                            break;
-                        case 3: // don't prompt again + don't run
-                            SettingsCache::instance().updates().setStartupCardUpdateCheckPromptForUpdate(false);
-                            SettingsCache::instance().updates().setStartupCardUpdateCheckAlwaysUpdate(false);
-                            break;
-                        default:
-                            break;
+                Dialogs::open(startupCardCheckDialog, [this, startupCardCheckDialog, showTips](int result) {
+                    if (result == QDialog::Accepted) {
+                        switch (startupCardCheckDialog->group->checkedId()) {
+                            case 0: // foreground
+                                actCheckCardUpdates();
+                                break;
+                            case 1: // background
+                                actCheckCardUpdatesBackground();
+                                break;
+                            case 2: // background + always
+                                SettingsCache::instance().updates().setStartupCardUpdateCheckPromptForUpdate(false);
+                                SettingsCache::instance().updates().setStartupCardUpdateCheckAlwaysUpdate(true);
+                                actCheckCardUpdatesBackground();
+                                break;
+                            case 3: // don't prompt again + don't run
+                                SettingsCache::instance().updates().setStartupCardUpdateCheckPromptForUpdate(false);
+                                SettingsCache::instance().updates().setStartupCardUpdateCheckAlwaysUpdate(false);
+                                break;
+                            default:
+                                break;
+                        }
                     }
-                }
+                    showTips();
+                });
+                return;
             } else if (SettingsCache::instance().updates().getStartupCardUpdateCheckAlwaysUpdate()) {
                 actCheckCardUpdatesBackground();
             }
         }
 
-        // Run the tips dialog only on subsequent startups.
-        // On the first run after an install/update the startup is already crowded enough
-        if (tip->successfulInit && SettingsCache::instance().personal().getShowTipsOnStartup() &&
-            tip->newTipsAvailable) {
-            tip->raise();
-            tip->show();
-        }
+        showTips();
     }
-#endif
 }
+#endif
 
 void MainWindow::runFirstRunWizard(bool firstRun)
 {
@@ -952,21 +966,24 @@ bool MainWindow::startupDestinationConnectsToServer() const
 
 void MainWindow::alertForcedOracleRun(const QString &version, bool isUpdate)
 {
+    const auto launchOracle = [this] {
+        actCheckCardUpdates();
+        actCheckServerUpdates();
+        actCheckCommanderBracketDefinitionUpdates();
+    };
     if (isUpdate) {
-        QMessageBox::information(this, tr("New Version"),
-                                 tr("Congratulations on updating to Cockatrice %1!\n"
-                                    "Oracle will now launch to update your card database.")
-                                     .arg(version));
+        Dialogs::information(this, tr("New Version"),
+                             tr("Congratulations on updating to Cockatrice %1!\n"
+                                "Oracle will now launch to update your card database.")
+                                 .arg(version),
+                             launchOracle);
     } else {
-        QMessageBox::information(this, tr("Cockatrice installed"),
-                                 tr("Congratulations on installing Cockatrice %1!\n"
-                                    "Oracle will now launch to install the initial card database.")
-                                     .arg(version));
+        Dialogs::information(this, tr("Cockatrice installed"),
+                             tr("Congratulations on installing Cockatrice %1!\n"
+                                "Oracle will now launch to install the initial card database.")
+                                 .arg(version),
+                             launchOracle);
     }
-
-    actCheckCardUpdates();
-    actCheckServerUpdates();
-    actCheckCommanderBracketDefinitionUpdates();
 }
 
 MainWindow::~MainWindow()
@@ -1213,25 +1230,26 @@ void MainWindow::cardDatabaseLoadingFailed()
         return;
     }
     askedForDbUpdater = true;
-    QMessageBox msgBox;
-    msgBox.setWindowTitle(tr("Card database"));
-    msgBox.setIcon(QMessageBox::Question);
-    msgBox.setText(tr("Cockatrice is unable to load the card database.\n"
-                      "Do you want to update your card database now?\n"
-                      "If unsure or first time user, choose \"Yes\""));
+    auto *msgBox = new QMessageBox;
+    msgBox->setWindowTitle(tr("Card database"));
+    msgBox->setIcon(QMessageBox::Question);
+    msgBox->setText(tr("Cockatrice is unable to load the card database.\n"
+                       "Do you want to update your card database now?\n"
+                       "If unsure or first time user, choose \"Yes\""));
 
-    QPushButton *yesButton = msgBox.addButton(tr("Yes"), QMessageBox::YesRole);
-    msgBox.addButton(tr("No"), QMessageBox::NoRole);
-    QPushButton *settingsButton = msgBox.addButton(tr("Open settings"), QMessageBox::ActionRole);
-    msgBox.setDefaultButton(yesButton);
+    QPushButton *yesButton = msgBox->addButton(tr("Yes"), QMessageBox::YesRole);
+    msgBox->addButton(tr("No"), QMessageBox::NoRole);
+    QPushButton *settingsButton = msgBox->addButton(tr("Open settings"), QMessageBox::ActionRole);
+    msgBox->setDefaultButton(yesButton);
 
-    msgBox.exec();
-
-    if (msgBox.clickedButton() == yesButton) {
-        actCheckCardUpdates();
-    } else if (msgBox.clickedButton() == settingsButton) {
-        actSettings();
-    }
+    Dialogs::open(msgBox, std::function<void(QAbstractButton *)>(
+                              Dialogs::whileAlive(this, [this, yesButton, settingsButton](QAbstractButton *clicked) {
+                                  if (clicked == yesButton) {
+                                      actCheckCardUpdates();
+                                  } else if (clicked == settingsButton) {
+                                      actSettings();
+                                  }
+                              })));
 }
 
 void MainWindow::cardDatabaseNewSetsFound(int numUnknownSets, QStringList unknownSetsNames)
@@ -1243,38 +1261,38 @@ void MainWindow::cardDatabaseNewSetsFound(int numUnknownSets, QStringList unknow
         return;
     }
 
-    QMessageBox msgBox(this);
-    msgBox.setWindowTitle(tr("New sets found"));
-    msgBox.setIcon(QMessageBox::Question);
-    msgBox.setText(tr("%n new set(s) found in the card database\n"
-                      "Set code(s): %1\n"
-                      "Do you want to enable it/them?",
-                      "", numUnknownSets)
-                       .arg(unknownSetsNames.join(", ")));
+    auto *msgBox = new QMessageBox(this);
+    msgBox->setWindowTitle(tr("New sets found"));
+    msgBox->setIcon(QMessageBox::Question);
+    msgBox->setText(tr("%n new set(s) found in the card database\n"
+                       "Set code(s): %1\n"
+                       "Do you want to enable it/them?",
+                       "", numUnknownSets)
+                        .arg(unknownSetsNames.join(", ")));
 
-    QPushButton *yesButton = msgBox.addButton(tr("Yes"), QMessageBox::YesRole);
-    QPushButton *yesAlwaysButton = msgBox.addButton(tr("Yes, always enable"), QMessageBox::YesRole);
-    QPushButton *noButton = msgBox.addButton(tr("No"), QMessageBox::NoRole);
-    QPushButton *settingsButton = msgBox.addButton(tr("View sets"), QMessageBox::ActionRole);
-    msgBox.setDefaultButton(yesButton);
+    QPushButton *yesButton = msgBox->addButton(tr("Yes"), QMessageBox::YesRole);
+    QPushButton *yesAlwaysButton = msgBox->addButton(tr("Yes, always enable"), QMessageBox::YesRole);
+    QPushButton *noButton = msgBox->addButton(tr("No"), QMessageBox::NoRole);
+    QPushButton *settingsButton = msgBox->addButton(tr("View sets"), QMessageBox::ActionRole);
+    msgBox->setDefaultButton(yesButton);
 
-    msgBox.exec();
-
-    if (msgBox.clickedButton() == yesButton) {
-        CardDatabaseManager::getInstance()->enableAllUnknownSets();
-        const auto reloadOk1 =
-            QtConcurrent::run([] { CardDatabaseManager::getInstance()->reloadCardDatabasesAndNotify(); });
-    } else if (msgBox.clickedButton() == yesAlwaysButton) {
-        CardDatabaseManager::getInstance()->enableAllUnknownSets();
-        const auto reloadOk1 =
-            QtConcurrent::run([] { CardDatabaseManager::getInstance()->reloadCardDatabasesAndNotify(); });
-        SettingsCache::instance().updates().setAlwaysEnableNewSets(true);
-    } else if (msgBox.clickedButton() == noButton) {
-        CardDatabaseManager::getInstance()->markAllSetsAsKnown();
-    } else if (msgBox.clickedButton() == settingsButton) {
-        CardDatabaseManager::getInstance()->markAllSetsAsKnown();
-        actManageSets();
-    }
+    Dialogs::open(msgBox, [this, yesButton, yesAlwaysButton, noButton, settingsButton](QAbstractButton *clicked) {
+        if (clicked == yesButton) {
+            CardDatabaseManager::getInstance()->enableAllUnknownSets();
+            const auto reloadOk1 =
+                QtConcurrent::run([] { CardDatabaseManager::getInstance()->reloadCardDatabasesAndNotify(); });
+        } else if (clicked == yesAlwaysButton) {
+            CardDatabaseManager::getInstance()->enableAllUnknownSets();
+            const auto reloadOk1 =
+                QtConcurrent::run([] { CardDatabaseManager::getInstance()->reloadCardDatabasesAndNotify(); });
+            SettingsCache::instance().updates().setAlwaysEnableNewSets(true);
+        } else if (clicked == noButton) {
+            CardDatabaseManager::getInstance()->markAllSetsAsKnown();
+        } else if (clicked == settingsButton) {
+            CardDatabaseManager::getInstance()->markAllSetsAsKnown();
+            actManageSets();
+        }
+    });
 }
 
 void MainWindow::cardDatabaseAllNewSetsEnabled()
@@ -1297,15 +1315,15 @@ void MainWindow::cardDatabaseAllNewSetsEnabled()
             // The onboarding wizard owns the first-run messaging on a clean install.
             return;
         }
-        QMessageBox::information(
+        // The reload above replaces the set instances, so Manage Sets must open
+        // only after the finished snapshot has been swapped in.
+        Dialogs::information(
             this, tr("Welcome"),
             tr("Hi! It seems like you're running this version of Cockatrice for the first time.\nAll the sets in the "
                "card "
                "database have been enabled.\nRead more about changing the set order or disabling specific sets and "
-               "consequent effects in the \"Manage Sets\" dialog."));
-        // The reload above replaces the set instances, so Manage Sets must open
-        // only after the finished snapshot has been swapped in.
-        actManageSets();
+               "consequent effects in the \"Manage Sets\" dialog."),
+            [this] { actManageSets(); });
     });
     watcher->setFuture(QtConcurrent::run([cardDatabase] { cardDatabase->reloadCardDatabasesAndNotify(); }));
 }
@@ -1343,9 +1361,9 @@ void MainWindow::createCardUpdateProcess(bool background)
             announceCardUpdateRunning();
             return;
         }
-        QMessageBox::information(this, tr("Information"),
-                                 tr("The card database updater is already open.\n"
-                                    "Look for the Oracle window - it may be behind this one."));
+        Dialogs::information(this, tr("Information"),
+                             tr("The card database updater is already open.\n"
+                                "Look for the Oracle window - it may be behind this one."));
         return;
     }
 
@@ -1402,10 +1420,11 @@ void MainWindow::createCardUpdateProcess(bool background)
     if (updaterCmd.isEmpty()) {
         qCWarning(CardDatabaseUpdateLog) << "Unable to locate the card database updater; looked for"
                                          << dir.absoluteFilePath(binaryName);
-        QMessageBox::warning(this, tr("Error"),
-                             tr("Unable to run the card database updater: ") + dir.absoluteFilePath(binaryName));
-        exitCardDatabaseUpdate(false);
-        emit cardDatabaseUpdateFinished(false);
+        Dialogs::warning(this, tr("Error"),
+                         tr("Unable to run the card database updater: ") + dir.absoluteFilePath(binaryName), [this] {
+                             exitCardDatabaseUpdate(false);
+                             emit cardDatabaseUpdateFinished(false);
+                         });
         return;
     }
 
@@ -1544,8 +1563,8 @@ void MainWindow::cardUpdateError(QProcess::ProcessError err)
 
     qCWarning(CardDatabaseUpdateLog) << "The card database updater exited with an error:" << error;
     exitCardDatabaseUpdate(false);
-    QMessageBox::warning(this, tr("Error"), tr("The card database updater exited with an error:\n%1").arg(error));
-    emit cardDatabaseUpdateFinished(false);
+    Dialogs::warning(this, tr("Error"), tr("The card database updater exited with an error:\n%1").arg(error),
+                     [this] { emit cardDatabaseUpdateFinished(false); });
 }
 
 void MainWindow::cardUpdateFinished(int exitCode, QProcess::ExitStatus exitStatus)

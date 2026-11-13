@@ -5,6 +5,7 @@
 #include <QString>
 #include <QStringList>
 #include <QtGlobal>
+#include <functional>
 
 class QWidget;
 
@@ -35,8 +36,9 @@ public:
     /**
      * @brief Backs up at-risk data paths and warns about them.
      * @param parent Parent widget for the warning dialog
+     * @param thenDone Runs once the warning is closed, or at once when there is nothing to warn about
      */
-    static void warnAboutDataPathsInProgramDir(QWidget *parent);
+    static void warnAboutDataPathsInProgramDir(QWidget *parent, const std::function<void()> &thenDone);
 
 private:
     static QStringList collectInstalledAtRiskPaths(const QString &appDir);
@@ -44,7 +46,10 @@ private:
     static QString buildInstalledAtRiskMessage(const QStringList &offenders,
                                                const QStringList &sources,
                                                const AtRiskBackupOutcome &outcome);
-    static void showAtRiskDataWarning(QWidget *parent, const QString &title, const QString &message);
+    static void showAtRiskDataWarning(QWidget *parent,
+                                      const QString &title,
+                                      const QString &message,
+                                      const std::function<void()> &thenClosed);
 };
 
 #endif // AT_RISK_DATA_WARNING_H

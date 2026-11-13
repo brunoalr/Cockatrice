@@ -163,6 +163,7 @@ private:
         return "oracle";
     }
 #ifndef Q_OS_WASM
+    void continueStartupConfigCheck();
     void createCardUpdateProcess(bool background = false);
     void exitCardDatabaseUpdate(bool doReload);
 #endif
