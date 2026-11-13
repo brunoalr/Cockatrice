@@ -17,7 +17,9 @@
 class QVBoxLayout;
 class QWidget;
 
-DlgForgotPasswordReset::DlgForgotPasswordReset(QWidget *parent) : QDialog(parent)
+DlgForgotPasswordReset::DlgForgotPasswordReset(QWidget *parent)
+    : QDialog(parent), tokenEdit(new QLineEdit()), newpasswordEdit(new QLineEdit()),
+      newpasswordverifyEdit(new QLineEdit())
 {
     const auto [lastfphost, lastfpport, lastfpplayername] = lastForgotPasswordServer();
     rejectWithoutPasswordRequest(this, tr("Reset Password Warning"),
@@ -43,24 +45,20 @@ DlgForgotPasswordReset::DlgForgotPasswordReset(QWidget *parent) : QDialog(parent
 
     //: Code mailed to the player so they can reset their password. Not a game token.
     tokenLabel = new QLabel(tr("Token:"));
-    tokenEdit = new QLineEdit();
     tokenEdit->setMaxLength(MAX_NAME_LENGTH);
     tokenLabel->setBuddy(tokenLabel);
 
     newpasswordLabel = new QLabel(tr("New Password:"));
-    newpasswordEdit = new QLineEdit();
     newpasswordEdit->setMaxLength(MAX_NAME_LENGTH);
     newpasswordLabel->setBuddy(newpasswordEdit);
     newpasswordEdit->setEchoMode(QLineEdit::Password);
 
     newpasswordverifyLabel = new QLabel(tr("New Password:"));
-    newpasswordverifyEdit = new QLineEdit();
     newpasswordverifyEdit->setMaxLength(MAX_NAME_LENGTH);
     newpasswordverifyLabel->setBuddy(newpasswordEdit);
     newpasswordverifyEdit->setEchoMode(QLineEdit::Password);
 
-    const ServersSettings &servers = SettingsCache::instance().servers();
-    if (!servers.getFPHostname().isEmpty() && !servers.getFPPort().isEmpty() && !servers.getFPPlayerName().isEmpty()) {
+    if (hasSavedPasswordRequest()) {
         hostLabel->hide();
         hostEdit->hide();
         portLabel->hide();

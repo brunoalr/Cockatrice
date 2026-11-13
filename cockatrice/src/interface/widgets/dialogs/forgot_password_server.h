@@ -16,10 +16,16 @@ struct ForgotPasswordServer
     QString playerName;
 };
 
+inline bool hasSavedPasswordRequest()
+{
+    const ServersSettings &servers = SettingsCache::instance().servers();
+    return !servers.getFPHostname().isEmpty() && !servers.getFPPort().isEmpty() && !servers.getFPPlayerName().isEmpty();
+}
+
 inline ForgotPasswordServer lastForgotPasswordServer()
 {
     const ServersSettings &servers = SettingsCache::instance().servers();
-    if (!servers.getFPHostname().isEmpty() && !servers.getFPPort().isEmpty() && !servers.getFPPlayerName().isEmpty()) {
+    if (hasSavedPasswordRequest()) {
         return {servers.getFPHostname(), servers.getFPPort(), servers.getFPPlayerName()};
     }
     return {servers.getHostname(), servers.getPort(), servers.getPlayerName()};
@@ -27,8 +33,8 @@ inline ForgotPasswordServer lastForgotPasswordServer()
 
 inline void rejectWithoutPasswordRequest(QDialog *dialog, const QString &title, const QString &text)
 {
-    const ServersSettings &servers = SettingsCache::instance().servers();
-    if (!servers.getFPHostname().isEmpty() || !servers.getFPPort().isEmpty() || !servers.getFPPlayerName().isEmpty()) {
+    if (const ServersSettings &servers = SettingsCache::instance().servers();
+        !servers.getFPHostname().isEmpty() || !servers.getFPPort().isEmpty() || !servers.getFPPlayerName().isEmpty()) {
         return;
     }
     QTimer::singleShot(0, dialog, [dialog, title, text] { Dialogs::warning(dialog, title, text); });

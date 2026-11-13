@@ -15,7 +15,7 @@
 
 class QWidget;
 
-DlgForgotPasswordChallenge::DlgForgotPasswordChallenge(QWidget *parent) : QDialog(parent)
+DlgForgotPasswordChallenge::DlgForgotPasswordChallenge(QWidget *parent) : QDialog(parent), emailEdit(new QLineEdit())
 {
     const auto [lastfphost, lastfpport, lastfpplayername] = lastForgotPasswordServer();
     rejectWithoutPasswordRequest(this, tr("Reset Password Challenge Warning"),
@@ -41,12 +41,10 @@ DlgForgotPasswordChallenge::DlgForgotPasswordChallenge(QWidget *parent) : QDialo
     playernameLabel->setBuddy(playernameEdit);
 
     emailLabel = new QLabel(tr("Email:"));
-    emailEdit = new QLineEdit();
     emailEdit->setMaxLength(MAX_NAME_LENGTH);
     emailLabel->setBuddy(emailLabel);
 
-    const ServersSettings &servers = SettingsCache::instance().servers();
-    if (!servers.getFPHostname().isEmpty() && !servers.getFPPort().isEmpty() && !servers.getFPPlayerName().isEmpty()) {
+    if (hasSavedPasswordRequest()) {
         hostLabel->hide();
         hostEdit->hide();
         portLabel->hide();
