@@ -10,6 +10,8 @@
 
 #include "tab.h"
 
+#include <QFileInfo>
+#include <QList>
 #include <QString>
 #include <QVariant>
 #include <libcockatrice/network/client/abstract/abstract_client.h>
@@ -52,6 +54,7 @@ private:
     void setRemoteEnabled(bool enabled);
 
     void downloadNodeAtIndex(const QModelIndex &curLeft, const QModelIndex &curRight);
+    void renameLocalInTurn(QList<QFileInfo> files);
 
 private slots:
     void handleConnected(const ServerInfo_User &userInfo);
