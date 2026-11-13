@@ -144,13 +144,12 @@ void IntentUrlParser::askToJoinGame(const QUrlQuery &query)
     const QString gameDescription = query.queryItemValue("game", QUrl::FullyDecoded);
     const QString message = generateJoinGameMessage(ctx, gameDescription);
 
-    Dialogs::confirm(
-        mainWindow, tr("Join game"), message, Dialogs::whileAlive(this, [this, ctx](bool confirmed) {
-            PendingIntentChain chain;
-            Intent *firstIntent = confirmed ? createJoinGameIntent(ctx, chain) : nullptr;
-            queueChain(chain, firstIntent);
-        }),
-        QMessageBox::Yes);
+    const auto answered = Dialogs::whileAlive(this, [this, ctx](bool confirmed) {
+        PendingIntentChain chain;
+        Intent *firstIntent = confirmed ? createJoinGameIntent(ctx, chain) : nullptr;
+        queueChain(chain, firstIntent);
+    });
+    Dialogs::confirm(mainWindow, tr("Join game"), message, answered, QMessageBox::Yes);
 }
 
 Intent *IntentUrlParser::createJoinGameIntent(const ContextJoinGame &context, PendingIntentChain &chain)

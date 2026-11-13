@@ -337,23 +337,23 @@ void TabCardArtRules::clearBlacklistedBannersResponse(const Response &r)
             break;
         case Response::RespFunctionNotAllowed:
             Dialogs::warning(this, tr("Not supported"),
-                                 tr("This server does not support clearing blacklisted banners. It may be running an "
-                                    "older version."));
+                             tr("This server does not support clearing blacklisted banners. It may be running an "
+                                "older version."));
             return;
         case Response::RespInternalError:
             Dialogs::critical(this, tr("Error"),
-                                  tr("The server could not clear blacklisted banners because of a database error."));
+                              tr("The server could not clear blacklisted banners because of a database error."));
             return;
         default:
             Dialogs::critical(this, tr("Error"),
-                                  tr("The server rejected the request: %1")
-                                      .arg(QString::fromStdString(Response_ResponseCode_Name(r.response_code()))));
+                              tr("The server rejected the request: %1")
+                                  .arg(QString::fromStdString(Response_ResponseCode_Name(r.response_code()))));
             return;
     }
 
     const auto &resp = r.GetExtension(Response_ClearBlacklistedBanners::ext);
     Dialogs::information(this, tr("Banners cleared"),
-                             tr("%n banner card(s) cleared.\n\n"
-                                "Users who are online keep showing their banner until they log in again.",
-                                "number of banners cleared", resp.cleared_count()));
+                         tr("%n banner card(s) cleared.\n\n"
+                            "Users who are online keep showing their banner until they log in again.",
+                            "number of banners cleared", resp.cleared_count()));
 }

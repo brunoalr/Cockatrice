@@ -401,7 +401,8 @@ void UserInfoBox::processEditResponse(const Response &r)
             Dialogs::information(this, tr("Information"), tr("User information updated."));
             break;
         case Response::RespFunctionNotAllowed:
-            Dialogs::critical(this, tr("Error"), tr("This server does not permit you to update your user informations."));
+            Dialogs::critical(this, tr("Error"),
+                              tr("This server does not permit you to update your user informations."));
             break;
         case Response::RespWrongPassword:
             Dialogs::critical(this, tr("Error"), tr("The entered password does not match your account."));

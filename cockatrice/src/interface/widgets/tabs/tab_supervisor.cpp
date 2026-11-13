@@ -1559,17 +1559,16 @@ void TabSupervisor::processNotifyUserEvent(const Event_NotifyUser &event)
             Dialogs::information(this, tr("Idle Timeout"), tr("You are about to be logged out due to inactivity."));
             break;
         case Event_NotifyUser::PROMOTED:
-            Dialogs::information(
-                this, tr("Promotion"),
-                tr("You have been promoted. Please log out and back in for changes to take effect."));
+            Dialogs::information(this, tr("Promotion"),
+                                 tr("You have been promoted. Please log out and back in for changes to take effect."));
             break;
         case Event_NotifyUser::WARNING: {
             if (!QString::fromStdString(event.warning_reason()).simplified().isEmpty()) {
                 Dialogs::warning(this, tr("Warned"),
-                                     tr("You have received a warning due to %1.\nPlease refrain from engaging in this "
-                                        "activity or further actions may be taken against you. If you have any "
-                                        "questions, please private message a moderator.")
-                                         .arg(QString::fromStdString(event.warning_reason()).simplified()));
+                                 tr("You have received a warning due to %1.\nPlease refrain from engaging in this "
+                                    "activity or further actions may be taken against you. If you have any "
+                                    "questions, please private message a moderator.")
+                                     .arg(QString::fromStdString(event.warning_reason()).simplified()));
             }
             break;
         }

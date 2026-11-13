@@ -552,9 +552,9 @@ void TabModeration::resetPasswordResponse(const Response &response)
 
     const Response_ResetUserPassword &resp = response.GetExtension(Response_ResetUserPassword::ext);
     Dialogs::information(this, tr("Password reset"),
-                             tr("Temporary password for %1:\n\n%2\n\nPass it to the user through a secure channel.")
-                                 .arg(QString::fromStdString(resp.user_name()))
-                                 .arg(QString::fromStdString(resp.temporary_password())));
+                         tr("Temporary password for %1:\n\n%2\n\nPass it to the user through a secure channel.")
+                             .arg(QString::fromStdString(resp.user_name()))
+                             .arg(QString::fromStdString(resp.temporary_password())));
 }
 
 void TabModeration::removeAvatar()
@@ -564,7 +564,8 @@ void TabModeration::removeAvatar()
     }
 
     Dialogs::confirm(
-        this, tr("Remove Avatar"), tr("Remove the avatar of %1? The user will have to upload a new one.").arg(currentUser),
+        this, tr("Remove Avatar"),
+        tr("Remove the avatar of %1? The user will have to upload a new one.").arg(currentUser),
         [this, userName = currentUser](bool confirmed) {
             if (!confirmed) {
                 return;
@@ -587,7 +588,7 @@ void TabModeration::removeAvatarResponse(const Response &response)
 
     const Response_RemoveUserAvatar &resp = response.GetExtension(Response_RemoveUserAvatar::ext);
     Dialogs::information(this, tr("Avatar removed"),
-                             tr("The avatar of %1 has been removed.").arg(QString::fromStdString(resp.user_name())));
+                         tr("The avatar of %1 has been removed.").arg(QString::fromStdString(resp.user_name())));
 }
 
 void TabModeration::removeBanner()
@@ -622,13 +623,12 @@ void TabModeration::removeBannerResponse(const Response &response)
         case Response::RespOk:
             break;
         case Response::RespNameNotFound:
-            Dialogs::warning(this, tr("User not found"),
-                                 tr("The server does not know a user named %1.").arg(target));
+            Dialogs::warning(this, tr("User not found"), tr("The server does not know a user named %1.").arg(target));
             return;
         case Response::RespFunctionNotAllowed:
             Dialogs::warning(this, tr("Not supported"),
-                                 tr("This server does not support removing banner cards. It may be running an older "
-                                    "version."));
+                             tr("This server does not support removing banner cards. It may be running an older "
+                                "version."));
             return;
         case Response::RespInternalError:
             Dialogs::critical(
@@ -647,12 +647,12 @@ void TabModeration::removeBannerResponse(const Response &response)
     const QString removedUser = resp.user_name().empty() ? target : QString::fromStdString(resp.user_name());
     if (!resp.had_banner()) {
         Dialogs::information(this, tr("No banner set"),
-                                 tr("%1 has no banner card set, so there was nothing to remove.").arg(removedUser));
+                             tr("%1 has no banner card set, so there was nothing to remove.").arg(removedUser));
         return;
     }
 
     Dialogs::information(this, tr("Banner removed"),
-                             tr("The banner card of %1 has been removed.\n\n"
-                                "Other players stop seeing it the next time %1 logs in.")
-                                 .arg(removedUser));
+                         tr("The banner card of %1 has been removed.\n\n"
+                            "Other players stop seeing it the next time %1 logs in.")
+                             .arg(removedUser));
 }

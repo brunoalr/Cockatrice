@@ -130,7 +130,7 @@ void UserContextMenu::gamesOfUserReceived(const Response &resp, const CommandCon
         return;
     } else if (resp.response_code() != Response::RespOk) {
         Dialogs::critical(static_cast<QWidget *>(parent()), tr("Error"),
-                              tr("Could not get %1's games.").arg(QString::fromStdString(cmd.user_name())));
+                          tr("Could not get %1's games.").arg(QString::fromStdString(cmd.user_name())));
         return;
     }
     const Response_GetGamesOfUser &response = resp.GetExtension(Response_GetGamesOfUser::ext);
@@ -237,12 +237,12 @@ void UserContextMenu::banUserHistory_processResponse(const Response &resp)
             table->show();
         } else {
             Dialogs::information(static_cast<QWidget *>(parent()), tr("Ban History"),
-                                     tr("User has never been banned."));
+                                 tr("User has never been banned."));
         }
 
     } else {
         Dialogs::critical(static_cast<QWidget *>(parent()), tr("Ban History"),
-                              tr("Failed to collect ban information."));
+                          tr("Failed to collect ban information."));
     }
 }
 
@@ -275,12 +275,12 @@ void UserContextMenu::warnUserHistory_processResponse(const Response &resp)
             table->show();
         } else {
             Dialogs::information(static_cast<QWidget *>(parent()), tr("Warning History"),
-                                     tr("User has never been warned."));
+                                 tr("User has never been warned."));
         }
 
     } else {
         Dialogs::critical(static_cast<QWidget *>(parent()), tr("Warning History"),
-                              tr("Failed to collect warning information."));
+                          tr("Failed to collect warning information."));
     }
 }
 
@@ -306,8 +306,7 @@ void UserContextMenu::adjustMod_processUserResponse(const Response &resp, const 
 
     if (resp.response_code() == Response::RespOk) {
         if (cmd.should_be_mod() || cmd.should_be_judge() || cmd.should_be_developer()) {
-            Dialogs::information(static_cast<QWidget *>(parent()), tr("Success"),
-                                     tr("Successfully promoted user."));
+            Dialogs::information(static_cast<QWidget *>(parent()), tr("Success"), tr("Successfully promoted user."));
         } else {
             Dialogs::information(static_cast<QWidget *>(parent()), tr("Success"), tr("Successfully demoted user."));
         }
@@ -679,7 +678,7 @@ void UserContextMenu::execAddToIgnore(const QString &userName)
             [this, userName](const Response &response, const CommandContainer &, const QVariant &) {
                 if (response.response_code() == Response::RespOk) {
                     Dialogs::information(static_cast<QWidget *>(parent()), tr("Ignore list"),
-                                             tr("%1 has been added to your ignore list.").arg(userName));
+                                         tr("%1 has been added to your ignore list.").arg(userName));
                 }
             });
     client->sendCommand(pend);

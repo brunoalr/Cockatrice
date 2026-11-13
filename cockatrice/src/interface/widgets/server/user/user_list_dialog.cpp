@@ -159,13 +159,13 @@ void WarningDialog::okClicked()
 {
     if (nameWarning->text().simplified().isEmpty()) {
         Dialogs::critical(this, tr("Error"),
-                              tr("User name to send a warning to can not be blank, please specify a user to warn."));
+                          tr("User name to send a warning to can not be blank, please specify a user to warn."));
         return;
     }
 
     if (warningOption->currentData().toString().simplified().isEmpty()) {
         Dialogs::critical(this, tr("Error"),
-                              tr("Warning to use can not be blank, please select a valid warning to send."));
+                          tr("Warning to use can not be blank, please select a valid warning to send."));
         return;
     }
 
@@ -205,15 +205,15 @@ void BanDialog::okClicked()
 {
     if (!nameBanCheckBox->isChecked() && !ipBanCheckBox->isChecked() && !idBanCheckBox->isChecked()) {
         Dialogs::critical(this, tr("Error"),
-                              tr("You have to select a name-based, IP-based, clientId based, or some combination of "
-                                 "the three to place a ban."));
+                          tr("You have to select a name-based, IP-based, clientId based, or some combination of "
+                             "the three to place a ban."));
         return;
     }
 
     if (nameBanCheckBox->isChecked()) {
         if (nameBanEdit->text().simplified() == "") {
             Dialogs::critical(this, tr("Error"),
-                                  tr("You must have a value in the name ban when selecting the name ban checkbox."));
+                              tr("You must have a value in the name ban when selecting the name ban checkbox."));
             return;
         }
     }
@@ -221,7 +221,7 @@ void BanDialog::okClicked()
     if (ipBanCheckBox->isChecked()) {
         if (ipBanEdit->text().simplified() == "") {
             Dialogs::critical(this, tr("Error"),
-                                  tr("You must have a value in the ip ban when selecting the ip ban checkbox."));
+                              tr("You must have a value in the ip ban when selecting the ip ban checkbox."));
             return;
         }
     }

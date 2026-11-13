@@ -414,13 +414,13 @@ void TabLog::viewLogHistory_processResponse(const Response &resp)
 
     if (resp.response_code() != Response::RespOk) {
         Dialogs::critical(static_cast<QWidget *>(parent()), tr("Message History"),
-                              tr("Failed to collect message history information."));
+                          tr("Failed to collect message history information."));
         return;
     }
 
     if (isFirstPage && response.log_message_size() == 0) {
         Dialogs::information(static_cast<QWidget *>(parent()), tr("Message History"),
-                                 tr("There are no messages for the selected filters."));
+                             tr("There are no messages for the selected filters."));
         hasMoreResults = false;
         return;
     }
