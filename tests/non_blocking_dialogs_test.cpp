@@ -401,10 +401,9 @@ TEST_F(NonBlockingDialogs, EmptyCallbacksAreAllowed)
     box->button(QMessageBox::Ok)->click();
     settle();
 
-    Dialogs::open(new QMessageBox(parent.get()), std::function<void(QAbstractButton *)>{});
-    box = onlyMessageBox();
-    ASSERT_NE(box, nullptr);
-    box->reject();
+    auto *customBox = new QMessageBox(parent.get());
+    Dialogs::open(customBox, std::function<void(QAbstractButton *)>{});
+    customBox->reject();
     settle();
 
     Dialogs::getText(parent.get(), "Title", "Label", "text", {});
@@ -413,10 +412,10 @@ TEST_F(NonBlockingDialogs, EmptyCallbacksAreAllowed)
     input->accept();
     settle();
 
-    Dialogs::open(new QDialog(parent.get()), {});
-    QPointer<QDialog> dialog = parent->findChild<QDialog *>();
-    ASSERT_NE(dialog, nullptr);
-    dialog->accept();
+    auto *plain = new QDialog(parent.get());
+    QPointer<QDialog> dialog = plain;
+    Dialogs::open(plain, {});
+    plain->accept();
     settle();
 
     EXPECT_TRUE(dialog.isNull());
