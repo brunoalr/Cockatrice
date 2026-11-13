@@ -443,6 +443,10 @@ int main(int argc, char **argv)
     QCoreApplication::setApplicationName(
         QStringLiteral("connection-controller-test-%1").arg(QCoreApplication::applicationPid()));
     ::testing::InitGoogleTest(&argc, argv);
+    // CMake lists the cases at build time, where LeakSanitizer is on: the settings singleton leaks at exit.
+    if (::testing::GTEST_FLAG(list_tests)) {
+        return RUN_ALL_TESTS();
+    }
 
     themeManager = new ThemeManager;
     ServersSettings &servers = SettingsCache::instance().servers();
@@ -455,9 +459,7 @@ int main(int argc, char **argv)
 
     const int result = RUN_ALL_TESTS();
 
-    if (!::testing::GTEST_FLAG(list_tests)) {
-        QDir(SettingsCache::instance().getDataPath()).removeRecursively();
-        QDir(SettingsCache::instance().getCachePath()).removeRecursively();
-    }
+    QDir(SettingsCache::instance().getDataPath()).removeRecursively();
+    QDir(SettingsCache::instance().getCachePath()).removeRecursively();
     return result;
 }
