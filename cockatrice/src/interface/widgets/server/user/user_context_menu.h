@@ -135,6 +135,7 @@ public:
 
 private:
     void execInvite(const QString &userName, const GameInviteOption &option);
+    void execMenuAction(const QAction *actionClicked, const QString &userName, int playerId, const ChatView *chatView);
 };
 
 #endif

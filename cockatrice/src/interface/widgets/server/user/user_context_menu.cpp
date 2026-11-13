@@ -2,6 +2,7 @@
 
 #include "../../dialogs/dlg_report_user.h"
 #include "../../interface/widgets/tabs/tab_supervisor.h"
+#include "../../utility/non_blocking_dialogs.h"
 #include "../chat_view/chat_view.h"
 #include "../game_link.h"
 #include "../game_selector.h"
@@ -119,16 +120,16 @@ void UserContextMenu::gamesOfUserReceived(const Response &resp, const CommandCon
 {
     const Command_GetGamesOfUser &cmd = commandContainer.session_command(0).GetExtension(Command_GetGamesOfUser::ext);
     if (resp.response_code() == Response::RespNameNotFound) {
-        QMessageBox::critical(static_cast<QWidget *>(parent()), tr("Error"), tr("This user does not exist."));
+        Dialogs::critical(static_cast<QWidget *>(parent()), tr("Error"), tr("This user does not exist."));
         return;
     }
     if (resp.response_code() == Response::RespInIgnoreList) {
-        QMessageBox::critical(
+        Dialogs::critical(
             static_cast<QWidget *>(parent()), tr("Error"),
             tr("You are being ignored by %1 and can't see their games.").arg(QString::fromStdString(cmd.user_name())));
         return;
     } else if (resp.response_code() != Response::RespOk) {
-        QMessageBox::critical(static_cast<QWidget *>(parent()), tr("Error"),
+        Dialogs::critical(static_cast<QWidget *>(parent()), tr("Error"),
                               tr("Could not get %1's games.").arg(QString::fromStdString(cmd.user_name())));
         return;
     }
@@ -235,12 +236,12 @@ void UserContextMenu::banUserHistory_processResponse(const Response &resp)
                                   table->verticalHeader()->length() + (table->rowCount() * 3));
             table->show();
         } else {
-            QMessageBox::information(static_cast<QWidget *>(parent()), tr("Ban History"),
+            Dialogs::information(static_cast<QWidget *>(parent()), tr("Ban History"),
                                      tr("User has never been banned."));
         }
 
     } else {
-        QMessageBox::critical(static_cast<QWidget *>(parent()), tr("Ban History"),
+        Dialogs::critical(static_cast<QWidget *>(parent()), tr("Ban History"),
                               tr("Failed to collect ban information."));
     }
 }
@@ -273,12 +274,12 @@ void UserContextMenu::warnUserHistory_processResponse(const Response &resp)
                                   table->verticalHeader()->length() + (table->rowCount() * 3));
             table->show();
         } else {
-            QMessageBox::information(static_cast<QWidget *>(parent()), tr("Warning History"),
+            Dialogs::information(static_cast<QWidget *>(parent()), tr("Warning History"),
                                      tr("User has never been warned."));
         }
 
     } else {
-        QMessageBox::critical(static_cast<QWidget *>(parent()), tr("Warning History"),
+        Dialogs::critical(static_cast<QWidget *>(parent()), tr("Warning History"),
                               tr("Failed to collect warning information."));
     }
 }
@@ -288,7 +289,7 @@ void UserContextMenu::getAdminNotes_processResponse(const Response &resp)
     const Response_GetAdminNotes &response = resp.GetExtension(Response_GetAdminNotes::ext);
 
     if (resp.response_code() != Response::RespOk) {
-        QMessageBox::information(static_cast<QWidget *>(parent()), tr("Failed"), tr("Failed to get admin notes."));
+        Dialogs::information(static_cast<QWidget *>(parent()), tr("Failed"), tr("Failed to get admin notes."));
         return;
     }
 
@@ -305,17 +306,17 @@ void UserContextMenu::adjustMod_processUserResponse(const Response &resp, const 
 
     if (resp.response_code() == Response::RespOk) {
         if (cmd.should_be_mod() || cmd.should_be_judge() || cmd.should_be_developer()) {
-            QMessageBox::information(static_cast<QWidget *>(parent()), tr("Success"),
+            Dialogs::information(static_cast<QWidget *>(parent()), tr("Success"),
                                      tr("Successfully promoted user."));
         } else {
-            QMessageBox::information(static_cast<QWidget *>(parent()), tr("Success"), tr("Successfully demoted user."));
+            Dialogs::information(static_cast<QWidget *>(parent()), tr("Success"), tr("Successfully demoted user."));
         }
 
     } else {
         if (cmd.should_be_mod() || cmd.should_be_judge() || cmd.should_be_developer()) {
-            QMessageBox::information(static_cast<QWidget *>(parent()), tr("Failed"), tr("Failed to promote user."));
+            Dialogs::information(static_cast<QWidget *>(parent()), tr("Failed"), tr("Failed to promote user."));
         } else {
-            QMessageBox::information(static_cast<QWidget *>(parent()), tr("Failed"), tr("Failed to demote user."));
+            Dialogs::information(static_cast<QWidget *>(parent()), tr("Failed"), tr("Failed to demote user."));
         }
     }
 }
@@ -395,16 +396,16 @@ void UserContextMenu::showContextMenu(const QPoint &pos,
                                       const QString &deckHash,
                                       ChatView *chatView)
 {
-    QAction *aCopyToClipBoard = nullptr, *aRemoveMessages = nullptr;
     aUserName->setText(userName);
     const bool anotherUser = userName != userListProxy->getOwnUsername();
 
     auto *menu = new QMenu(static_cast<QWidget *>(parent()));
+    menu->setAttribute(Qt::WA_DeleteOnClose);
     menu->addAction(aUserName);
     menu->addSeparator();
     if (!deckHash.isEmpty()) {
-        aCopyToClipBoard = new QAction(tr("Copy hash to clipboard"), this);
-        menu->addAction(aCopyToClipBoard);
+        connect(menu->addAction(tr("Copy hash to clipboard")), &QAction::triggered, this,
+                [deckHash] { QGuiApplication::clipboard()->setText(deckHash); });
     }
     menu->addAction(aDetails);
     menu->addAction(aShowGames);
@@ -437,8 +438,8 @@ void UserContextMenu::showContextMenu(const QPoint &pos,
         }
     }
     if (chatView != nullptr) {
-        aRemoveMessages = new QAction(tr("Remove this user's messages"), this);
-        menu->addAction(aRemoveMessages);
+        connect(menu->addAction(tr("Remove this user's messages")), &QAction::triggered, this,
+                [chatView, userName] { chatView->redactMessages(userName, -1); });
     }
     if (userListProxy->isOwnUserRegistered()) {
         menu->addAction(aReport);
@@ -511,9 +512,18 @@ void UserContextMenu::showContextMenu(const QPoint &pos,
     aPromoteToDeveloper->setEnabled(anotherUser);
     aDemoteFromDeveloper->setEnabled(anotherUser);
 
-    QAction *actionClicked = menu->exec(pos);
-    if (actionClicked == nullptr) {
-    } else if (actionClicked == aDetails) {
+    connect(menu, &QMenu::triggered, this, [this, userName, playerId, chatView](const QAction *action) {
+        execMenuAction(action, userName, playerId, chatView);
+    });
+    menu->popup(pos);
+}
+
+void UserContextMenu::execMenuAction(const QAction *actionClicked,
+                                     const QString &userName,
+                                     int playerId,
+                                     const ChatView *chatView)
+{
+    if (actionClicked == aDetails) {
         execDetails(userName);
     } else if (actionClicked == aChat) {
         execChat(userName);
@@ -538,8 +548,7 @@ void UserContextMenu::showContextMenu(const QPoint &pos,
             autoChatLog = chatView->getRecentChatLog(50);
         }
         auto dlgReport = new DlgReportUser(client, userName, gameId, autoChatLog, static_cast<QWidget *>(parent()));
-        dlgReport->setAttribute(Qt::WA_DeleteOnClose);
-        dlgReport->exec();
+        Dialogs::open(dlgReport, {});
     } else if (actionClicked == aBan) {
         execBan(userName);
     } else if (actionClicked == aPromoteToMod || actionClicked == aDemoteFromMod) {
@@ -560,14 +569,7 @@ void UserContextMenu::showContextMenu(const QPoint &pos,
         execInvestigateUser(userName);
     } else if (actionClicked == aInvestigateAlts) {
         execInvestigateAlts(userName);
-    } else if (actionClicked == aCopyToClipBoard) {
-        QClipboard *clipboard = QGuiApplication::clipboard();
-        clipboard->setText(deckHash);
-    } else if (actionClicked == aRemoveMessages) {
-        chatView->redactMessages(userName, -1);
     }
-
-    delete menu;
 }
 
 void UserContextMenu::execChat(const QString &userName)
@@ -676,7 +678,7 @@ void UserContextMenu::execAddToIgnore(const QString &userName)
     connect(pend, &PendingCommand::finished, this,
             [this, userName](const Response &response, const CommandContainer &, const QVariant &) {
                 if (response.response_code() == Response::RespOk) {
-                    QMessageBox::information(static_cast<QWidget *>(parent()), tr("Ignore list"),
+                    Dialogs::information(static_cast<QWidget *>(parent()), tr("Ignore list"),
                                              tr("%1 has been added to your ignore list.").arg(userName));
                 }
             });
