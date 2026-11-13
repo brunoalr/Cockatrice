@@ -437,7 +437,7 @@ void UserContextMenu::showContextMenu(const QPoint &pos,
         }
     }
     if (chatView != nullptr) {
-        connect(menu->addAction(tr("Remove this user's messages")), &QAction::triggered, this,
+        connect(menu->addAction(tr("Remove this user's messages")), &QAction::triggered, chatView,
                 [chatView, userName] { chatView->redactMessages(userName, -1); });
     }
     if (userListProxy->isOwnUserRegistered()) {
@@ -511,9 +511,11 @@ void UserContextMenu::showContextMenu(const QPoint &pos,
     aPromoteToDeveloper->setEnabled(anotherUser);
     aDemoteFromDeveloper->setEnabled(anotherUser);
 
-    connect(menu, &QMenu::triggered, this, [this, userName, playerId, chatView](const QAction *action) {
-        execMenuAction(action, userName, playerId, chatView);
-    });
+    // The chat view can close while the menu is up.
+    connect(menu, &QMenu::triggered, this,
+            [this, userName, playerId, chat = QPointer<ChatView>(chatView)](const QAction *action) {
+                execMenuAction(action, userName, playerId, chat);
+            });
     menu->popup(pos);
 }
 

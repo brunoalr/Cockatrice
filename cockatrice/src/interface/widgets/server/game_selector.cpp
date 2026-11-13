@@ -579,16 +579,16 @@ void GameSelector::customContextMenu(const QPoint &point)
     }
 
     connect(menu->addAction(tr("Spectate Game")), &QAction::triggered, this, &GameSelector::actJoinAsSpectator);
-    connect(menu->addAction(tr("Game Information")), &QAction::triggered, this, [this, index]() {
-        const ServerInfo_Game &gameInfo = gameListModel->getGame(index.data(Qt::UserRole).toInt());
+    // The list changes while the menu is up: the menu keeps the game it was opened on.
+    const ServerInfo_Game gameInfo = gameListModel->getGame(index.data(Qt::UserRole).toInt());
+    connect(menu->addAction(tr("Game Information")), &QAction::triggered, this, [this, gameInfo]() {
         const QMap<int, QString> &gameTypes = gameListModel->getGameTypes().value(gameInfo.room_id());
 
         Dialogs::open(new DlgCreateGame(gameInfo, gameTypes, this), {});
     });
 
     if (!client->serverName().isEmpty()) {
-        connect(menu->addAction(tr("Cop&y game link")), &QAction::triggered, this, [this, index]() {
-            const ServerInfo_Game &gameInfo = gameListModel->getGame(index.data(Qt::UserRole).toInt());
+        connect(menu->addAction(tr("Cop&y game link")), &QAction::triggered, this, [this, gameInfo]() {
             QGuiApplication::clipboard()->setText(makeGameJoinLink(client->serverName(), client->serverPort(),
                                                                    gameInfo.room_id(), gameInfo.game_id(),
                                                                    QString::fromStdString(gameInfo.description())));
