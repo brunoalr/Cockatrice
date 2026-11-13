@@ -85,9 +85,9 @@ void open(QMessageBox *box, std::function<void(QAbstractButton *clicked)> thenCl
 
 template <typename Fn> auto whileAlive(QObject *context, Fn fn)
 {
-    return [guard = QPointer<QObject>(context), fn = std::move(fn)](auto &&...arguments) {
+    return [guard = QPointer<QObject>(context), fn = std::move(fn)]<typename... Arguments>(Arguments &&...arguments) {
         if (guard) {
-            fn(std::forward<decltype(arguments)>(arguments)...);
+            fn(std::forward<Arguments>(arguments)...);
         }
     };
 }
