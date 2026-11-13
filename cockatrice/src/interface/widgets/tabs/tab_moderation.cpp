@@ -1,6 +1,7 @@
 #include "tab_moderation.h"
 
 #include "../utility/epoch_format.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "../utility/table_activation.h"
 #include "abstract_client.h"
 #include "libcockatrice/protocol/pb/admin_commands.pb.h"
@@ -41,7 +42,6 @@
 #include <libcockatrice/protocol/pb/response_user_sessions.pb.h>
 #include <libcockatrice/protocol/pb/serverinfo_user.pb.h>
 #include <libcockatrice/protocol/pending_command.h>
-#include <libcockatrice/utility/qt_utils.h>
 #include <qnamespace.h>
 #include <string>
 
@@ -525,30 +525,33 @@ void TabModeration::resetPassword()
         return;
     }
 
-    if (!QtUtils::confirm(this, tr("Reset Password"),
-                          tr("Reset the password of %1? A temporary password will be generated and shown to you. "
-                             "The user must change it on their first login.")
-                              .arg(currentUser),
-                          QMessageBox::No)) {
-        return;
-    }
-
-    Command_ResetUserPassword cmd;
-    cmd.set_user_name(currentUser.toStdString());
-    PendingCommand *pend = client->prepareModeratorCommand(cmd);
-    connect(pend, &PendingCommand::finished, this, &TabModeration::resetPasswordResponse);
-    client->sendCommand(pend);
+    Dialogs::confirm(
+        this, tr("Reset Password"),
+        tr("Reset the password of %1? A temporary password will be generated and shown to you. "
+           "The user must change it on their first login.")
+            .arg(currentUser),
+        [this, userName = currentUser](bool confirmed) {
+            if (!confirmed) {
+                return;
+            }
+            Command_ResetUserPassword cmd;
+            cmd.set_user_name(userName.toStdString());
+            PendingCommand *pend = client->prepareModeratorCommand(cmd);
+            connect(pend, &PendingCommand::finished, this, &TabModeration::resetPasswordResponse);
+            client->sendCommand(pend);
+        },
+        QMessageBox::No);
 }
 
 void TabModeration::resetPasswordResponse(const Response &response)
 {
     if (response.response_code() != Response::RespOk) {
-        QMessageBox::critical(this, tr("Error"), tr("Password reset failed."));
+        Dialogs::critical(this, tr("Error"), tr("Password reset failed."));
         return;
     }
 
     const Response_ResetUserPassword &resp = response.GetExtension(Response_ResetUserPassword::ext);
-    QMessageBox::information(this, tr("Password reset"),
+    Dialogs::information(this, tr("Password reset"),
                              tr("Temporary password for %1:\n\n%2\n\nPass it to the user through a secure channel.")
                                  .arg(QString::fromStdString(resp.user_name()))
                                  .arg(QString::fromStdString(resp.temporary_password())));
@@ -560,28 +563,30 @@ void TabModeration::removeAvatar()
         return;
     }
 
-    if (!QtUtils::confirm(this, tr("Remove Avatar"),
-                          tr("Remove the avatar of %1? The user will have to upload a new one.").arg(currentUser),
-                          QMessageBox::No)) {
-        return;
-    }
-
-    Command_RemoveUserAvatar cmd;
-    cmd.set_user_name(currentUser.toStdString());
-    PendingCommand *pend = client->prepareModeratorCommand(cmd);
-    connect(pend, &PendingCommand::finished, this, &TabModeration::removeAvatarResponse);
-    client->sendCommand(pend);
+    Dialogs::confirm(
+        this, tr("Remove Avatar"), tr("Remove the avatar of %1? The user will have to upload a new one.").arg(currentUser),
+        [this, userName = currentUser](bool confirmed) {
+            if (!confirmed) {
+                return;
+            }
+            Command_RemoveUserAvatar cmd;
+            cmd.set_user_name(userName.toStdString());
+            PendingCommand *pend = client->prepareModeratorCommand(cmd);
+            connect(pend, &PendingCommand::finished, this, &TabModeration::removeAvatarResponse);
+            client->sendCommand(pend);
+        },
+        QMessageBox::No);
 }
 
 void TabModeration::removeAvatarResponse(const Response &response)
 {
     if (response.response_code() != Response::RespOk) {
-        QMessageBox::critical(this, tr("Error"), tr("Could not remove the avatar."));
+        Dialogs::critical(this, tr("Error"), tr("Could not remove the avatar."));
         return;
     }
 
     const Response_RemoveUserAvatar &resp = response.GetExtension(Response_RemoveUserAvatar::ext);
-    QMessageBox::information(this, tr("Avatar removed"),
+    Dialogs::information(this, tr("Avatar removed"),
                              tr("The avatar of %1 has been removed.").arg(QString::fromStdString(resp.user_name())));
 }
 
@@ -591,19 +596,22 @@ void TabModeration::removeBanner()
         return;
     }
 
-    if (!QtUtils::confirm(this, tr("Remove Banner"),
-                          tr("Remove the banner card of %1? The user will have to choose a new one.\n\n"
-                             "Other players stop seeing the banner the next time %1 logs in.")
-                              .arg(currentUser),
-                          QMessageBox::No)) {
-        return;
-    }
-
-    Command_RemoveUserBanner cmd;
-    cmd.set_user_name(currentUser.toStdString());
-    PendingCommand *pend = client->prepareModeratorCommand(cmd);
-    connect(pend, &PendingCommand::finished, this, &TabModeration::removeBannerResponse);
-    client->sendCommand(pend);
+    Dialogs::confirm(
+        this, tr("Remove Banner"),
+        tr("Remove the banner card of %1? The user will have to choose a new one.\n\n"
+           "Other players stop seeing the banner the next time %1 logs in.")
+            .arg(currentUser),
+        [this, userName = currentUser](bool confirmed) {
+            if (!confirmed) {
+                return;
+            }
+            Command_RemoveUserBanner cmd;
+            cmd.set_user_name(userName.toStdString());
+            PendingCommand *pend = client->prepareModeratorCommand(cmd);
+            connect(pend, &PendingCommand::finished, this, &TabModeration::removeBannerResponse);
+            client->sendCommand(pend);
+        },
+        QMessageBox::No);
 }
 
 void TabModeration::removeBannerResponse(const Response &response)
@@ -614,21 +622,21 @@ void TabModeration::removeBannerResponse(const Response &response)
         case Response::RespOk:
             break;
         case Response::RespNameNotFound:
-            QMessageBox::warning(this, tr("User not found"),
+            Dialogs::warning(this, tr("User not found"),
                                  tr("The server does not know a user named %1.").arg(target));
             return;
         case Response::RespFunctionNotAllowed:
-            QMessageBox::warning(this, tr("Not supported"),
+            Dialogs::warning(this, tr("Not supported"),
                                  tr("This server does not support removing banner cards. It may be running an older "
                                     "version."));
             return;
         case Response::RespInternalError:
-            QMessageBox::critical(
+            Dialogs::critical(
                 this, tr("Error"),
                 tr("The server could not clear the banner card of %1 because of a database error.").arg(target));
             return;
         default:
-            QMessageBox::critical(
+            Dialogs::critical(
                 this, tr("Error"),
                 tr("The server rejected the request for %1: %2")
                     .arg(target, QString::fromStdString(Response_ResponseCode_Name(response.response_code()))));
@@ -638,12 +646,12 @@ void TabModeration::removeBannerResponse(const Response &response)
     const Response_RemoveUserBanner &resp = response.GetExtension(Response_RemoveUserBanner::ext);
     const QString removedUser = resp.user_name().empty() ? target : QString::fromStdString(resp.user_name());
     if (!resp.had_banner()) {
-        QMessageBox::information(this, tr("No banner set"),
+        Dialogs::information(this, tr("No banner set"),
                                  tr("%1 has no banner card set, so there was nothing to remove.").arg(removedUser));
         return;
     }
 
-    QMessageBox::information(this, tr("Banner removed"),
+    Dialogs::information(this, tr("Banner removed"),
                              tr("The banner card of %1 has been removed.\n\n"
                                 "Other players stop seeing it the next time %1 logs in.")
                                  .arg(removedUser));
