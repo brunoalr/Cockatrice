@@ -698,6 +698,7 @@ if(WITH_ORACLE OR WITH_CLIENT)
       ${CMAKE_SOURCE_DIR}/cockatrice/src/client/settings/cache_settings.cpp
       ${CMAKE_SOURCE_DIR}/cockatrice/src/client/settings/card_counter_settings.cpp
       ${CMAKE_SOURCE_DIR}/cockatrice/src/client/settings/shortcuts_settings.cpp
+      ${CMAKE_SOURCE_DIR}/cockatrice/src/interface/widgets/utility/non_blocking_dialogs.cpp
       ${VERSION_STRING_CPP}
   )
   set(SETTINGS_LIBS libcockatrice_network libcockatrice_settings)
@@ -752,7 +753,6 @@ if(WITH_CLIENT)
     ${CLIENT_SRC}/interface/widgets/server/handle_public_servers.cpp
     ${CLIENT_SRC}/interface/widgets/server/user/user_info_connection.cpp
     ${CLIENT_SRC}/interface/widgets/utility/get_text_with_max.cpp
-    ${CLIENT_SRC}/interface/widgets/utility/non_blocking_dialogs.cpp
     ${CLIENT_SRC}/interface/pixel_map_generator.cpp
     ${CLIENT_SRC}/interface/theme_config.cpp
     ${CLIENT_SRC}/interface/theme_icon.cpp
@@ -777,7 +777,6 @@ if(WITH_CLIENT)
     ${CLIENT_SRC}/client/crash/crash_reporter.cpp
     ${CLIENT_SRC}/interface/logger.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_crash_report.cpp
-    ${CLIENT_SRC}/interface/widgets/utility/non_blocking_dialogs.cpp
     ${SETTINGS_SOURCES}
     crash_report_dialog_test.cpp
     LIBS

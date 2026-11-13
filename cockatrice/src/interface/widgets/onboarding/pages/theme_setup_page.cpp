@@ -6,6 +6,7 @@
 #include "../../interface/palette_editor/quick_setup_panel.h"
 #include "../../interface/theme_manager.h"
 #include "../../interface/widgets/general/background_sources.h"
+#include "../../utility/non_blocking_dialogs.h"
 #include "../first_run_wizard_page.h"
 #include "libcockatrice/settings/appearance_settings.h"
 
@@ -17,7 +18,6 @@
 #include <QIODevice>
 #include <QList>
 #include <QMap>
-#include <QMessageBox>
 #include <QObject>
 #include <QPalette>
 #include <QSharedPointer>
@@ -238,8 +238,8 @@ bool ThemeSetupPage::validatePage()
         PaletteConfig cfg =
             PaletteGenerator::fromAccent(quickSetupPanel->accentColor(), quickSetupPanel->intensity(), scheme);
         if (!ThemeManager::commitPalette(writableThemeDir(), scheme, cfg)) {
-            QMessageBox::warning(this, tr("Save failed"),
-                                 tr("Could not write the theme palette to:\n%1").arg(writableThemeDir()));
+            Dialogs::warning(this, tr("Save failed"),
+                             tr("Could not write the theme palette to:\n%1").arg(writableThemeDir()));
             return false;
         }
         themeManager->reloadCurrentTheme();
