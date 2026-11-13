@@ -79,7 +79,15 @@ TEST_F(NonBlockingDialogs, ConfirmReturnsBeforeTheCallbackRuns)
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
     EXPECT_TRUE(box->isVisible());
-    EXPECT_EQ(box->windowModality(), Qt::WindowModal);
+}
+
+TEST_F(NonBlockingDialogs, ADialogWithAParentBlocksTheWholeApplication)
+{
+    Dialogs::getText(parent.get(), "Title", "Label", "", [](const QString &) {});
+
+    QInputDialog *dialog = onlyInputDialog();
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_EQ(dialog->windowModality(), Qt::ApplicationModal);
 }
 
 TEST_F(NonBlockingDialogs, ConfirmShowsAQuestionWithYesAndNo)

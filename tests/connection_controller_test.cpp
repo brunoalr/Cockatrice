@@ -114,7 +114,7 @@ TEST_F(ConnectionControllerDialogs, ConnectReturnsWithTheDialogOpen)
 
     DlgConnect *dialog = onlyOpen<DlgConnect>();
     ASSERT_NE(dialog, nullptr);
-    EXPECT_EQ(dialog->windowModality(), Qt::WindowModal);
+    EXPECT_EQ(dialog->windowModality(), Qt::ApplicationModal);
 }
 
 TEST_F(ConnectionControllerDialogs, AcceptingConnectConnectsWithTheTypedLogin)
