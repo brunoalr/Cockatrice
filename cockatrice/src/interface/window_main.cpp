@@ -1242,14 +1242,13 @@ void MainWindow::cardDatabaseLoadingFailed()
     QPushButton *settingsButton = msgBox->addButton(tr("Open settings"), QMessageBox::ActionRole);
     msgBox->setDefaultButton(yesButton);
 
-    Dialogs::open(msgBox, std::function<void(QAbstractButton *)>(
-                              Dialogs::whileAlive(this, [this, yesButton, settingsButton](QAbstractButton *clicked) {
-                                  if (clicked == yesButton) {
-                                      actCheckCardUpdates();
-                                  } else if (clicked == settingsButton) {
-                                      actSettings();
-                                  }
-                              })));
+    Dialogs::open(msgBox, Dialogs::whileAlive(this, [this, yesButton, settingsButton](QAbstractButton *clicked) {
+                      if (clicked == yesButton) {
+                          actCheckCardUpdates();
+                      } else if (clicked == settingsButton) {
+                          actSettings();
+                      }
+                  }));
 }
 
 void MainWindow::cardDatabaseNewSetsFound(int numUnknownSets, QStringList unknownSetsNames)

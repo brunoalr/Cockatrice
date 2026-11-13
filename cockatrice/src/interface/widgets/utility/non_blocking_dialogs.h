@@ -9,6 +9,7 @@
 #include <QPointer>
 #include <QString>
 #include <QStringList>
+#include <concepts>
 #include <functional>
 #include <type_traits>
 #include <utility>
@@ -85,7 +86,9 @@ void open(QMessageBox *box, std::function<void(QAbstractButton *clicked)> thenCl
 
 template <typename Fn> auto whileAlive(QObject *context, Fn fn)
 {
-    return [guard = QPointer<QObject>(context), fn = std::move(fn)]<typename... Arguments>(Arguments &&...arguments) {
+    return [guard = QPointer<QObject>(context), fn = std::move(fn)]<typename... Arguments>(Arguments &&...arguments)
+        requires std::invocable<const Fn &, Arguments...>
+    {
         if (guard) {
             fn(std::forward<Arguments>(arguments)...);
         }

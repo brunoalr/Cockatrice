@@ -809,6 +809,19 @@ TEST_F(NonBlockingDialogs, WhileAliveForwardsOnlyWhileItsContextLives)
     guarded(5);
     EXPECT_EQ(received, 3);
 }
+
+TEST_F(NonBlockingDialogs, WhileAliveFitsTheMessageBoxOverload)
+{
+    auto *box = new QMessageBox(parent.get());
+    QPushButton *keep = box->addButton("Keep", QMessageBox::YesRole);
+    QAbstractButton *clicked = nullptr;
+    Dialogs::open(box, Dialogs::whileAlive(parent.get(), [&](QAbstractButton *button) { clicked = button; }));
+
+    keep->click();
+    settle();
+
+    EXPECT_EQ(clicked, keep);
+}
 } // namespace
 
 int main(int argc, char **argv)
