@@ -549,6 +549,15 @@ cockatrice_add_test(
 )
 cockatrice_add_test(
   NAME
+  non_blocking_dialogs_test
+  SOURCES
+  ${CMAKE_SOURCE_DIR}/cockatrice/src/interface/widgets/utility/non_blocking_dialogs.cpp
+  non_blocking_dialogs_test.cpp
+  INCLUDE_DIRS
+  ${CMAKE_SOURCE_DIR}/cockatrice/src
+)
+cockatrice_add_test(
+  NAME
   deck_hash_performance_test
   SOURCES
   deck_hash_performance_test.cpp
