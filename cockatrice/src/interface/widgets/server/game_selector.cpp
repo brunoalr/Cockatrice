@@ -570,17 +570,19 @@ void GameSelector::customContextMenu(const QPoint &point)
 
     auto menu = std::make_unique<QMenu>();
     menu->setAttribute(Qt::WA_DeleteOnClose);
-    connect(menu->addAction(tr("Join Game")), &QAction::triggered, this, &GameSelector::actJoin);
-
-    if (tabSupervisor->getUserInfo()->user_level() & ServerInfo_User::IsJudge) {
-        connect(menu->addAction(tr("Join Game as Judge")), &QAction::triggered, this, &GameSelector::actJoinAsJudge);
-        connect(menu->addAction(tr("Spectate Game as Judge")), &QAction::triggered, this,
-                &GameSelector::actJoinAsJudgeSpectator);
-    }
-
-    connect(menu->addAction(tr("Spectate Game")), &QAction::triggered, this, &GameSelector::actJoinAsSpectator);
     // The list changes while the menu is up: the menu keeps the game it was opened on.
     const ServerInfo_Game gameInfo = gameListModel->getGame(index.data(Qt::UserRole).toInt());
+    const auto join = [this, gameInfo](bool asSpectator, bool asJudge) {
+        return [this, gameInfo, asSpectator, asJudge] { joinGame(gameInfo, asSpectator, asJudge); };
+    };
+    connect(menu->addAction(tr("Join Game")), &QAction::triggered, this, join(false, false));
+
+    if (tabSupervisor->getUserInfo()->user_level() & ServerInfo_User::IsJudge) {
+        connect(menu->addAction(tr("Join Game as Judge")), &QAction::triggered, this, join(false, true));
+        connect(menu->addAction(tr("Spectate Game as Judge")), &QAction::triggered, this, join(true, true));
+    }
+
+    connect(menu->addAction(tr("Spectate Game")), &QAction::triggered, this, join(true, false));
     connect(menu->addAction(tr("Game Information")), &QAction::triggered, this, [this, gameInfo]() {
         const QMap<int, QString> &gameTypes = gameListModel->getGameTypes().value(gameInfo.room_id());
 
