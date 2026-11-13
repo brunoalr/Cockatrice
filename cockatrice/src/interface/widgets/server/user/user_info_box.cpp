@@ -21,10 +21,10 @@
 #include <QFont>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocale>
-#include <QMessageBox>
 #include <QSharedPointer>
 #include <QSize>
 #include <QSizePolicy>
@@ -245,32 +245,43 @@ void UserInfoBox::actEditInternal(const Response &r)
     QString country = QString::fromStdString(user.country());
     QString realName = QString::fromStdString(user.real_name());
 
-    DlgEditUser dlg(this, email, country, realName);
-    if (!dlg.exec()) {
-        return;
-    }
-
-    Command_AccountEdit cmd;
-    cmd.set_real_name(dlg.getRealName().toStdString());
-    if (client->getServerSupportsPasswordHash()) {
-        if (email != dlg.getEmail()) {
+    auto *dlg = new DlgEditUser(this, email, country, realName);
+    Dialogs::open(dlg, [this, dlg, email](int result) {
+        if (result != QDialog::Accepted) {
+            return;
+        }
+        Command_AccountEdit cmd;
+        cmd.set_real_name(dlg->getRealName().toStdString());
+        cmd.set_country(dlg->getCountry().toStdString());
+        if (!client->getServerSupportsPasswordHash()) {
+            cmd.set_email(dlg->getEmail().toStdString());
+        } else if (email != dlg->getEmail()) {
             // real password is required to change email
-            bool ok = false;
-            QString password =
-                getTextWithMax(this, tr("Enter Password"),
-                               tr("Password verification is required in order to change your email address"),
-                               QLineEdit::Password, "", &ok);
-            if (!ok) {
-                return;
-            }
-            cmd.set_password_check(password.toStdString());
-            cmd.set_email(dlg.getEmail().toStdString());
+            askPasswordToEdit(cmd, dlg->getEmail());
+            return;
         } // servers that support password hash do not require all fields to be filled anymore
-    } else {
-        cmd.set_email(dlg.getEmail().toStdString());
-    }
-    cmd.set_country(dlg.getCountry().toStdString());
+        sendAccountEdit(cmd);
+    });
+}
 
+void UserInfoBox::askPasswordToEdit(const Command_AccountEdit &edit, const QString &newEmail)
+{
+    auto *prompt = newTextDialogWithMax(this, tr("Enter Password"),
+                                        tr("Password verification is required in order to change your email address"),
+                                        QLineEdit::Password);
+    Dialogs::open(prompt, [this, prompt, edit, newEmail](int result) {
+        if (result != QDialog::Accepted) {
+            return;
+        }
+        Command_AccountEdit cmd = edit;
+        cmd.set_password_check(prompt->textValue().toStdString());
+        cmd.set_email(newEmail.toStdString());
+        sendAccountEdit(cmd);
+    });
+}
+
+void UserInfoBox::sendAccountEdit(const Command_AccountEdit &cmd)
+{
     PendingCommand *pend = client->prepareSessionCommand(cmd);
     connect(pend, &PendingCommand::finished, this, &UserInfoBox::processEditResponse);
 
@@ -320,18 +331,19 @@ void UserInfoBox::changePassword(const QString &oldPassword, const QString &newP
 
 void UserInfoBox::actAvatar()
 {
-    DlgEditAvatar dlg(this);
-    if (!dlg.exec()) {
-        return;
-    }
+    auto *dlg = new DlgEditAvatar(this);
+    Dialogs::open(dlg, [this, dlg](int result) {
+        if (result != QDialog::Accepted) {
+            return;
+        }
+        Command_AccountImage cmd;
+        cmd.set_image(dlg->getImage().data(), dlg->getImage().size());
 
-    Command_AccountImage cmd;
-    cmd.set_image(dlg.getImage().data(), dlg.getImage().size());
+        PendingCommand *pend = client->prepareSessionCommand(cmd);
+        connect(pend, &PendingCommand::finished, this, &UserInfoBox::processAvatarResponse);
 
-    PendingCommand *pend = client->prepareSessionCommand(cmd);
-    connect(pend, &PendingCommand::finished, this, &UserInfoBox::processAvatarResponse);
-
-    client->sendCommand(pend);
+        client->sendCommand(pend);
+    });
 }
 
 void UserInfoBox::actBannerCard()
@@ -347,13 +359,16 @@ void UserInfoBox::actBannerCard()
         initial.zoom = cap.zoom();
     }
 
-    UserCardArtSettingsDialog dlg(initial, this);
-    if (dlg.exec() != QDialog::Accepted) {
-        return;
-    }
+    auto *dlg = new UserCardArtSettingsDialog(initial, this);
+    Dialogs::open(dlg, [this, dlg](int result) {
+        if (result == QDialog::Accepted) {
+            sendCardArtParams(dlg->params());
+        }
+    });
+}
 
-    const CardArtParams p = dlg.params();
-
+void UserInfoBox::sendCardArtParams(const CardArtParams &p)
+{
     Command_SetCardArtParams cmd;
     cmd.set_card_name(p.cardName.toStdString());
     if (!p.cardName.isEmpty()) {
@@ -367,12 +382,12 @@ void UserInfoBox::actBannerCard()
     PendingCommand *pend = client->prepareSessionCommand(cmd);
     connect(pend, &PendingCommand::finished, this, [p, this](const Response &r) {
         if (r.response_code() != Response::RespOk) {
-            QMessageBox::critical(this, tr("Error"),
-                                  tr("The selected card is blacklisted on this server or another error occurred."));
+            Dialogs::critical(this, tr("Error"),
+                              tr("The selected card is blacklisted on this server or another error occurred."));
         } else {
             updateInfo(nameLabel.text()); // re-fetch so currentUserInfo reflects the change
-            QMessageBox::information(this, tr("Information"),
-                                     p.cardName.isEmpty() ? tr("Banner card removed.") : tr("Banner card updated."));
+            Dialogs::information(this, tr("Information"),
+                                 p.cardName.isEmpty() ? tr("Banner card removed.") : tr("Banner card updated."));
         }
     });
     client->sendCommand(pend);
@@ -383,19 +398,17 @@ void UserInfoBox::processEditResponse(const Response &r)
     switch (r.response_code()) {
         case Response::RespOk:
             updateInfo(nameLabel.text());
-            QMessageBox::information(this, tr("Information"), tr("User information updated."));
+            Dialogs::information(this, tr("Information"), tr("User information updated."));
             break;
         case Response::RespFunctionNotAllowed:
-            QMessageBox::critical(this, tr("Error"),
-                                  tr("This server does not permit you to update your user informations."));
+            Dialogs::critical(this, tr("Error"), tr("This server does not permit you to update your user informations."));
             break;
         case Response::RespWrongPassword:
-            QMessageBox::critical(this, tr("Error"), tr("The entered password does not match your account."));
+            Dialogs::critical(this, tr("Error"), tr("The entered password does not match your account."));
             break;
         case Response::RespInternalError:
         default:
-            QMessageBox::critical(this, tr("Error"),
-                                  tr("An error occurred while trying to update your user information."));
+            Dialogs::critical(this, tr("Error"), tr("An error occurred while trying to update your user information."));
             break;
     }
 }
@@ -427,14 +440,14 @@ void UserInfoBox::processAvatarResponse(const Response &r)
     switch (r.response_code()) {
         case Response::RespOk:
             updateInfo(nameLabel.text());
-            QMessageBox::information(this, tr("Information"), tr("Avatar updated."));
+            Dialogs::information(this, tr("Information"), tr("Avatar updated."));
             break;
         case Response::RespFunctionNotAllowed:
-            QMessageBox::critical(this, tr("Error"), tr("This server does not permit you to update your avatar."));
+            Dialogs::critical(this, tr("Error"), tr("This server does not permit you to update your avatar."));
             break;
         case Response::RespInternalError:
         default:
-            QMessageBox::critical(this, tr("Error"), tr("An error occured while trying to update your avatar."));
+            Dialogs::critical(this, tr("Error"), tr("An error occured while trying to update your avatar."));
             break;
     }
 }
