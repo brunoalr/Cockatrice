@@ -12,7 +12,6 @@
 
 class RemoteClient;
 class ServerInfo_User;
-class DlgConnect;
 class Event_ConnectionClosed;
 class Event_ServerShutdown;
 class QThread;
@@ -111,9 +110,6 @@ private:
 
     // Persistent so it can be updated in-place by onServerShutdownEvent
     QMessageBox serverShutdownMessageBox;
-
-    // Kept as a member so the forgot-password signal can be wired to it
-    DlgConnect *dlgConnect{nullptr};
 
     // Captured from the connect dialog when a connection is initiated
     QString pendingSaveName;

@@ -1,20 +1,22 @@
 #include "remote_connection_controller.h"
 
 #include "../../../interface/pixel_map_generator.h"
+#include "../../../interface/widgets/dialogs/dlg_connect.h"
+#include "../../../interface/widgets/dialogs/dlg_edit_password.h"
+#include "../../../interface/widgets/dialogs/dlg_forgot_password_challenge.h"
+#include "../../../interface/widgets/dialogs/dlg_forgot_password_request.h"
+#include "../../../interface/widgets/dialogs/dlg_forgot_password_reset.h"
+#include "../../../interface/widgets/dialogs/dlg_register.h"
+#include "../../../interface/widgets/utility/get_text_with_max.h"
+#include "../../../interface/widgets/utility/non_blocking_dialogs.h"
 #include "../../settings/cache_settings.h"
-#include "../interface/widgets/dialogs/dlg_connect.h"
-#include "../interface/widgets/dialogs/dlg_edit_password.h"
-#include "../interface/widgets/dialogs/dlg_forgot_password_challenge.h"
-#include "../interface/widgets/dialogs/dlg_forgot_password_request.h"
-#include "../interface/widgets/dialogs/dlg_forgot_password_reset.h"
-#include "../interface/widgets/dialogs/dlg_register.h"
-#include "../interface/widgets/utility/get_text_with_max.h"
 #include "libcockatrice/protocol/pb/event_connection_closed.pb.h"
 #include "libcockatrice/protocol/pb/event_server_shutdown.pb.h"
 
 #include <QChar>
 #include <QDateTime>
 #include <QDebug>
+#include <QInputDialog>
 #include <QLineEdit>
 #include <QList>
 #include <QMessageBox>
@@ -25,10 +27,21 @@
 #include <libcockatrice/network/client/remote/remote_client.h>
 #include <libcockatrice/protocol/pb/response.pb.h>
 #include <libcockatrice/settings/servers_settings.h>
-#include <libcockatrice/utility/qt_utils.h>
 #include <qnamespace.h>
 
 class QWidget;
+
+template <typename Dialog> static bool raiseOpenDialog(QWidget *parent)
+{
+    for (Dialog *dialog : parent->findChildren<Dialog *>(Qt::FindDirectChildrenOnly)) {
+        if (dialog->isVisible()) {
+            dialog->raise();
+            dialog->activateWindow();
+            return true;
+        }
+    }
+    return false;
+}
 
 ConnectionController::ConnectionController(QWidget *dialogParent, QObject *parent)
     : QObject(parent), dialogParent(dialogParent)
@@ -108,16 +121,23 @@ void ConnectionController::wireClientSignals()
 
 void ConnectionController::connectToServer()
 {
-    dlgConnect = new DlgConnect(dialogParent);
+    if (raiseOpenDialog<DlgConnect>(dialogParent)) {
+        return;
+    }
+    auto *dlgConnect = new DlgConnect(dialogParent);
     connect(dlgConnect, &DlgConnect::sigStartForgotPasswordRequest, this, &ConnectionController::forgotPasswordRequest);
 
-    if (dlgConnect->exec()) {
-        pendingSaveName = dlgConnect->getSaveName();
-        pendingSavePassword = dlgConnect->getSavePassword();
-        remoteClient->setStoredVerifier(dlgConnect->getStoredVerifier());
-        remoteClient->connectToServer(dlgConnect->getHost(), static_cast<unsigned int>(dlgConnect->getPort()),
-                                      dlgConnect->getPlayerName(), dlgConnect->getPassword());
-    }
+    Dialogs::open(dlgConnect, Dialogs::whileAlive(this, [this, dlgConnect](int result) {
+                      if (result != QDialog::Accepted) {
+                          return;
+                      }
+                      pendingSaveName = dlgConnect->getSaveName();
+                      pendingSavePassword = dlgConnect->getSavePassword();
+                      remoteClient->setStoredVerifier(dlgConnect->getStoredVerifier());
+                      remoteClient->connectToServer(dlgConnect->getHost(),
+                                                    static_cast<unsigned int>(dlgConnect->getPort()),
+                                                    dlgConnect->getPlayerName(), dlgConnect->getPassword());
+                  }));
 }
 
 void ConnectionController::onPasswordVerifierReady(const QString &verifier)
@@ -148,20 +168,31 @@ void ConnectionController::disconnectFromServer()
 
 void ConnectionController::registerToServer()
 {
-    DlgRegister dlg(dialogParent);
-    if (dlg.exec()) {
-        remoteClient->registerToServer(dlg.getHost(), static_cast<unsigned int>(dlg.getPort()), dlg.getPlayerName(),
-                                       dlg.getPassword(), dlg.getEmail(), dlg.getCountry(), dlg.getRealName());
+    if (raiseOpenDialog<DlgRegister>(dialogParent)) {
+        return;
     }
+    auto *dlg = new DlgRegister(dialogParent);
+    Dialogs::open(dlg, Dialogs::whileAlive(this, [this, dlg](int result) {
+                      if (result == QDialog::Accepted) {
+                          remoteClient->registerToServer(dlg->getHost(), static_cast<unsigned int>(dlg->getPort()),
+                                                         dlg->getPlayerName(), dlg->getPassword(), dlg->getEmail(),
+                                                         dlg->getCountry(), dlg->getRealName());
+                      }
+                  }));
 }
 
 void ConnectionController::forgotPasswordRequest()
 {
-    DlgForgotPasswordRequest dlg(dialogParent);
-    if (dlg.exec()) {
-        remoteClient->requestForgotPasswordToServer(dlg.getHost(), static_cast<unsigned int>(dlg.getPort()),
-                                                    dlg.getPlayerName());
+    if (raiseOpenDialog<DlgForgotPasswordRequest>(dialogParent)) {
+        return;
     }
+    auto *dlg = new DlgForgotPasswordRequest(dialogParent);
+    Dialogs::open(dlg, Dialogs::whileAlive(this, [this, dlg](int result) {
+                      if (result == QDialog::Accepted) {
+                          remoteClient->requestForgotPasswordToServer(
+                              dlg->getHost(), static_cast<unsigned int>(dlg->getPort()), dlg->getPlayerName());
+                      }
+                  }));
 }
 
 void ConnectionController::onConnectionClosedEvent(const Event_ConnectionClosed &event)
@@ -207,8 +238,8 @@ void ConnectionController::onConnectionClosedEvent(const Event_ConnectionClosed 
             reasonStr = QString::fromStdString(event.reason_str());
     }
 
-    QMessageBox::critical(dialogParent, tr("Connection closed"),
-                          tr("The server has terminated your connection.\nReason: %1").arg(reasonStr));
+    Dialogs::critical(dialogParent, tr("Connection closed"),
+                      tr("The server has terminated your connection.\nReason: %1").arg(reasonStr));
 }
 
 void ConnectionController::onServerShutdownEvent(const Event_ServerShutdown &event)
@@ -247,30 +278,31 @@ void ConnectionController::onLoginError(int r,
                                         quint32 endTime,
                                         const QList<QString> &missingFeatures)
 {
+    const auto reopenConnect = Dialogs::whileAlive(this, [this] { connectToServer(); });
     switch (static_cast<Response::ResponseCode>(r)) {
         case Response::RespClientUpdateRequired: {
-            QMessageBox msgBox(dialogParent);
-            msgBox.setIcon(QMessageBox::Critical);
-            msgBox.setWindowTitle(tr("Failed Login"));
+            auto *msgBox = new QMessageBox(dialogParent);
+            msgBox->setIcon(QMessageBox::Critical);
+            msgBox->setWindowTitle(tr("Failed Login"));
 
             if (missingFeatures.isEmpty()) {
                 // Without a feature list this is either a login the client stopped itself or a
                 // strict server asking for a password; the reason string already says which and
                 // what to do. No client update can fix any of those causes, so show it instead of
                 // the update advice.
-                msgBox.setText(reasonStr.isEmpty() ? tr("The login did not complete.") : reasonStr);
+                msgBox->setText(reasonStr.isEmpty() ? tr("The login did not complete.") : reasonStr);
             } else {
                 QString formatted = tr("Missing Features:");
                 for (const QString &feature : missingFeatures) {
                     formatted.append(QString("\n     %1 ").arg(QChar(0x2022)) + feature);
                 }
 
-                msgBox.setText(tr("Your client seems to be missing features this server requires for connection.") +
-                               "\n\n" + tr("To update your client, go to 'Help -> Check for Client Updates'."));
-                msgBox.setDetailedText(formatted);
+                msgBox->setText(tr("Your client seems to be missing features this server requires for connection.") +
+                                "\n\n" + tr("To update your client, go to 'Help -> Check for Client Updates'."));
+                msgBox->setDetailedText(formatted);
             }
 
-            msgBox.exec();
+            Dialogs::open(msgBox, [reopenConnect](QAbstractButton *) { reopenConnect(); });
             break;
         }
 
@@ -281,21 +313,23 @@ void ConnectionController::onLoginError(int r,
             if (!reasonStr.isEmpty()) {
                 bannedStr.append("\n\n" + reasonStr);
             }
-            QMessageBox::critical(dialogParent, tr("Error"), bannedStr);
+            Dialogs::critical(dialogParent, tr("Error"), bannedStr, reopenConnect);
             break;
         }
 
         case Response::RespWrongPassword: {
-            QMessageBox::critical(dialogParent, tr("Error"),
-                                  tr("Incorrect username or password. "
-                                     "Please check your authentication information and try again."));
+            Dialogs::critical(dialogParent, tr("Error"),
+                              tr("Incorrect username or password. "
+                                 "Please check your authentication information and try again."),
+                              reopenConnect);
             break;
         }
 
         case Response::RespWouldOverwriteOldSession: {
-            QMessageBox::critical(dialogParent, tr("Error"),
-                                  tr("There is already an active session using this user name.\n"
-                                     "Please close that session first and re-login."));
+            Dialogs::critical(dialogParent, tr("Error"),
+                              tr("There is already an active session using this user name.\n"
+                                 "Please close that session first and re-login."),
+                              reopenConnect);
             break;
         }
 
@@ -306,52 +340,57 @@ void ConnectionController::onLoginError(int r,
             if (!reasonStr.isEmpty()) {
                 bannedStr.append("\n\n" + reasonStr);
             }
-            QMessageBox::critical(dialogParent, tr("Error"), bannedStr);
+            Dialogs::critical(dialogParent, tr("Error"), bannedStr, reopenConnect);
             break;
         }
 
         case Response::RespUsernameInvalid: {
-            QMessageBox::critical(dialogParent, tr("Error"), extractInvalidUsernameMessage(reasonStr));
+            Dialogs::critical(dialogParent, tr("Error"), extractInvalidUsernameMessage(reasonStr), reopenConnect);
             break;
         }
 
         case Response::RespRegistrationRequired: {
-            if (QtUtils::confirm(dialogParent, tr("Error"),
-                                 tr("This server requires user registration. Do you want to register now?"))) {
-                registerToServer();
-            }
+            Dialogs::confirm(dialogParent, tr("Error"),
+                             tr("This server requires user registration. Do you want to register now?"),
+                             Dialogs::whileAlive(this, [this](bool confirmed) {
+                                 if (confirmed) {
+                                     registerToServer();
+                                 }
+                             }));
             return; // don't re-prompt connect
         }
 
         case Response::RespClientIdRequired: {
-            QMessageBox::critical(dialogParent, tr("Error"),
-                                  tr("This server requires client IDs. Your client is either failing to generate an "
-                                     "ID or you are running a modified client.\n"
-                                     "Please close and reopen your client to try again."));
+            Dialogs::critical(dialogParent, tr("Error"),
+                              tr("This server requires client IDs. Your client is either failing to generate an "
+                                 "ID or you are running a modified client.\n"
+                                 "Please close and reopen your client to try again."),
+                              reopenConnect);
             break;
         }
 
         case Response::RespContextError: {
-            QMessageBox::critical(dialogParent, tr("Error"),
-                                  tr("An internal error has occurred, please close and reopen Cockatrice before "
-                                     "trying again.\nIf the error persists, ensure you are running the latest "
-                                     "version of the software and if needed contact the software developers."));
+            Dialogs::critical(dialogParent, tr("Error"),
+                              tr("An internal error has occurred, please close and reopen Cockatrice before "
+                                 "trying again.\nIf the error persists, ensure you are running the latest "
+                                 "version of the software and if needed contact the software developers."),
+                              reopenConnect);
             break;
         }
 
         case Response::RespAccountNotActivated: {
-            bool ok = false;
-            QString token =
-                getTextWithMax(dialogParent, tr("Account activation"),
-                               tr("Your account has not been activated yet.\n"
-                                  "You need to provide the activation token received in the activation email."),
-                               QLineEdit::Normal, QString(), &ok);
-
-            if (ok && !token.isEmpty()) {
-                remoteClient->activateToServer(token);
-                return;
-            }
-            remoteClient->disconnectFromServer();
+            auto *dialog =
+                newTextDialogWithMax(dialogParent, tr("Account activation"),
+                                     tr("Your account has not been activated yet.\n"
+                                        "You need to provide the activation token received in the activation email."));
+            Dialogs::open(dialog, Dialogs::whileAlive(this, [this, dialog](int result) {
+                              const QString token = dialog->textValue();
+                              if (result == QDialog::Accepted && !token.isEmpty()) {
+                                  remoteClient->activateToServer(token);
+                                  return;
+                              }
+                              remoteClient->disconnectFromServer();
+                          }));
             return;
         }
 
@@ -360,51 +399,53 @@ void ConnectionController::onLoginError(int r,
             // is chosen. Let the user complete the change here: sending them off to "ask the
             // administrator for your temporary password" sends them in circles, since they just
             // logged in with it and the session ends without a way to comply.
-            DlgEditPassword dlg(dialogParent);
-            dlg.setWindowTitle(tr("Password Change Required"));
-            if (dlg.exec()) {
-                remoteClient->changePasswordToServer(dlg.getOldPassword(), dlg.getNewPassword());
-                return; // onPasswordChangeSuccess/onPasswordChangeError decides the next step
-            }
-            remoteClient->disconnectFromServer();
+            auto *dlg = new DlgEditPassword(dialogParent);
+            dlg->setWindowTitle(tr("Password Change Required"));
+            Dialogs::open(dlg, Dialogs::whileAlive(this, [this, dlg](int result) {
+                              if (result == QDialog::Accepted) {
+                                  remoteClient->changePasswordToServer(dlg->getOldPassword(), dlg->getNewPassword());
+                                  return; // onPasswordChangeSuccess/onPasswordChangeError decides the next step
+                              }
+                              remoteClient->disconnectFromServer();
+                          }));
             return;
         }
 
         case Response::RespServerFull: {
-            QMessageBox::critical(dialogParent, tr("Server Full"),
-                                  tr("The server has reached its maximum user capacity, please check back later."));
+            Dialogs::critical(dialogParent, tr("Server Full"),
+                              tr("The server has reached its maximum user capacity, please check back later."),
+                              reopenConnect);
             break;
         }
 
         default: {
-            QMessageBox::critical(dialogParent, tr("Error"),
-                                  tr("Unknown login error: %1").arg(r) +
-                                      tr("\nThis usually means that your client version is out of date, and the server "
-                                         "sent a reply your client doesn't understand."));
+            Dialogs::critical(dialogParent, tr("Error"),
+                              tr("Unknown login error: %1").arg(r) +
+                                  tr("\nThis usually means that your client version is out of date, and the server "
+                                     "sent a reply your client doesn't understand."),
+                              reopenConnect);
             break;
         }
     }
-
-    // Re-open the connect dialog after any handled error
-    connectToServer();
 }
 
 void ConnectionController::onRegisterError(int r, QString reasonStr, quint32 endTime)
 {
+    const auto reopenRegister = Dialogs::whileAlive(this, [this] { registerToServer(); });
     switch (static_cast<Response::ResponseCode>(r)) {
         case Response::RespRegistrationDisabled: {
-            QMessageBox::critical(dialogParent, tr("Registration denied"),
-                                  tr("Registration is currently disabled on this server"));
+            Dialogs::critical(dialogParent, tr("Registration denied"),
+                              tr("Registration is currently disabled on this server"), reopenRegister);
             break;
         }
         case Response::RespUserAlreadyExists: {
-            QMessageBox::critical(dialogParent, tr("Registration denied"),
-                                  tr("There is already an existing account with the same user name."));
+            Dialogs::critical(dialogParent, tr("Registration denied"),
+                              tr("There is already an existing account with the same user name."), reopenRegister);
             break;
         }
         case Response::RespEmailRequiredToRegister: {
-            QMessageBox::critical(dialogParent, tr("Registration denied"),
-                                  tr("It's mandatory to specify a valid email address when registering."));
+            Dialogs::critical(dialogParent, tr("Registration denied"),
+                              tr("It's mandatory to specify a valid email address when registering."), reopenRegister);
             break;
         }
         case Response::RespEmailBlackListed: {
@@ -412,7 +453,7 @@ void ConnectionController::onRegisterError(int r, QString reasonStr, quint32 end
                 reasonStr =
                     "The email address provider used during registration has been blocked from use on this server.";
             }
-            QMessageBox::critical(dialogParent, tr("Registration denied"), reasonStr);
+            Dialogs::critical(dialogParent, tr("Registration denied"), reasonStr, reopenRegister);
             break;
         }
         case Response::RespTooManyRequests: {
@@ -424,11 +465,11 @@ void ConnectionController::onRegisterError(int r, QString reasonStr, quint32 end
                              "restricts the number of accounts a user can register per address. Please "
                              "contact the server operator for further assistance or to obtain your "
                              "credential information.");
-            QMessageBox::critical(dialogParent, tr("Registration denied"), deniedStr);
+            Dialogs::critical(dialogParent, tr("Registration denied"), deniedStr, reopenRegister);
             break;
         }
         case Response::RespPasswordTooShort: {
-            QMessageBox::critical(dialogParent, tr("Registration denied"), tr("Password too short."));
+            Dialogs::critical(dialogParent, tr("Registration denied"), tr("Password too short."), reopenRegister);
             break;
         }
         case Response::RespUserIsBanned: {
@@ -438,74 +479,75 @@ void ConnectionController::onRegisterError(int r, QString reasonStr, quint32 end
             if (!reasonStr.isEmpty()) {
                 bannedStr.append("\n\n" + reasonStr);
             }
-            QMessageBox::critical(dialogParent, tr("Error"), bannedStr);
+            Dialogs::critical(dialogParent, tr("Error"), bannedStr, reopenRegister);
             break;
         }
         case Response::RespUsernameInvalid: {
-            QMessageBox::critical(dialogParent, tr("Error"), extractInvalidUsernameMessage(reasonStr));
+            Dialogs::critical(dialogParent, tr("Error"), extractInvalidUsernameMessage(reasonStr), reopenRegister);
             break;
         }
         case Response::RespRegistrationFailed: {
-            QMessageBox::critical(dialogParent, tr("Error"),
-                                  tr("Registration failed for a technical problem on the server."));
+            Dialogs::critical(dialogParent, tr("Error"),
+                              tr("Registration failed for a technical problem on the server."), reopenRegister);
             break;
         }
         case Response::RespNotConnected: {
-            QMessageBox::critical(dialogParent, tr("Error"), tr("The connection to the server has been lost."));
+            Dialogs::critical(dialogParent, tr("Error"), tr("The connection to the server has been lost."),
+                              reopenRegister);
             break;
         }
         default: {
-            QMessageBox::critical(dialogParent, tr("Error"),
-                                  tr("Unknown registration error: %1").arg(r) +
-                                      tr("\nThis usually means that your client version is out of date, and the server "
-                                         "sent a reply your client doesn't understand."));
+            Dialogs::critical(dialogParent, tr("Error"),
+                              tr("Unknown registration error: %1").arg(r) +
+                                  tr("\nThis usually means that your client version is out of date, and the server "
+                                     "sent a reply your client doesn't understand."),
+                              reopenRegister);
             break;
         }
     }
-
-    registerToServer();
 }
 
 void ConnectionController::onActivateError()
 {
-    QMessageBox::critical(dialogParent, tr("Error"), tr("Account activation failed"));
-    remoteClient->disconnectFromServer();
-    connectToServer();
+    Dialogs::critical(dialogParent, tr("Error"), tr("Account activation failed"), Dialogs::whileAlive(this, [this] {
+                          remoteClient->disconnectFromServer();
+                          connectToServer();
+                      }));
 }
 
 void ConnectionController::onSocketError(const QString &errorStr)
 {
-    QMessageBox::critical(dialogParent, tr("Error"), tr("Socket error: %1").arg(errorStr));
-    connectToServer();
+    Dialogs::critical(dialogParent, tr("Error"), tr("Socket error: %1").arg(errorStr),
+                      Dialogs::whileAlive(this, [this] { connectToServer(); }));
 }
 
 void ConnectionController::onServerTimeout()
 {
-    QMessageBox::critical(dialogParent, tr("Error"), tr("Server timeout"));
-    connectToServer();
+    Dialogs::critical(dialogParent, tr("Error"), tr("Server timeout"),
+                      Dialogs::whileAlive(this, [this] { connectToServer(); }));
 }
 
 void ConnectionController::onProtocolVersionMismatch(int localVersion, int remoteVersion)
 {
     if (localVersion > remoteVersion) {
-        QMessageBox::critical(dialogParent, tr("Error"),
-                              tr("You are trying to connect to an obsolete server. Please downgrade your Cockatrice "
-                                 "version or connect to a suitable server.\n"
-                                 "Local version is %1, remote version is %2.")
-                                  .arg(localVersion)
-                                  .arg(remoteVersion));
+        Dialogs::critical(dialogParent, tr("Error"),
+                          tr("You are trying to connect to an obsolete server. Please downgrade your Cockatrice "
+                             "version or connect to a suitable server.\n"
+                             "Local version is %1, remote version is %2.")
+                              .arg(localVersion)
+                              .arg(remoteVersion));
     } else {
-        QMessageBox::critical(dialogParent, tr("Error"),
-                              tr("Your Cockatrice client is obsolete. Please update your Cockatrice version.\n"
-                                 "Local version is %1, remote version is %2.")
-                                  .arg(localVersion)
-                                  .arg(remoteVersion));
+        Dialogs::critical(dialogParent, tr("Error"),
+                          tr("Your Cockatrice client is obsolete. Please update your Cockatrice version.\n"
+                             "Local version is %1, remote version is %2.")
+                              .arg(localVersion)
+                              .arg(remoteVersion));
     }
 }
 
 void ConnectionController::onRegisterAccepted()
 {
-    QMessageBox::information(dialogParent, tr("Success"), tr("Registration accepted.\nWill now login."));
+    Dialogs::information(dialogParent, tr("Success"), tr("Registration accepted.\nWill now login."));
 }
 
 void ConnectionController::onRegisterAcceptedNeedsActivate()
@@ -515,17 +557,16 @@ void ConnectionController::onRegisterAcceptedNeedsActivate()
 
 void ConnectionController::onActivateAccepted()
 {
-    QMessageBox::information(dialogParent, tr("Success"), tr("Account activation accepted.\nWill now login."));
+    Dialogs::information(dialogParent, tr("Success"), tr("Account activation accepted.\nWill now login."));
 }
 
 void ConnectionController::onNotifyUserAboutUpdate()
 {
-    QMessageBox::information(
-        dialogParent, tr("Information"),
-        tr("This server supports additional features that your client doesn't have.\n"
-           "This is most likely not a problem, but this message might mean there is a new version of "
-           "Cockatrice available or this server is running a custom or pre-release version.\n\n"
-           "To update your client, go to Help -> Check for Updates."));
+    Dialogs::information(dialogParent, tr("Information"),
+                         tr("This server supports additional features that your client doesn't have.\n"
+                            "This is most likely not a problem, but this message might mean there is a new version of "
+                            "Cockatrice available or this server is running a custom or pre-release version.\n\n"
+                            "To update your client, go to Help -> Check for Updates."));
 }
 
 void ConnectionController::onPasswordChangeSuccess()
@@ -536,10 +577,12 @@ void ConnectionController::onPasswordChangeSuccess()
         SettingsCache::instance().servers().setServerPassword(pendingSaveName, "");
     }
 
-    QMessageBox::information(dialogParent, tr("Password Changed"),
-                             tr("Your password has been changed. Please log in again with your new password."));
-    remoteClient->disconnectFromServer();
-    connectToServer();
+    Dialogs::information(dialogParent, tr("Password Changed"),
+                         tr("Your password has been changed. Please log in again with your new password."),
+                         Dialogs::whileAlive(this, [this] {
+                             remoteClient->disconnectFromServer();
+                             connectToServer();
+                         }));
 }
 
 void ConnectionController::onPasswordChangeError(int responseCode)
@@ -560,14 +603,15 @@ void ConnectionController::onPasswordChangeError(int responseCode)
             break;
     }
 
-    QMessageBox::critical(dialogParent, tr("Password Change Failed"), reason);
-    remoteClient->disconnectFromServer();
-    connectToServer();
+    Dialogs::critical(dialogParent, tr("Password Change Failed"), reason, Dialogs::whileAlive(this, [this] {
+                          remoteClient->disconnectFromServer();
+                          connectToServer();
+                      }));
 }
 
 void ConnectionController::onForgotPasswordSuccess()
 {
-    QMessageBox::information(
+    Dialogs::information(
         dialogParent, tr("Reset Password"),
         tr("Your password has been reset successfully, you can now log in using the new credentials."));
     SettingsCache::instance().servers().setFPHostName("");
@@ -600,7 +644,7 @@ void ConnectionController::onForgotPasswordError(int responseCode)
             break;
     }
 
-    QMessageBox::warning(dialogParent, tr("Reset Password"), message);
+    Dialogs::warning(dialogParent, tr("Reset Password"), message);
 
     if (!keepPrefill) {
         SettingsCache::instance().servers().setFPHostName("");
@@ -611,22 +655,30 @@ void ConnectionController::onForgotPasswordError(int responseCode)
 
 void ConnectionController::onPromptForgotPasswordReset()
 {
-    QMessageBox::information(dialogParent, tr("Reset Password"),
-                             tr("Activation request received, please check your email for an activation token."));
-    DlgForgotPasswordReset dlg(dialogParent);
-    if (dlg.exec()) {
-        remoteClient->submitForgotPasswordResetToServer(dlg.getHost(), static_cast<unsigned int>(dlg.getPort()),
-                                                        dlg.getPlayerName(), dlg.getToken(), dlg.getPassword());
-    }
+    Dialogs::information(dialogParent, tr("Reset Password"),
+                         tr("Activation request received, please check your email for an activation token."),
+                         Dialogs::whileAlive(this, [this] {
+                             auto *dlg = new DlgForgotPasswordReset(dialogParent);
+                             Dialogs::open(dlg, Dialogs::whileAlive(this, [this, dlg](int result) {
+                                               if (result == QDialog::Accepted) {
+                                                   remoteClient->submitForgotPasswordResetToServer(
+                                                       dlg->getHost(), static_cast<unsigned int>(dlg->getPort()),
+                                                       dlg->getPlayerName(), dlg->getToken(), dlg->getPassword());
+                                               }
+                                           }));
+                         }));
 }
 
 void ConnectionController::onPromptForgotPasswordChallenge()
 {
-    DlgForgotPasswordChallenge dlg(dialogParent);
-    if (dlg.exec()) {
-        remoteClient->submitForgotPasswordChallengeToServer(dlg.getHost(), static_cast<unsigned int>(dlg.getPort()),
-                                                            dlg.getPlayerName(), dlg.getEmail());
-    }
+    auto *dlg = new DlgForgotPasswordChallenge(dialogParent);
+    Dialogs::open(dlg, Dialogs::whileAlive(this, [this, dlg](int result) {
+                      if (result == QDialog::Accepted) {
+                          remoteClient->submitForgotPasswordChallengeToServer(dlg->getHost(),
+                                                                              static_cast<unsigned int>(dlg->getPort()),
+                                                                              dlg->getPlayerName(), dlg->getEmail());
+                      }
+                  }));
 }
 
 void ConnectionController::updateWindowTitle()
