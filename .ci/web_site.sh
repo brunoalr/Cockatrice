@@ -129,7 +129,8 @@ copy_fonts() {
 
 assemble() {
   local app=$1 database=$2 site=${3%/} previous_url=${4:-}
-  local repo web worker hash source=${WEB_SITE_SOURCE_URL:-} fonts=${WEB_SITE_FONTS:-} previous=
+  local repo web worker hash source=${WEB_SITE_SOURCE_URL:-} relay=${WEB_SITE_RELAY_URL:-} fonts=${WEB_SITE_FONTS:-} previous=
+  local source_edit relay_edit
   repo="$(dirname "$0")/.."
   web="$repo/cockatrice/web"
   worker="$web/coi-serviceworker.js"
@@ -140,6 +141,11 @@ assemble() {
   # The address goes into the page as it is
   if [[ -n $source && ! $source =~ ^https://[A-Za-z0-9./_-]+$ ]]; then
     echo "::error::WEB_SITE_SOURCE_URL is not a plain https address: $source"
+    exit 1
+  fi
+  # The client takes the same addresses from the page
+  if [[ -n $relay && ! $relay =~ ^(https://[A-Za-z0-9.-]+|http://(127\.0\.0\.1|localhost))(:[0-9]+)?/?$ ]]; then
+    echo "::error::WEB_SITE_RELAY_URL is not an https host, or http on 127.0.0.1 or localhost, without a path: $relay"
     exit 1
   fi
   if [[ $(head -n 1 "$worker" | grep -oE '[0-9a-f]{64}') != "$(tail -n +2 "$worker" | sha256 | cut -c1-64)" ]]; then
@@ -165,10 +171,16 @@ assemble() {
   cp "$repo/LICENSE" "$staging/LICENSE.txt"
   if [[ -n $source ]]; then
     echo "$source" >"$staging/SOURCE.txt"
-    sed "s|app/@HASH@/|app/$hash/|g; s|@SOURCE@|$source|" "$web/index.html" >"$staging/index.html"
+    source_edit="s|@SOURCE@|$source|"
   else
-    sed "s|app/@HASH@/|app/$hash/|g; /@SOURCE@/d" "$web/index.html" >"$staging/index.html"
+    source_edit='/@SOURCE@/d'
   fi
+  if [[ -n $relay ]]; then
+    relay_edit="s|@RELAY@|$relay|"
+  else
+    relay_edit='/@RELAY@/d'
+  fi
+  sed -e "s|app/@HASH@/|app/$hash/|g" -e "$source_edit" -e "$relay_edit" "$web/index.html" >"$staging/index.html"
   if ! grep -q "app/$hash/" "$staging/index.html" || grep -q '@HASH@' "$staging/index.html"; then
     echo "::error::$web/index.html does not name app/@HASH@/"
     exit 1
@@ -388,6 +400,45 @@ self_test() {
   fi
   WEB_SITE_SOURCE_URL='https://example.org/"><script>' refuses "a site with a source address that is not a plain https address" \
     "$work/app" "$work/database" "$work/x12"
+
+  if grep -qE '@RELAY@|cockatrice-relay' "$work/a/index.html"; then
+    echo "self-test FAILED: a site without a relay address still names one"
+    return 1
+  fi
+  WEB_SITE_RELAY_URL='' assembles "$work/app" "$work/database" "$work/relay-empty"
+  if grep -qE '@RELAY@|cockatrice-relay' "$work/relay-empty/index.html"; then
+    echo "self-test FAILED: an empty relay address still shows in the site"
+    return 1
+  fi
+  local relay=https://relay.example.test
+  WEB_SITE_RELAY_URL=$relay assembles "$work/app" "$work/database" "$work/relayed"
+  if [[ $(grep -c 'name="cockatrice-relay"' "$work/relayed/index.html") != 1 ]] ||
+    ! grep -q "<meta name=\"cockatrice-relay\" content=\"$relay\">" "$work/relayed/index.html" ||
+    grep -q '@RELAY@' "$work/relayed/index.html"; then
+    echo "self-test FAILED: the site does not carry the relay address $relay"
+    return 1
+  fi
+  if [[ $(versions_of "$work/relayed") != "$a" ]]; then
+    echo "self-test FAILED: a relay address changed the version to $(versions_of "$work/relayed")"
+    return 1
+  fi
+  local accepted=0
+  for relay in https://relay.example.test:8443 https://relay.example.test/ http://127.0.0.1:8787 http://localhost:8787; do
+    WEB_SITE_RELAY_URL=$relay assembles "$work/app" "$work/database" "$work/relay-ok-$((accepted++))"
+  done
+  for relay in 'https://relay.example/"><script>' 'https://relay example' 'https://relay.example?x=1' 'https://relay.example/#x' \
+    'https://relay.example/a|b' 'http://relay.example' 'http://127.0.0.1.example' 'ftp://relay.example' 'javascript:alert(1)' \
+    'https://' 'relay.example' 'https://relay.example/v1' 'https://relay.example/v1/' 'https://user@relay.example'; do
+    WEB_SITE_RELAY_URL=$relay refuses "a site with the relay address '$relay'" "$work/app" "$work/database" "$work/x19"
+    if ! grep -q 'WEB_SITE_RELAY_URL is not' "$out"; then
+      echo "self-test FAILED: the relay address '$relay' was not named: $(<"$out")"
+      return 1
+    fi
+  done
+  if [[ -e $work/x19 ]] || ls -d "$work"/x19.* >/dev/null 2>&1; then
+    echo "self-test FAILED: a refused relay address left $(ls -d "$work"/x19*) behind"
+    return 1
+  fi
 
   if [[ -e $work/a/fonts ]]; then
     echo "self-test FAILED: a site assembled without fonts has a fonts directory"
