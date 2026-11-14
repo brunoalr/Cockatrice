@@ -403,7 +403,13 @@ bool LoadSetsPage::validatePage()
         const auto url = QUrl::fromUserInput(urlLineEdit->text());
 
         if (!url.isValid()) {
-            QMessageBox::critical(this, tr("Error"), tr("The provided URL is not valid."));
+            const QString message = tr("The provided URL is not valid.");
+            if (wizard()->backgroundMode) {
+                qWarning() << message;
+                wizard()->reject();
+                return false;
+            }
+            QMessageBox::critical(this, tr("Error"), message);
             return false;
         }
 
@@ -499,7 +505,14 @@ void LoadSetsPage::actDownloadFinishedSetsFile()
     }
     auto errorCode = reply->error();
     if (errorCode != QNetworkReply::NoError) {
-        QMessageBox::critical(this, tr("Error"), tr("Network error: %1.").arg(reply->errorString()));
+        const QString message = tr("Network error: %1.").arg(reply->errorString());
+        if (wizard()->backgroundMode) {
+            qWarning() << message;
+            reply->deleteLater();
+            wizard()->reject();
+            return;
+        }
+        QMessageBox::critical(this, tr("Error"), message);
 
         wizard()->enableButtons();
         setEnabled(true);
