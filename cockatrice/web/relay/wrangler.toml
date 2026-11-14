@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <https://www.gnu.org/licenses/>.
 
-name = "cockatrice-web-relay"
+name = "relay"
 main = "worker.mjs"
 compatibility_date = "2026-11-01"
 preview_urls = false
