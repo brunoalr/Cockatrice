@@ -841,6 +841,7 @@ if(WITH_CLIENT)
     ${CLIENT_SRC}/client/network/update/card_spoiler/spoiler_background_updater.cpp
     ${CLIENT_SRC}/client/network/update/card_spoiler/spoiler_file.cpp
     ${CLIENT_SRC}/client/settings/shortcut_treeview.cpp
+    ${CLIENT_SRC}/interface/palette_editor/color_button.cpp
     ${CLIENT_SRC}/interface/pixel_map_generator.cpp
     ${CLIENT_SRC}/interface/shutdown_chain.cpp
     ${CLIENT_SRC}/interface/theme_config.cpp

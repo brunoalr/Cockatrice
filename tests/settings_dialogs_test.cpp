@@ -2,6 +2,7 @@
 #include "client/settings/shortcuts_settings.h"
 #include "dialog_test_support.h"
 #include "interface/card_picture_loader/card_picture_loader.h"
+#include "interface/palette_editor/color_button.h"
 #include "interface/theme_manager.h"
 #include "interface/widgets/dialogs/settings_close_check.h"
 #include "interface/widgets/settings_page/deck_editor_settings_page.h"
@@ -11,6 +12,7 @@
 #include "interface/widgets/utility/non_blocking_dialogs.h"
 #include "main.h"
 
+#include <QColorDialog>
 #include <QDialog>
 #include <QDir>
 #include <QFile>
@@ -540,6 +542,52 @@ TEST_F(MessagePrompts, ACancelledEditKeepsTheMessage)
     settle();
 
     EXPECT_EQ(stored(), (QStringList{"gg", "brb"}));
+}
+class ColourPicker : public SettingsDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    ColorButton *button = new ColorButton(window.get());
+    QList<QColor> changes;
+
+    void SetUp() override
+    {
+        button->setColor(Qt::blue);
+        QObject::connect(button, &ColorButton::colorChanged, button,
+                         [this](const QColor &color) { changes.append(color); });
+    }
+
+    QColorDialog *pick() const
+    {
+        button->click();
+        settle();
+        return onlyOpen<QColorDialog>();
+    }
+};
+
+TEST_F(ColourPicker, AnAcceptedColourIsSet)
+{
+    QColorDialog *dialog = pick();
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_EQ(dialog->currentColor(), QColor(Qt::blue));
+    EXPECT_TRUE(dialog->testOption(QColorDialog::ShowAlphaChannel));
+
+    dialog->setCurrentColor(Qt::red);
+    dialog->accept();
+    settle();
+    EXPECT_EQ(button->getColor(), QColor(Qt::red));
+    EXPECT_EQ(changes, QList<QColor>{QColor(Qt::red)});
+}
+
+TEST_F(ColourPicker, ACancelledPickKeepsTheColour)
+{
+    QColorDialog *dialog = pick();
+    ASSERT_NE(dialog, nullptr);
+
+    dialog->setCurrentColor(Qt::red);
+    dialog->reject();
+    settle();
+    EXPECT_EQ(button->getColor(), QColor(Qt::blue));
+    EXPECT_TRUE(changes.isEmpty());
 }
 } // namespace
 

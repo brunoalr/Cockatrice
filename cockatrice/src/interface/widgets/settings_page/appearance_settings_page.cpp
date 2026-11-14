@@ -9,13 +9,13 @@
 #include "../interface/theme_manager.h"
 #include "../interface/widgets/general/background_sources.h"
 #include "../playmat/playmat_collection_dialog.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "libcockatrice/interfaces/interface_interface_settings_provider.h"
 #include "libcockatrice/utility/macros.h"
 
 #include <QAbstractButton>
 #include <QApplication>
 #include <QColor>
-#include <QColorDialog>
 #include <QDebug>
 #include <QDir>
 #include <QGridLayout>
@@ -338,14 +338,14 @@ AppearanceSettingsPage::AppearanceSettingsPage()
                 });
 
         connect(pushButton, &QPushButton::clicked, this, [index, this]() {
-            auto &cardCounterSettings = SettingsCache::instance().cardCounters();
+            Dialogs::getColor(SettingsCache::instance().cardCounters().color(index), this, {},
+                              [index](const QColor &newColor) {
+                                  if (!newColor.isValid()) {
+                                      return;
+                                  }
 
-            auto newColor = QColorDialog::getColor(cardCounterSettings.color(index), this);
-            if (!newColor.isValid()) {
-                return;
-            }
-
-            cardCounterSettings.setColor(index, newColor);
+                                  SettingsCache::instance().cardCounters().setColor(index, newColor);
+                              });
         });
 
         auto *colorName = new QLabel;

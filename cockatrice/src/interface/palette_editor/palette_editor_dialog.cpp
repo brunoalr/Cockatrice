@@ -5,6 +5,7 @@
 #include "font_grid_widget.h"
 #include "palette_generator.h"
 #include "palette_grid_widget.h"
+#include "../widgets/utility/non_blocking_dialogs.h"
 #include "quick_setup_panel.h"
 
 #include <QApplication>
@@ -17,7 +18,6 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QList>
-#include <QMessageBox>
 #include <QPalette>
 #include <QPushButton>
 #include <QSharedPointer>
@@ -347,8 +347,8 @@ void PaletteEditorDialog::onSave()
             continue;
         }
         if (!ThemeManager::commitPalette(saveDir, it.key(), it.value())) {
-            QMessageBox::warning(this, tr("Save failed"),
-                                 tr("Could not write %1 to:\n%2").arg(PaletteConfig::fileName(it.key()), saveDir));
+            Dialogs::warning(this, tr("Save failed"),
+                             tr("Could not write %1 to:\n%2").arg(PaletteConfig::fileName(it.key()), saveDir));
             return;
         }
     }
@@ -356,8 +356,8 @@ void PaletteEditorDialog::onSave()
     // Commit the active scheme last so the global colour scheme matches.
     if (workingConfig[loadedScheme] != savedConfig.value(loadedScheme)) {
         if (!ThemeManager::commitPalette(saveDir, loadedScheme, workingConfig[loadedScheme])) {
-            QMessageBox::warning(this, tr("Save failed"),
-                                 tr("Could not write %1 to:\n%2").arg(PaletteConfig::fileName(loadedScheme), saveDir));
+            Dialogs::warning(this, tr("Save failed"),
+                             tr("Could not write %1 to:\n%2").arg(PaletteConfig::fileName(loadedScheme), saveDir));
             return;
         }
     } else {
@@ -377,8 +377,8 @@ void PaletteEditorDialog::onSave()
         const FontConfig fontCfg = fontGrid->currentFontConfig();
         if (fontCfg != savedFontConfig) {
             if (!ThemeManager::saveFontConfig(saveDir, fontCfg)) {
-                QMessageBox::warning(this, tr("Save failed"),
-                                     tr("Could not write %1 to:\n%2").arg(FontConfig::fileName(), saveDir));
+                Dialogs::warning(this, tr("Save failed"),
+                                 tr("Could not write %1 to:\n%2").arg(FontConfig::fileName(), saveDir));
                 return;
             }
             savedFontConfig = fontCfg;
