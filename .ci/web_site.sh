@@ -108,9 +108,28 @@ keep_previous() {
   echo "kept the previous version $previous from $url"
 }
 
+copy_fonts() {
+  local from=$1 to=$2 name
+  require_files "$from" index.txt
+  mkdir "$to"
+  while IFS= read -r name || [[ -n $name ]]; do
+    if [[ -z $name ]]; then
+      continue
+    fi
+    # The client fetches only plain names inside fonts/
+    if [[ ! $name =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+      echo "::error::$from/index.txt lists '$name', which is not a plain file name"
+      exit 1
+    fi
+    require_files "$from" "$name" "${name%.*}.LICENSE.txt"
+    cp "$from/$name" "$from/${name%.*}.LICENSE.txt" "$to/"
+  done <"$from/index.txt"
+  cp "$from/index.txt" "$to/"
+}
+
 assemble() {
   local app=$1 database=$2 site=${3%/} previous_url=${4:-}
-  local repo web worker hash source=${WEB_SITE_SOURCE_URL:-} previous=
+  local repo web worker hash source=${WEB_SITE_SOURCE_URL:-} fonts=${WEB_SITE_FONTS:-} previous=
   repo="$(dirname "$0")/.."
   web="$repo/cockatrice/web"
   worker="$web/coi-serviceworker.js"
@@ -153,6 +172,9 @@ assemble() {
   if ! grep -q "app/$hash/" "$staging/index.html" || grep -q '@HASH@' "$staging/index.html"; then
     echo "::error::$web/index.html does not name app/@HASH@/"
     exit 1
+  fi
+  if [[ -n $fonts ]]; then
+    copy_fonts "$fonts" "$staging/fonts"
   fi
   if [[ -n $previous_url ]]; then
     keep_previous "$previous_url" "$staging"
@@ -366,6 +388,46 @@ self_test() {
   fi
   WEB_SITE_SOURCE_URL='https://example.org/"><script>' refuses "a site with a source address that is not a plain https address" \
     "$work/app" "$work/database" "$work/x12"
+
+  if [[ -e $work/a/fonts ]]; then
+    echo "self-test FAILED: a site assembled without fonts has a fonts directory"
+    return 1
+  fi
+  local fonts="$work/fonts"
+  mkdir "$fonts"
+  printf 'a.ttf\n\nb.ttc\n' >"$fonts/index.txt"
+  for file in a.ttf a.LICENSE.txt b.ttc b.LICENSE.txt unlisted.ttf; do
+    echo "fixture $file" >"$fonts/$file"
+  done
+  WEB_SITE_FONTS=$fonts assembles "$work/app" "$work/database" "$work/fonts-site"
+  if [[ $(cd "$work/fonts-site/fonts" && echo *) != "a.LICENSE.txt a.ttf b.LICENSE.txt b.ttc index.txt" ]]; then
+    echo "self-test FAILED: the site's fonts directory holds $(cd "$work/fonts-site/fonts" && echo *)"
+    return 1
+  fi
+  for file in index.txt a.ttf b.LICENSE.txt; do
+    if ! cmp -s "$fonts/$file" "$work/fonts-site/fonts/$file"; then
+      echo "self-test FAILED: fonts/$file changed on the way"
+      return 1
+    fi
+  done
+  rm "$fonts/b.LICENSE.txt"
+  WEB_SITE_FONTS=$fonts refuses "a site with a font without its licence" "$work/app" "$work/database" "$work/x16"
+  if ! grep -q 'b.LICENSE.txt is missing' "$out"; then
+    echo "self-test FAILED: the missing font licence was not named: $(<"$out")"
+    return 1
+  fi
+  printf 'a.ttf\n../cards.xml\n' >"$fonts/index.txt"
+  WEB_SITE_FONTS=$fonts refuses "a site whose font list names a file outside fonts/" "$work/app" "$work/database" "$work/x17"
+  if ! grep -q "lists '../cards.xml', which is not a plain file name" "$out"; then
+    echo "self-test FAILED: the font list entry outside fonts/ was not named: $(<"$out")"
+    return 1
+  fi
+  rm "$fonts/index.txt"
+  WEB_SITE_FONTS=$fonts refuses "a site with fonts but no font list" "$work/app" "$work/database" "$work/x18"
+  if ! grep -q 'fonts/index.txt is missing' "$out"; then
+    echo "self-test FAILED: the missing font list was not named: $(<"$out")"
+    return 1
+  fi
 
   cp -R "$work/app" "$work/app-no-notice"
   rm "$work/app-no-notice/QT.txt"
