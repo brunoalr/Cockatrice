@@ -9,6 +9,7 @@
 #include "../tabs/abstract_tab_deck_editor.h"
 #include "../tabs/api/commander_spellbook/commander_bracket_widget.h"
 #include "../utility/custom_line_edit.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "../visual_deck_storage/deck_preview/deck_preview_deck_tags_display_widget.h"
 #include "deck_list_history_manager_widget.h"
 #include "deck_list_model.h"
@@ -518,10 +519,13 @@ void DeckEditorDeckDockWidget::openPlaymatSettings()
 {
     PlaymatInfo current = deckStateManager->getMetadata().playmat;
 
-    PlaymatSettingsDialog dialog(current.card, current.params, this);
-    if (dialog.exec() == QDialog::Accepted) {
-        CardRef newCard = dialog.card();
-        PlaymatParams newParams = dialog.params();
+    auto *dialog = new PlaymatSettingsDialog(current.card, current.params, this);
+    Dialogs::open(dialog, [this, dialog](int result) {
+        if (result != QDialog::Accepted) {
+            return;
+        }
+        CardRef newCard = dialog->card();
+        PlaymatParams newParams = dialog->params();
 
         if (newCard.isEmpty()) {
             deckStateManager->setPlaymat(PlaymatInfo{});
@@ -530,7 +534,7 @@ void DeckEditorDeckDockWidget::openPlaymatSettings()
         }
 
         updatePlaymatLabel();
-    }
+    });
 }
 
 void DeckEditorDeckDockWidget::updatePlaymatLabel()
@@ -857,13 +861,16 @@ void DeckEditorDeckDockWidget::decklistCustomMenu(QPoint point)
         QAction *renameAction = menu.addAction(tr("&Rename zone..."));
         connect(renameAction, &QAction::triggered, this, [this, zoneName] {
             // The unchanged name must not validate as a duplicate.
-            const QString newName =
-                DeckZoneDialog::promptForRename(this, zoneName, [this, zoneName](const QString &candidate) {
+            DeckZoneDialog::promptForRename(
+                this, zoneName,
+                [this, zoneName](const QString &candidate) {
                     return candidate == zoneName ? QString() : deckStateManager->validateNewZoneName(candidate);
+                },
+                [this, zoneName](const QString &newName) {
+                    if (!newName.isEmpty() && newName != zoneName) {
+                        deckStateManager->renameCustomZone(zoneName, newName);
+                    }
                 });
-            if (!newName.isEmpty() && newName != zoneName) {
-                deckStateManager->renameCustomZone(zoneName, newName);
-            }
         });
 
         QMenu *boardMenu = menu.addMenu(tr("Change &board"));
@@ -877,12 +884,13 @@ void DeckEditorDeckDockWidget::decklistCustomMenu(QPoint point)
             menu.setToolTipsVisible(true);
         }
         connect(deleteAction, &QAction::triggered, this, [this, zoneName] {
-            const auto result =
-                QMessageBox::warning(this, tr("Delete zone"), tr("Delete the zone \"%1\"?").arg(zoneName),
-                                     QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-            if (result == QMessageBox::Yes) {
-                deckStateManager->removeCustomZone(zoneName);
-            }
+            Dialogs::ask(this, QMessageBox::Warning, tr("Delete zone"), tr("Delete the zone \"%1\"?").arg(zoneName),
+                         QMessageBox::Yes | QMessageBox::No, QMessageBox::No,
+                         [this, zoneName](QMessageBox::StandardButton answer) {
+                             if (answer == QMessageBox::Yes) {
+                                 deckStateManager->removeCustomZone(zoneName);
+                             }
+                         });
         });
         menu.addSeparator();
     } else if (isBoardZoneRow) {
@@ -959,29 +967,31 @@ void DeckEditorDeckDockWidget::addMoveToZoneMenu(QMenu *menu,
 
     moveMenu->addSeparator();
 
-    QAction *newZoneAction = moveMenu->addAction(tr("Create new zone and move &here..."));
-    connect(newZoneAction, &QAction::triggered, this, [this, sourceCardIndex, currentBoardName, currentZoneName] {
-        // Resolve the card's identity before creating the zone:
-        // createNewCustomZone rebuilds the model tree, so sourceCardIndex's
-        // internal pointer is freed by the time it would be used.
-        const QString cardName =
-            sourceCardIndex.siblingAtColumn(DeckListModelColumns::CARD_NAME).data(Qt::EditRole).toString();
-        const QString providerId =
-            sourceCardIndex.siblingAtColumn(DeckListModelColumns::CARD_PROVIDER_ID).data(Qt::DisplayRole).toString();
-        const QString collectorNumber = sourceCardIndex.siblingAtColumn(DeckListModelColumns::CARD_COLLECTOR_NUMBER)
-                                            .data(Qt::DisplayRole)
-                                            .toString();
+    // Resolve the card's identity before creating the zone:
+    // creating it rebuilds the model tree, so sourceCardIndex's
+    // internal pointer is freed by the time it would be used.
+    const QString cardName =
+        sourceCardIndex.siblingAtColumn(DeckListModelColumns::CARD_NAME).data(Qt::EditRole).toString();
+    const QString providerId =
+        sourceCardIndex.siblingAtColumn(DeckListModelColumns::CARD_PROVIDER_ID).data(Qt::DisplayRole).toString();
+    const QString collectorNumber =
+        sourceCardIndex.siblingAtColumn(DeckListModelColumns::CARD_COLLECTOR_NUMBER).data(Qt::DisplayRole).toString();
 
-        const QString zoneName = createNewCustomZone(currentBoardName);
-        if (!zoneName.isEmpty()) {
-            // Re-find the card: the old index is no longer safe since rows were
-            // rebuilt. Mirror DeckStateManager::decrementCard's re-find pattern.
-            const QModelIndex refreshed = getModel()->findCard(cardName, currentZoneName, providerId, collectorNumber);
-            if (refreshed.isValid()) {
-                deckStateManager->moveCardToZone(refreshed, zoneName);
-            }
-        }
-    });
+    QAction *newZoneAction = moveMenu->addAction(tr("Create new zone and move &here..."));
+    connect(newZoneAction, &QAction::triggered, this,
+            [this, cardName, providerId, collectorNumber, currentBoardName, currentZoneName] {
+                DeckZoneDialog::promptToCreateZone(
+                    this, deckStateManager, currentBoardName,
+                    [this, cardName, currentZoneName, providerId, collectorNumber](const QString &zoneName) {
+                        // Re-find the card: the old index is no longer safe since rows were
+                        // rebuilt. Mirror DeckStateManager::decrementCard's re-find pattern.
+                        const QModelIndex refreshed =
+                            getModel()->findCard(cardName, currentZoneName, providerId, collectorNumber);
+                        if (refreshed.isValid()) {
+                            deckStateManager->moveCardToZone(refreshed, zoneName);
+                        }
+                    });
+            });
 }
 
 void DeckEditorDeckDockWidget::addChangeBoardMenu(QMenu *menu, const QString &zoneName)
@@ -1014,21 +1024,9 @@ void DeckEditorDeckDockWidget::addChangeBoardMenu(QMenu *menu, const QString &zo
 void DeckEditorDeckDockWidget::addNewZoneAction(QMenu *menu, const QString &initialBoardName)
 {
     QAction *newZoneAction = menu->addAction(tr("Create &new zone..."));
-    connect(newZoneAction, &QAction::triggered, this,
-            [this, initialBoardName] { createNewCustomZone(initialBoardName); });
-}
-
-QString DeckEditorDeckDockWidget::createNewCustomZone(const QString &initialBoardName)
-{
-    QString boardName;
-    const QString zoneName =
-        DeckZoneDialog::promptForNewZone(this, initialBoardName, &boardName, [this](const QString &candidate) {
-            return deckStateManager->validateNewZoneName(candidate);
-        });
-    if (!zoneName.isEmpty()) {
-        deckStateManager->createCustomZone(boardName, zoneName);
-    }
-    return zoneName;
+    connect(newZoneAction, &QAction::triggered, this, [this, initialBoardName] {
+        DeckZoneDialog::promptToCreateZone(this, deckStateManager, initialBoardName);
+    });
 }
 
 void DeckEditorDeckDockWidget::refreshShortcuts()

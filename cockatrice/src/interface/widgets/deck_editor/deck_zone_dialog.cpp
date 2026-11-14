@@ -1,5 +1,8 @@
 #include "deck_zone_dialog.h"
 
+#include "../utility/non_blocking_dialogs.h"
+#include "deck_state_manager.h"
+
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QEvent>
@@ -123,27 +126,45 @@ void DeckZoneDialog::validateName()
     buttonBox->button(QDialogButtonBox::Ok)->setEnabled(error.isEmpty());
 }
 
-QString DeckZoneDialog::promptForNewZone(QWidget *parent,
-                                         const QString &initialBoardName,
-                                         QString *chosenBoardName,
-                                         const std::function<QString(const QString &)> &nameValidator)
+void DeckZoneDialog::promptForNewZone(
+    QWidget *parent,
+    const QString &initialBoardName,
+    const std::function<QString(const QString &)> &nameValidator,
+    std::function<void(const QString &boardName, const QString &zoneName)> thenAccepted)
 {
-    DeckZoneDialog dialog(parent, initialBoardName, nameValidator);
-    if (dialog.exec() != QDialog::Accepted) {
-        return {};
-    }
-
-    if (chosenBoardName) {
-        *chosenBoardName = dialog.getBoardName();
-    }
-    return dialog.getZoneName();
+    auto *dialog = new DeckZoneDialog(parent, initialBoardName, nameValidator);
+    Dialogs::open(dialog, [dialog, thenAccepted = std::move(thenAccepted)](int result) {
+        if (result == QDialog::Accepted) {
+            thenAccepted(dialog->getBoardName(), dialog->getZoneName());
+        }
+    });
 }
 
-QString DeckZoneDialog::promptForRename(QWidget *parent,
-                                        const QString &currentZoneName,
-                                        const std::function<QString(const QString &)> &nameValidator)
+void DeckZoneDialog::promptToCreateZone(QWidget *parent,
+                                        DeckStateManager *deck,
+                                        const QString &initialBoardName,
+                                        std::function<void(const QString &zoneName)> thenCreated)
 {
-    DeckZoneDialog dialog(parent, {}, nameValidator, false);
-    dialog.setZoneName(currentZoneName);
-    return dialog.exec() == QDialog::Accepted ? dialog.getZoneName() : QString();
+    promptForNewZone(
+        parent, initialBoardName, [deck](const QString &candidate) { return deck->validateNewZoneName(candidate); },
+        [deck, thenCreated = std::move(thenCreated)](const QString &boardName, const QString &zoneName) {
+            deck->createCustomZone(boardName, zoneName);
+            if (thenCreated) {
+                thenCreated(zoneName);
+            }
+        });
+}
+
+void DeckZoneDialog::promptForRename(QWidget *parent,
+                                     const QString &currentZoneName,
+                                     const std::function<QString(const QString &)> &nameValidator,
+                                     std::function<void(const QString &newName)> thenAccepted)
+{
+    auto *dialog = new DeckZoneDialog(parent, {}, nameValidator, false);
+    dialog->setZoneName(currentZoneName);
+    Dialogs::open(dialog, [dialog, thenAccepted = std::move(thenAccepted)](int result) {
+        if (result == QDialog::Accepted) {
+            thenAccepted(dialog->getZoneName());
+        }
+    });
 }

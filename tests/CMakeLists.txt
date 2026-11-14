@@ -790,6 +790,26 @@ if(WITH_CLIENT)
   )
   cockatrice_add_test(
     NAME
+    deck_dialogs_test
+    SOURCES
+    ${CLIENT_SRC}/interface/widgets/deck_editor/deck_state_manager.cpp
+    ${CLIENT_SRC}/interface/widgets/deck_editor/deck_zone_dialog.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_default_tags_editor.cpp
+    ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_dialog.cpp
+    ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_item_widget.cpp
+    ${SETTINGS_SOURCES}
+    deck_dialogs_test.cpp
+    LIBS
+    libcockatrice_card
+    libcockatrice_deck_list
+    libcockatrice_models
+    libcockatrice_utility
+    ${SETTINGS_LIBS}
+    INCLUDE_DIRS
+    ${SETTINGS_INCLUDE_DIRS}
+  )
+  cockatrice_add_test(
+    NAME
     lobby_dialogs_test
     SOURCES
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_avatar.cpp

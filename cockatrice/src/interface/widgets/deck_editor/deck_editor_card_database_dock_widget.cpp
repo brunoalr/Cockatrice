@@ -44,16 +44,8 @@ void DeckEditorCardDatabaseDockWidget::createDatabaseDisplayDock(AbstractTabDeck
             }
             return result;
         },
-        [this, deckEditor]() -> QString {
-            QString boardName;
-            const QString zoneName =
-                DeckZoneDialog::promptForNewZone(this, {}, &boardName, [deckEditor](const QString &candidate) {
-                    return deckEditor->deckStateManager->validateNewZoneName(candidate);
-                });
-            if (!zoneName.isEmpty()) {
-                deckEditor->deckStateManager->createCustomZone(boardName, zoneName);
-            }
-            return zoneName;
+        [this, deckEditor](std::function<void(const QString &zoneName)> thenCreated) {
+            DeckZoneDialog::promptToCreateZone(this, deckEditor->deckStateManager, {}, std::move(thenCreated));
         });
 
     auto *frame = new QVBoxLayout;

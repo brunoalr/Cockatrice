@@ -2,6 +2,7 @@
 
 #include "../../../client/settings/cache_settings.h"
 #include "../../key_signals.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "card_database_display_model.h"
 #include "card_database_model.h"
 #include "libcockatrice/card/card_info.h"
@@ -109,7 +110,7 @@ void CardDatabaseView::decrementCard(const QString &zoneName)
 }
 
 void CardDatabaseView::setZoneMenuProvider(const std::function<QList<QPair<QString, QStringList>>()> &provider,
-                                           const std::function<QString()> &newZoneHandler)
+                                           const NewZoneHandler &newZoneHandler)
 {
     zoneMenuProvider = provider;
     this->newZoneHandler = newZoneHandler;
@@ -203,10 +204,8 @@ void CardDatabaseView::openCustomMenu(QPoint point)
 
             QAction *newZoneAction = addToZoneMenu->addAction(tr("Create &new zone..."));
             connect(newZoneAction, &QAction::triggered, this, [this, card] {
-                const QString zoneName = newZoneHandler();
-                if (!zoneName.isEmpty()) {
-                    emit cardAdded(card->getName(), zoneName);
-                }
+                newZoneHandler(Dialogs::whileAlive(
+                    this, [this, card](const QString &zoneName) { emit cardAdded(card->getName(), zoneName); }));
             });
         }
     }

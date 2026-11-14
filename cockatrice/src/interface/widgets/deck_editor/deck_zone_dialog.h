@@ -12,6 +12,7 @@
 #include <functional>
 #include <qtmetamacros.h>
 
+class DeckStateManager;
 class QComboBox;
 class QDialogButtonBox;
 class QLabel;
@@ -21,8 +22,8 @@ class QWidget;
 /**
  * @brief Modal dialog asking for the name and parent zone of a new custom deck zone.
  *
- * Menus construct the dialog transiently around exec(), so validation state only
- * ever reflects the name currently typed.
+ * Each prompt constructs a new dialog, so validation state only ever reflects the
+ * name currently typed.
  */
 class DeckZoneDialog : public QDialog
 {
@@ -65,19 +66,29 @@ public:
     /**
      * @brief Prompts the user for a new custom zone name and the board zone to nest it under.
      *
-     * Convenience wrapper that runs DeckZoneDialog modally.
+     * Returns at once; the dialog is application-modal.
      *
      * @param parent The parent widget for the dialog
      * @param initialBoardName The board zone to preselect in the dialog. Unknown names fall
      *        back to main.
-     * @param chosenBoardName (out) The internal name of the board zone the user chose
      * @param nameValidator Optional validator forwarded to the dialog
-     * @return The trimmed zone name, or an empty string if the user cancelled
+     * @param thenAccepted Called with the chosen board zone and the trimmed zone name once
+     *        the user accepts; not called when the user cancels
      */
-    static QString promptForNewZone(QWidget *parent,
-                                    const QString &initialBoardName,
-                                    QString *chosenBoardName,
-                                    const std::function<QString(const QString &)> &nameValidator = {});
+    static void promptForNewZone(QWidget *parent,
+                                 const QString &initialBoardName,
+                                 const std::function<QString(const QString &)> &nameValidator,
+                                 std::function<void(const QString &boardName, const QString &zoneName)> thenAccepted);
+
+    /**
+     * @brief Prompts for a new custom zone and creates it in @p deck once the user accepts.
+     *
+     * @param thenCreated Called with the name of the created zone; not called when the user cancels
+     */
+    static void promptToCreateZone(QWidget *parent,
+                                   DeckStateManager *deck,
+                                   const QString &initialBoardName,
+                                   std::function<void(const QString &zoneName)> thenCreated = {});
 
     /**
      * @brief Prompts the user for a new name for an existing custom zone.
@@ -89,11 +100,13 @@ public:
      * @param nameValidator Validator deciding whether a candidate name is usable. It sees
      *        the current name too, so callers wanting to allow unchanged names must
      *        special-case that themselves.
-     * @return The trimmed new name, or an empty string if the user cancelled
+     * @param thenAccepted Called with the trimmed new name once the user accepts; not called
+     *        when the user cancels
      */
-    static QString promptForRename(QWidget *parent,
-                                   const QString &currentZoneName,
-                                   const std::function<QString(const QString &)> &nameValidator = {});
+    static void promptForRename(QWidget *parent,
+                                const QString &currentZoneName,
+                                const std::function<QString(const QString &)> &nameValidator,
+                                std::function<void(const QString &newName)> thenAccepted);
 
 protected:
     void changeEvent(QEvent *event) override;

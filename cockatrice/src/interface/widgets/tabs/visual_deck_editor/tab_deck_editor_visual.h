@@ -176,12 +176,6 @@ public slots:
      */
     void actSaveDeckAs(std::function<void(bool saved)> then = {}) override;
 
-    /**
-     * @brief Prompts for and creates a new custom deck zone.
-     * @return The name of the created zone, or an empty string if creation was cancelled.
-     */
-    QString createNewZone();
-
 private:
     /**
      * @brief Sets the deck for this tab and selects the sub-tab to open on

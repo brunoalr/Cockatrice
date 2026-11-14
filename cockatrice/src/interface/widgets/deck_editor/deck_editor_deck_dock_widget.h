@@ -114,7 +114,6 @@ private:
 
     void addMoveToZoneMenu(QMenu *menu, const QModelIndex &sourceCardIndex, const QString &currentBoardName);
     void addChangeBoardMenu(QMenu *menu, const QString &zoneName);
-    QString createNewCustomZone(const QString &initialBoardName = {});
     void addNewZoneAction(QMenu *menu, const QString &initialBoardName = {});
 
 private slots:
