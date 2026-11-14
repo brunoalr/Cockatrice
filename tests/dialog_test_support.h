@@ -5,6 +5,8 @@
 #include <QDebug>
 #include <QDialog>
 #include <QFile>
+#include <QFileDialog>
+#include <QLineEdit>
 #include <QList>
 #include <QStandardPaths>
 #include <QString>
@@ -23,6 +25,42 @@ inline void settle()
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
 }
 
+// An empty path cancels.
+inline void answerFileDialog(QFileDialog *files, const QString &path)
+{
+    if (path.isEmpty()) {
+        files->reject();
+    } else {
+        auto *name = files->findChild<QLineEdit *>(QStringLiteral("fileNameEdit"));
+        ASSERT_NE(name, nullptr) << "the file dialog has no name field: is it a native one?";
+        // Typed, as selectFile() leaves a focused name field and its preselected file as they are.
+        name->setText(path);
+        // QFileDialog::accept() is protected; through QDialog it still validates the chosen file.
+        static_cast<QDialog *>(files)->accept();
+    }
+    settle();
+}
+
+#ifdef Q_OS_MACOS
+// ~QFileDialog saves to the QtProject preferences, which macOS writes in the real Library whatever the home is:
+// a file dialog is kept once its owner is done with it, never destroyed.
+class KeepFileDialogs : public QObject
+{
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (event->type() != QEvent::DeferredDelete) {
+            return false;
+        }
+        if (auto *files = qobject_cast<QFileDialog *>(watched)) {
+            files->setParent(nullptr);
+            return true;
+        }
+        return false;
+    }
+};
+#endif
+
 // A dialog that blocks runs a nested event loop: fail and close it instead of hanging.
 class NestedLoopWatchdog
 {
@@ -34,6 +72,9 @@ public:
                 return;
             }
             ADD_FAILURE() << "a nested event loop is running";
+            if (QWidget *popup = QApplication::activePopupWidget()) {
+                popup->close();
+            }
             for (QWidget *widget : QApplication::topLevelWidgets()) {
                 if (auto *dialog = qobject_cast<QDialog *>(widget); dialog && dialog->isVisible()) {
                     dialog->reject();
@@ -92,8 +133,18 @@ template <typename RunTests> int run(int argc, char **argv, const QString &appli
     // A CI container's user has no home it can write to: saved settings and file dialogs both use it.
     const QTemporaryDir home;
     qputenv("HOME", home.path().toUtf8());
+#ifdef Q_OS_MACOS
+    // The standard paths ignore HOME on macOS.
+    qputenv("CFFIXED_USER_HOME", home.path().toUtf8());
+#endif
     QStandardPaths::setTestModeEnabled(true);
+    // A platform theme's native file dialog has none of the widgets the tests answer through.
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
     QApplication app(argc, argv);
+#ifdef Q_OS_MACOS
+    KeepFileDialogs keepFileDialogs;
+    app.installEventFilter(&keepFileDialogs);
+#endif
     QCoreApplication::setOrganizationName(QStringLiteral("CockatriceTest"));
     QCoreApplication::setApplicationName(
         QStringLiteral("%1-%2").arg(applicationName).arg(QCoreApplication::applicationPid()));
@@ -107,6 +158,14 @@ template <typename RunTests> int run(int argc, char **argv, const QString &appli
         qCritical() << "portable.dat is beside the test binary: refusing to run on portable data";
         return 1;
     }
+#ifndef Q_OS_WIN
+    // Not on Windows: its known folders follow no environment variable, so they cannot be moved for a test.
+    if (const QString data = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+        !data.startsWith(home.path() + QLatin1Char('/'))) {
+        qCritical() << "the settings would be written to" << data << "outside the temporary home: refusing to run";
+        return 1;
+    }
+#endif
     return runTests();
 }
 
