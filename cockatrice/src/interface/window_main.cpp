@@ -578,8 +578,11 @@ void MainWindow::createMenus()
     dbMenu->addAction(aManageSets);
     dbMenu->addAction(aEditTokens);
     dbMenu->addSeparator();
+#ifndef Q_OS_WASM
+    // A tab has no file manager to show a folder in.
     dbMenu->addAction(aOpenCustomFolder);
     dbMenu->addAction(aOpenCustomsetsFolder);
+#endif
     dbMenu->addAction(aAddCustomSet);
     dbMenu->addSeparator();
     dbMenu->addAction(aReloadCardDatabase);
@@ -730,6 +733,7 @@ void MainWindow::startupConfigCheck()
     SettingsCache::instance().network().setClientVersion(VERSION_STRING);
     const QUrl page(QString::fromStdString(emscripten::val::global("location")["href"].as<std::string>()));
     auto *fetcher = new CardDatabaseFetcher(page, SettingsCache::instance().getCachePath(), this);
+    cardDatabaseFetcher = fetcher;
     connect(fetcher, &CardDatabaseFetcher::fetched, this, &MainWindow::reloadCardDatabaseAndCheckSets);
     connect(fetcher, &CardDatabaseFetcher::failed, this, [this, fetcher](const QString &what) {
         auto *warning =
@@ -1837,10 +1841,15 @@ int MainWindow::getNextCustomSetPrefix(QDir dataDir)
 
 void MainWindow::actReloadCardDatabase()
 {
+#ifdef Q_OS_WASM
+    // The files live in memory only, so a reload downloads them again; that also retries a failed download.
+    cardDatabaseFetcher->fetch();
+#else
     const auto reloadOk1 = QtConcurrent::run([] {
         CardDatabaseManager::getInstance()->reloadCardDatabasesAndNotify();
         SettingsCache::instance().downloads().sync();
     });
+#endif
 }
 
 void MainWindow::actManageSets()

@@ -475,6 +475,10 @@ void GeneralSettingsPage::cardLanguageBoxChanged(int index)
     // matching Scryfall URL is added to the top of the download list. It stays
     // visible in the deck editor settings, where it can be removed or reordered.
     const bool localizedUrlAdded = SettingsCache::instance().downloads().addLocalizedScryfallUrl();
+#ifdef Q_OS_WASM
+    // A tab cannot run Oracle, so there is no re-import to offer.
+    return;
+#endif
 
     QString message = tr("<p>The card database only contains English card data. To see cards in <b>%1</b>, "
                          "<b>Oracle</b> must run once with this language selected and re-import the card "
