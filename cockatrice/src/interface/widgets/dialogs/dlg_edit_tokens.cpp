@@ -39,6 +39,13 @@
 
 class QWidget;
 
+// Edits change the loaded database at once. A dialog destroyed with its window never reports a result,
+// so the file is written here.
+DlgEditTokens::~DlgEditTokens()
+{
+    CardDatabaseManager::getInstance()->saveCustomTokensToFile();
+}
+
 DlgEditTokens::DlgEditTokens(QWidget *parent) : QDialog(parent), currentCard(nullptr)
 {
     setObjectName("editTokensDialog");
@@ -206,7 +213,9 @@ void DlgEditTokens::actRemoveToken()
 void DlgEditTokens::colorChanged(int colorIndex)
 {
     if (currentCard) {
-        currentCard->setColors(QString(colorEdit->itemData(colorIndex).toChar()));
+        // "colorless" and no selection both hold a null QChar, which QString(QChar) would turn into one NUL character
+        const QChar color = colorEdit->itemData(colorIndex).toChar();
+        currentCard->setColors(color.isNull() ? QString() : QString(color));
     }
 }
 

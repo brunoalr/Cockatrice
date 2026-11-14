@@ -1,7 +1,7 @@
 /**
  * @file get_text_with_max.h
  * @ingroup UI
- * @brief Custom QInputDialog::getText implementation that allows configuration of the max length
+ * @brief A QInputDialog for text that allows configuration of the max length
  */
 
 #ifndef GETTEXTWITHMAX_H
@@ -21,12 +21,5 @@ QInputDialog *newTextDialogWithMax(QWidget *parent,
                                    QLineEdit::EchoMode echo = QLineEdit::Normal,
                                    const QString &text = QString(),
                                    int max = MAX_NAME_LENGTH);
-QString getTextWithMax(QWidget *parent,
-                       const QString &title,
-                       const QString &label,
-                       QLineEdit::EchoMode echo = QLineEdit::Normal,
-                       const QString &text = QString(),
-                       bool *ok = nullptr,
-                       int max = MAX_NAME_LENGTH);
 
 #endif // GETTEXTWITHMAX_H
