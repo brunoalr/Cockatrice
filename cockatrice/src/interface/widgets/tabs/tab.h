@@ -67,10 +67,9 @@ public:
      * Nicely asks to close the tab.
      * Override this method to do checks or ask for confirmation before closing the tab.
      * If you need to force close the tab, just call close() instead.
-     *
-     * @return True if the tab is successfully closed.
+     * The tab may close later, once the user has answered.
      */
-    virtual bool closeRequest();
+    virtual void closeRequest();
 
     virtual void tabActivated()
     {

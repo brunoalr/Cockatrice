@@ -46,7 +46,6 @@
 
 #include <QAction>
 #include <QApplication>
-#include <QCloseEvent>
 #include <QCommonStyle>
 #include <QDebug>
 #include <QFlag>
@@ -82,7 +81,6 @@
 #include <libcockatrice/settings/deck_editor_settings.h>
 #include <libcockatrice/settings/interface_settings.h>
 #include <libcockatrice/settings/tabs_settings.h>
-#include <libcockatrice/utility/qt_utils.h>
 #include <memory>
 #include <qnamespace.h>
 #include <string>
@@ -332,24 +330,24 @@ void TabSupervisor::refreshShortcuts()
     aTabModeration->setShortcuts(shortcuts.getShortcut("Tabs/aTabModeration"));
 }
 
-void TabSupervisor::closeEvent(QCloseEvent *event)
+QList<ShutdownChain::Step> TabSupervisor::closeSteps()
 {
-    // This will accept the event, which we may then override.
-    QTabWidget::closeEvent(event);
-
-    if (getGameCount()) {
-        if (!QtUtils::confirm(this, tr("Are you sure?"),
-                              tr("There are still open games. Are you sure you want to quit?"), QMessageBox::No)) {
-            event->ignore();
-            return;
-        }
-    }
-
+    QList<ShutdownChain::Step> steps{
+        {this, [this](const ShutdownChain::Answer &answer) { confirmLeavingGames(answer); }}};
     for (AbstractTabDeckEditor *tab : deckEditorTabs) {
-        if (!tab->confirmClose()) {
-            event->ignore();
-        }
+        steps.append({tab, [tab](const ShutdownChain::Answer &answer) { tab->confirmClose(answer); }});
     }
+    return steps;
+}
+
+void TabSupervisor::confirmLeavingGames(const ShutdownChain::Answer &answer)
+{
+    if (!getGameCount()) {
+        answer(true);
+        return;
+    }
+    Dialogs::confirm(this, tr("Are you sure?"), tr("There are still open games. Are you sure you want to quit?"),
+                     answer, QMessageBox::No);
 }
 
 AbstractClient *TabSupervisor::getClient() const
