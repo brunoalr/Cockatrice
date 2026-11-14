@@ -355,6 +355,8 @@ int main(int argc, char *argv[])
     translationPath = qApp->applicationDirPath() + "/../Resources/translations";
 #elif defined(Q_OS_WIN)
     translationPath = qApp->applicationDirPath() + "/translations";
+#elif defined(Q_OS_WASM)
+    translationPath = QStringLiteral(":/translations");
 #else // linux
     translationPath = qApp->applicationDirPath() + "/../share/cockatrice/translations";
 #endif
