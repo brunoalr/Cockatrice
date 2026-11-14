@@ -43,6 +43,16 @@ static bool canBeCommander(const CardInfoPtr &cardInfo)
            cardInfo->getText().contains("can be your commander", Qt::CaseInsensitive);
 }
 
+// A browser preflights a request that names its own User-Agent, and EDHREC refuses that preflight.
+static QNetworkRequest edhrecRequest(const QUrl &url)
+{
+    QNetworkRequest request{url};
+#ifndef Q_OS_WASM
+    request.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
+#endif
+    return request;
+}
+
 TabEdhRecMain::TabEdhRecMain(TabSupervisor *_tabSupervisor) : Tab(_tabSupervisor)
 {
     networkManager = NetworkManagerFactory::create(this);
@@ -153,40 +163,35 @@ void TabEdhRecMain::setCard(CardInfoPtr _cardToQuery, bool isCommander)
         url = QString("https://json.edhrec.com/pages/cards/%1.json").arg(formattedName);
     }
 
-    QNetworkRequest request{QUrl(url)};
-    request.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
+    const QNetworkRequest request = edhrecRequest(QUrl(url));
 
     networkManager->get(request);
 }
 
 void TabEdhRecMain::actNavigatePage(QString url)
 {
-    QNetworkRequest request{QUrl("https://json.edhrec.com/pages" + url + ".json")};
-    request.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
+    const QNetworkRequest request = edhrecRequest(QUrl("https://json.edhrec.com/pages" + url + ".json"));
 
     networkManager->get(request);
 }
 
 void TabEdhRecMain::getTopCards()
 {
-    QNetworkRequest request{QUrl("https://json.edhrec.com/pages/top/year.json")};
-    request.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
+    const QNetworkRequest request = edhrecRequest(QUrl("https://json.edhrec.com/pages/top/year.json"));
 
     networkManager->get(request);
 }
 
 void TabEdhRecMain::getTopCommanders()
 {
-    QNetworkRequest request{QUrl("https://json.edhrec.com/pages/commanders/year.json")};
-    request.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
+    const QNetworkRequest request = edhrecRequest(QUrl("https://json.edhrec.com/pages/commanders/year.json"));
 
     networkManager->get(request);
 }
 
 void TabEdhRecMain::getTopTags()
 {
-    QNetworkRequest request{QUrl("https://json.edhrec.com/pages/tags.json")};
-    request.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
+    const QNetworkRequest request = edhrecRequest(QUrl("https://json.edhrec.com/pages/tags.json"));
     networkManager->get(request);
 }
 
