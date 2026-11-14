@@ -1,5 +1,6 @@
 #include "tab_replays.h"
 
+#include "../../../client/flush_player_data.h"
 #include "../../../client/settings/cache_settings.h"
 #include "../../theme_icon.h"
 #include "../interface/widgets/server/remote/remote_replay_list_tree_widget.h"
@@ -526,6 +527,7 @@ void TabReplays::downloadFinished(const Response &r,
     }
     f.write((const char *)_data.data(), _data.size());
     f.close();
+    flushPlayerData();
 }
 
 void TabReplays::actKeepRemoteReplay()

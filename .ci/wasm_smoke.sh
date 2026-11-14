@@ -92,6 +92,14 @@ if [[ $result == started ]]; then
   fi
 fi
 
+if [[ $result == started && ${WASM_SMOKE_PERSIST:-0} == 1 ]]; then
+  if ! node --experimental-websocket "$(dirname "$0")/wasm_persist.mjs" "$devtools_port" "$start_seconds"; then
+    result="the data root did not persist"
+  elif grep -aqE "$fatal" "$log"; then
+    result="the page aborted during the persistence checks"
+  fi
+fi
+
 kill "$browser" "$server" 2>/dev/null
 wait "$browser" "$server" 2>/dev/null
 grep -a 'CONSOLE' "$log" | sed -E 's/^\[[^]]*\] //; s/", source: .*//' | cut -c1-400

@@ -18,6 +18,7 @@ set(cockatrice_SOURCES
     src/client/network/update/card_spoiler/spoiler_background_updater.cpp
     src/client/network/update/card_spoiler/spoiler_file.cpp
     src/client/crash/crash_reporter.cpp
+    src/client/flush_player_data.cpp
     src/client/latency_graph_widget.cpp
     src/client/latency_status_widget.cpp
     src/client/lag_monitor.cpp
@@ -612,6 +613,16 @@ target_link_libraries(
 )
 
 cockatrice_target_enable_crash_reporting(cockatrice)
+
+if(EMSCRIPTEN)
+  set(persist_script ${CMAKE_CURRENT_SOURCE_DIR}/web/persist.pre.js)
+  target_link_options(cockatrice PRIVATE -lidbfs.js "SHELL:--pre-js ${persist_script}")
+  set_property(
+    TARGET cockatrice
+    APPEND
+    PROPERTY LINK_DEPENDS ${persist_script}
+  )
+endif()
 
 if(WITH_GUI_TEST)
   # QtTesting integration and the Cockatrice-specific playback commands. They
