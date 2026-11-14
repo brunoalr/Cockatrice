@@ -49,7 +49,7 @@ private:
     void addStopDownloadAndRemoveOthers(bool enable);
     void beginUpdateCheck();
     void setLabel(const QString &text);
-    void warnInstallerIsWaiting();
+    static void warnInstallerIsWaiting(QWidget *parent);
     QLabel *statusLabel, *descriptionLabel;
     QProgressBar *progress;
     QPushButton *manualDownload, *gotoDownload, *ok, *stopDownload;
