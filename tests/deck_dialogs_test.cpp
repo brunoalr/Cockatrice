@@ -46,14 +46,29 @@
 ThemeManager *themeManager = nullptr; // NOSONAR: the client declares it extern and assigns it
 RNG_Abstract *rng = nullptr;          // NOSONAR: the client declares it extern and assigns it
 
+namespace
+{
+struct PictureCacheClears
+{
+    int pixmap = 0;
+    int network = 0;
+};
+
+PictureCacheClears &pictureCacheClears()
+{
+    static PictureCacheClears clears;
+    return clears;
+}
+} // namespace
+
 void CardPictureLoader::clearPixmapCache()
 {
-    // The test binary has no picture cache: only the printing warning calls this.
+    ++pictureCacheClears().pixmap;
 }
 
 void CardPictureLoader::clearNetworkCache()
 {
-    // The test binary has no picture cache: only the printing warning calls this.
+    ++pictureCacheClears().network;
 }
 
 namespace
@@ -651,6 +666,7 @@ TEST_F(CodConversion, AnExistingCodFileIsOverwrittenOnlyAfterYes)
     createCodVersion();
     prompt("deck.txt");
     answerConversion(true);
+    EXPECT_EQ(conversions, 0);
     EXPECT_FALSE(canStoreTags.has_value());
 
     clickInOnlyBox(QMessageBox::Yes, "A .cod version of this deck already exists. Overwrite it?");
@@ -677,6 +693,7 @@ protected:
     void SetUp() override
     {
         SettingsCache::instance().cardsDisplay().setOverrideAllCardArtWithPersonalPreference(false);
+        pictureCacheClears() = {};
     }
 
     void ask(bool enable)
@@ -694,6 +711,8 @@ TEST_F(PrintingOverride, YesChangesTheSetting)
 
     EXPECT_EQ(accepted, true);
     EXPECT_TRUE(SettingsCache::instance().cardsDisplay().getOverrideAllCardArtWithPersonalPreference());
+    EXPECT_EQ(pictureCacheClears().pixmap, 1);
+    EXPECT_EQ(pictureCacheClears().network, 1);
 }
 
 TEST_F(PrintingOverride, NoKeepsTheSetting)
@@ -703,6 +722,8 @@ TEST_F(PrintingOverride, NoKeepsTheSetting)
 
     EXPECT_EQ(accepted, false);
     EXPECT_FALSE(SettingsCache::instance().cardsDisplay().getOverrideAllCardArtWithPersonalPreference());
+    EXPECT_EQ(pictureCacheClears().pixmap, 0);
+    EXPECT_EQ(pictureCacheClears().network, 0);
 }
 } // namespace
 
