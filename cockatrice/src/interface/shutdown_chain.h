@@ -32,7 +32,7 @@ public:
         return currentState;
     }
 
-    // Reports from the event loop, never inside start(): Qt ignores a close() made inside the window's closeEvent().
+    // Reports as soon as it is decided: inside start() when every step answers there.
     bool start(QList<Step> steps, std::function<void(bool accepted)> finished);
 
 private:

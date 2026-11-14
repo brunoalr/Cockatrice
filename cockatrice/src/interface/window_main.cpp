@@ -1085,9 +1085,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
         case ShutdownChain::State::Idle:
             break;
     }
-    // The questions answer later: the window closes in a second pass once all of them said yes.
-    event->ignore();
+    // With nothing to ask the shutdown is agreed here. Otherwise the questions answer later, and the
+    // window closes in a second pass once all of them said yes.
     confirmShutdown({});
+    event->setAccepted(shutdownChain.state() == ShutdownChain::State::Accepted);
 }
 
 void MainWindow::confirmShutdown(std::function<void(bool closed)> then)

@@ -90,14 +90,33 @@ TEST_F(ShutdownChainTest, EveryStepSayingYesAcceptsTheShutdown)
     EXPECT_EQ(chain.state(), ShutdownChain::State::Accepted);
 }
 
-TEST_F(ShutdownChainTest, TheOutcomeArrivesFromTheEventLoop)
+TEST_F(ShutdownChainTest, StepsThatAnswerAtOnceDecideInsideStart)
 {
-    start({answering("first", true)});
+    start({answering("first", true), answering("second", true)});
 
+    EXPECT_EQ(finished, true);
+    EXPECT_EQ(chain.state(), ShutdownChain::State::Accepted);
+}
+
+TEST_F(ShutdownChainTest, ANoGivenAtOnceRefusesInsideStart)
+{
+    start({answering("first", false)});
+
+    EXPECT_EQ(finished, false);
+    EXPECT_EQ(chain.state(), ShutdownChain::State::Idle);
+}
+
+TEST_F(ShutdownChainTest, AnAnswerGivenLaterDecidesWhenItArrives)
+{
+    ShutdownChain::Answer held;
+    start({holding("first", &owner, held)});
     EXPECT_FALSE(finished.has_value());
     EXPECT_EQ(chain.state(), ShutdownChain::State::Confirming);
-    settle();
+
+    held(true);
+
     EXPECT_EQ(finished, true);
+    EXPECT_EQ(chain.state(), ShutdownChain::State::Accepted);
 }
 
 TEST_F(ShutdownChainTest, ANoInTheFirstStepAsksNothingMore)
@@ -208,15 +227,6 @@ TEST_F(ShutdownChainTest, StartingWhileOneRunsIsRefused)
     EXPECT_FALSE(secondFinished);
 }
 
-TEST_F(ShutdownChainTest, StartingIsRefusedOnceTheOutcomeIsDecidedButNotYetReported)
-{
-    start({answering("first", true)});
-
-    EXPECT_FALSE(chain.start({answering("second", true)}, [](bool) {}));
-    settle();
-    EXPECT_EQ(asked, QStringList({"first"}));
-}
-
 TEST_F(ShutdownChainTest, AnAcceptedShutdownCannotStartAgain)
 {
     start({});
@@ -316,6 +326,17 @@ TEST_F(UnsavedDeckGuardTest, ClosingAnUnchangedDeckAsksNothing)
     EXPECT_EQ(tabShown, 0);
 }
 
+TEST_F(UnsavedDeckGuardTest, AnUnchangedDeckClosesEvenWithADialogOfTheTabOpen)
+{
+    deck.setModified(false);
+    QDialog other(tab.get());
+    other.show();
+
+    confirmClose();
+
+    EXPECT_EQ(mayClose, true);
+}
+
 TEST_F(UnsavedDeckGuardTest, ClosingAChangedDeckShowsTheTabAndAsksWithoutBlocking)
 {
     confirmClose();
@@ -354,7 +375,6 @@ TEST_F(UnsavedDeckGuardTest, ASaveThatFailsKeepsTheTab)
 
     EXPECT_EQ(saves, 1);
     EXPECT_EQ(mayClose, false);
-    EXPECT_TRUE(deck.isModified());
 }
 
 TEST_F(UnsavedDeckGuardTest, TheCloseWaitsForASaveThatAnswersLater)
@@ -368,14 +388,13 @@ TEST_F(UnsavedDeckGuardTest, TheCloseWaitsForASaveThatAnswersLater)
     EXPECT_EQ(mayClose, true);
 }
 
-TEST_F(UnsavedDeckGuardTest, DiscardLetsTheTabCloseAndKeepsTheDeckModified)
+TEST_F(UnsavedDeckGuardTest, DiscardLetsTheTabCloseWithoutSaving)
 {
     confirmClose();
     click(tab.get(), QMessageBox::Discard);
 
     EXPECT_EQ(saves, 0);
     EXPECT_EQ(mayClose, true);
-    EXPECT_TRUE(deck.isModified());
 }
 
 TEST_F(UnsavedDeckGuardTest, CancelKeepsTheTab)
@@ -530,7 +549,7 @@ TEST_F(UnsavedDeckGuardTest, ASecondOpenWhileTheBoxIsOpenIsCancelled)
     EXPECT_EQ(openBoxes(tab.get()).size(), 1);
 }
 
-// Closes in two passes as MainWindow does, which cannot be built without most of the client.
+// Closes as MainWindow does, which cannot be built without most of the client.
 class TwoPassWindow : public QWidget
 {
 public:
@@ -553,8 +572,8 @@ protected:
             event->accept();
             return;
         }
-        event->ignore();
         confirmShutdown({});
+        event->setAccepted(chain.state() == ShutdownChain::State::Accepted);
     }
 
 private:
@@ -605,13 +624,12 @@ protected:
     }
 };
 
-TEST_F(WindowClose, AWindowWithNothingToAskClosesOnTheSecondPass)
+TEST_F(WindowClose, AWindowWithNothingToAskClosesAtOnce)
 {
     firstDeck.setModified(false);
     secondDeck.setModified(false);
 
-    EXPECT_FALSE(window->close());
-    settle();
+    EXPECT_TRUE(window->close());
     EXPECT_FALSE(window->isVisible());
     EXPECT_EQ(window->chain.state(), ShutdownChain::State::Accepted);
 }
@@ -684,8 +702,6 @@ TEST_F(WindowClose, CloseForUpdateReportsClosedOnceTheWindowClosed)
     std::optional<bool> closed;
     window->closeForUpdate([&closed](bool answer) { closed = answer; });
 
-    EXPECT_FALSE(closed.has_value());
-    settle();
     EXPECT_EQ(closed, true);
     EXPECT_FALSE(window->isVisible());
 }

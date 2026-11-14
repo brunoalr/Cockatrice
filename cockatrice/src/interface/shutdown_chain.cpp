@@ -56,13 +56,8 @@ void ShutdownChain::finish(bool accepted)
 {
     ++currentQuestion;
     pendingSteps.clear();
-    QMetaObject::invokeMethod(
-        this,
-        [this, accepted] {
-            currentState = accepted ? State::Accepted : State::Idle;
-            if (const auto finished = std::exchange(onFinished, {})) {
-                finished(accepted);
-            }
-        },
-        Qt::QueuedConnection);
+    currentState = accepted ? State::Accepted : State::Idle;
+    if (const auto finished = std::exchange(onFinished, {})) {
+        finished(accepted);
+    }
 }

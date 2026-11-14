@@ -20,12 +20,12 @@ UnsavedDeckGuard::UnsavedDeckGuard(QWidget *_tab,
 
 void UnsavedDeckGuard::confirmClose(std::function<void(bool mayClose)> then) const
 {
-    if (raiseOpenDialog()) {
-        then(false);
-        return;
-    }
     if (!deck->isModified()) {
         then(true);
+        return;
+    }
+    if (raiseOpenDialog()) {
+        then(false);
         return;
     }
 
