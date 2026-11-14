@@ -241,7 +241,10 @@ TabDeckStorage::TabDeckStorage(TabSupervisor *_tabSupervisor,
     leftToolBar->addAction(aNewLocalFolder);
     leftToolBar->addAction(aDeleteLocalDeck);
 
+#ifndef Q_OS_WASM
+    // A tab has no file manager to show a folder in.
     leftRightmostToolBar->addAction(aOpenDecksFolder);
+#endif
 
     rightToolBar->addAction(aOpenRemoteDeck);
     rightToolBar->addAction(aDownload);
