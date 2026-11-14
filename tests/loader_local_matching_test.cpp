@@ -2,6 +2,7 @@
 #include "interface/card_picture_loader/card_picture_loader_local.h"
 #include "libcockatrice/card/card_info.h"
 #include "libcockatrice/card/printing/printing_info.h"
+#include "support/test_home.h"
 
 #include "gtest/gtest.h"
 #include <QByteArray>
@@ -15,7 +16,6 @@
 #include <QLoggingCategory>
 #include <QScopeGuard>
 #include <QSharedPointer>
-#include <QStandardPaths>
 #include <QString>
 #include <QTemporaryDir>
 #include <QtGlobal>
@@ -215,21 +215,13 @@ TEST_F(LocalMatcherTest, CustomSubfolderIgnoresSuffixedFiles)
 int main(int argc, char **argv)
 {
     // Redirect SettingsCache reads/writes (app-data location) away from the real user profile.
-    QStandardPaths::setTestModeEnabled(true);
-
+    //
     // Some CI containers run as a uid without a passwd entry (e.g. GitHub's docker
     // runner), so HOME resolves to "/" and the test-mode qttest data dir cannot be
     // created. SettingsCache's QSettings then silently drops every write, reads come
     // back empty, and the paths the loader searches are "". Give the test a writable
     // HOME for the duration of the run so settings behave like on a normal machine.
-    QTemporaryDir home;
-    if (home.isValid()) {
-        qputenv("HOME", home.path().toLocal8Bit());
-#ifdef Q_OS_MACOS
-        // The standard paths ignore HOME on macOS.
-        qputenv("CFFIXED_USER_HOME", home.path().toLocal8Bit());
-#endif
-    }
+    const test_support::TestHome home;
 
     QCoreApplication app(argc, argv);
 
@@ -245,6 +237,9 @@ int main(int argc, char **argv)
     QCoreApplication::setOrganizationName(QStringLiteral("CockatriceTest"));
     QCoreApplication::setApplicationName(
         QStringLiteral("loader-local-matching-test-%1").arg(QCoreApplication::applicationPid()));
+    if (!home.writesStayInside()) {
+        return 1;
+    }
 
     QLoggingCategory::setFilterRules("card_picture_loader.*=false\nsettings_cache.*=false");
 

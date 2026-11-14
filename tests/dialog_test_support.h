@@ -18,6 +18,8 @@
 #ifndef DIALOG_TEST_SUPPORT_H
 #define DIALOG_TEST_SUPPORT_H
 
+#include "support/test_home.h"
+
 #include <QApplication>
 #include <QDebug>
 #include <QDialog>
@@ -25,10 +27,7 @@
 #include <QFileDialog>
 #include <QLineEdit>
 #include <QList>
-#include <QSettings>
-#include <QStandardPaths>
 #include <QString>
-#include <QTemporaryDir>
 #include <QThread>
 #include <QTimer>
 #include <QWidget>
@@ -149,15 +148,7 @@ template <typename RunTests> int run(int argc, char **argv, const QString &appli
 {
     qputenv("QT_QPA_PLATFORM", "offscreen");
     // A CI container's user has no home it can write to: saved settings and file dialogs both use it.
-    const QTemporaryDir home;
-    qputenv("HOME", home.path().toUtf8());
-#ifdef Q_OS_MACOS
-    // The standard paths ignore HOME on macOS.
-    qputenv("CFFIXED_USER_HOME", home.path().toUtf8());
-#endif
-    QStandardPaths::setTestModeEnabled(true);
-    // The native format on macOS is CFPreferences, which writes to the real Library whatever the home is.
-    QSettings::setDefaultFormat(QSettings::IniFormat);
+    const test_support::TestHome home;
     // A platform theme's native file dialog has none of the widgets the tests answer through.
     QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
     QApplication app(argc, argv);
@@ -178,18 +169,9 @@ template <typename RunTests> int run(int argc, char **argv, const QString &appli
         qCritical() << "portable.dat is beside the test binary: refusing to run on portable data";
         return 1;
     }
-#ifndef Q_OS_WIN
-    // Not on Windows: its known folders follow no environment variable, so they cannot be moved for a test.
-    for (const QString &path :
-         {QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation),
-          QStandardPaths::writableLocation(QStandardPaths::CacheLocation),
-          QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation), QSettings().fileName()}) {
-        if (!home.isValid() || !path.startsWith(home.path() + QLatin1Char('/'))) {
-            qCritical() << "the test would write to" << path << "outside the temporary home: refusing to run";
-            return 1;
-        }
+    if (!home.writesStayInside()) {
+        return 1;
     }
-#endif
     return runTests();
 }
 

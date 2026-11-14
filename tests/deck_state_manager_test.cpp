@@ -4,11 +4,9 @@
  */
 
 #include "libcockatrice/card/database/card_database.h"
+#include "support/test_home.h"
 
 #include <QCoreApplication>
-#include <QDir>
-#include <QStandardPaths>
-#include <client/settings/cache_settings.h>
 #include <deck_list_model.h>
 #include <gtest/gtest.h>
 #include <interface/widgets/deck_editor/deck_state_manager.h>
@@ -163,11 +161,14 @@ TEST(DeckStateManager, DecrementTokenMainboard)
 int main(int argc, char **argv)
 {
     // Redirect SettingsCache reads/writes (app-data location) away from the real user profile.
-    QStandardPaths::setTestModeEnabled(true);
+    const test_support::TestHome home;
     QCoreApplication app(argc, argv);
     QCoreApplication::setOrganizationName(QStringLiteral("CockatriceTest"));
     QCoreApplication::setApplicationName(
         QStringLiteral("deck-state-manager-test-%1").arg(QCoreApplication::applicationPid()));
+    if (!home.writesStayInside()) {
+        return 1;
+    }
 
     ::testing::InitGoogleTest(&argc, argv);
 
@@ -178,13 +179,5 @@ int main(int argc, char **argv)
     db->addCard(CardInfo::newInstance("Swords to Plowshares"));
     db->addCard(makeToken("Beast"));
 
-    int result = RUN_ALL_TESTS();
-
-    // Clean up the settings directory in ~/.qttest if the tests ran.
-    if (!::testing::GTEST_FLAG(list_tests)) {
-        QDir(SettingsCache::instance().getDataPath()).removeRecursively();
-        QDir(SettingsCache::instance().getCachePath()).removeRecursively();
-    }
-
-    return result;
+    return RUN_ALL_TESTS();
 }
