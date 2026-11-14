@@ -246,7 +246,7 @@ void IntentUrlParser::askToOpenDeck(const QUrlQuery &query)
 
     if (isConnectedTo(ctx.serverContext.hostname, ctx.serverContext.port)) {
         PendingIntentChain chain;
-        Intent *firstIntent = createOpenDeckIntent(ctx, chain);
+        const Intent *firstIntent = createOpenDeckIntent(ctx, chain);
         queueChain(chain, firstIntent);
         return;
     }
@@ -274,7 +274,7 @@ void IntentUrlParser::confirmOpenDeckServer(const ContextOpenDeck &context)
             chain.migrationTargetPort = context.serverContext.port;
             chain.pendingRestore = true;
         }
-        Intent *firstIntent = confirmed ? createOpenDeckIntent(context, chain) : nullptr;
+        const Intent *firstIntent = confirmed ? createOpenDeckIntent(context, chain) : nullptr;
         queueChain(chain, firstIntent);
     });
 
