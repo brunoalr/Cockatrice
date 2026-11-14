@@ -182,7 +182,7 @@ void DlgEditTokens::actAddToken()
     });
 }
 
-void DlgEditTokens::addToken(const QString &name)
+void DlgEditTokens::addToken(const QString &name) const
 {
     QString setName = CardSet::TOKENS_SETNAME;
     SetToPrintingsMap sets;

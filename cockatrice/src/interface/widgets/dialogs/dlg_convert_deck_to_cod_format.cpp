@@ -90,7 +90,7 @@ void convertAccepted(QWidget *parent,
 void DialogConvertDeckToCodFormat::promptIfRequired(QWidget *parent,
                                                     const QString &filePath,
                                                     const std::function<bool()> &convert,
-                                                    std::function<void(bool convertible)> then)
+                                                    const std::function<void(bool convertible)> &then)
 {
     if (DeckFileFormat::getFormatFromName(filePath) == DeckFileFormat::Cockatrice) {
         then(true);

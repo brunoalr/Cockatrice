@@ -135,7 +135,7 @@ public:
         setRequest(request);
         setUrl(request.url());
         setOperation(QNetworkAccessManager::GetOperation);
-        open(QIODevice::ReadOnly);
+        QIODevice::open(QIODevice::ReadOnly);
     }
 
     void answer(const QByteArray &data)
@@ -300,7 +300,7 @@ protected:
         return onlyOpen<DeckZoneDialog>();
     }
 
-    static void answer(DeckZoneDialog *dialog, const QString &name)
+    static void answer(const DeckZoneDialog *dialog, const QString &name)
     {
         dialog->findChild<QLineEdit *>()->setText(name);
         dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->click();

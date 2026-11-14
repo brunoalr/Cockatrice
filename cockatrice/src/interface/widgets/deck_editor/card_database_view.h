@@ -61,7 +61,7 @@ public:
      *                       creation was cancelled. The menu entry is hidden when not provided.
      */
     void setZoneMenuProvider(const std::function<QList<QPair<QString, QStringList>>()> &provider,
-                             const NewZoneHandler &newZoneHandler);
+                             const NewZoneHandler &handler);
 
 signals:
     void cardChanged(const QString &cardName);

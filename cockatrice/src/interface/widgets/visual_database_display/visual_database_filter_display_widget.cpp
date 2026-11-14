@@ -79,7 +79,7 @@ void FilterDisplayWidget::deleteFilter()
             QFile file(filePath);
             if (file.remove()) {
                 emit filterDeleted(filterFilename);
-                delete this;
+                deleteLater();
             } else {
                 Dialogs::warning(this, tr("Delete Failed"), tr("Failed to delete filter '%1'.").arg(filterFilename));
             }

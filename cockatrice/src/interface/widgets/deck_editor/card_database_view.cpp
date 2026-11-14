@@ -111,10 +111,10 @@ void CardDatabaseView::decrementCard(const QString &zoneName)
 }
 
 void CardDatabaseView::setZoneMenuProvider(const std::function<QList<QPair<QString, QStringList>>()> &provider,
-                                           const NewZoneHandler &newZoneHandler)
+                                           const NewZoneHandler &handler)
 {
     zoneMenuProvider = provider;
-    this->newZoneHandler = newZoneHandler;
+    newZoneHandler = handler;
 }
 
 void CardDatabaseView::updateCard(const QModelIndex &current, const QModelIndex & /*previous*/)
@@ -161,9 +161,9 @@ void CardDatabaseView::openCustomMenu(QPoint point)
     auto menu = std::make_unique<QMenu>();
     menu->setAttribute(Qt::WA_DeleteOnClose);
     // add to deck and sideboard options
-    QAction *addToDeck = menu->addAction(tr("Add to Deck"));
-    QAction *addToSideboard = menu->addAction(tr("Add to Sideboard"));
-    QAction *selectPrinting = menu->addAction(tr("Select Printing"));
+    const QAction *addToDeck = menu->addAction(tr("Add to Deck"));
+    const QAction *addToSideboard = menu->addAction(tr("Add to Sideboard"));
+    const QAction *selectPrinting = menu->addAction(tr("Select Printing"));
 
     connect(addToDeck, &QAction::triggered, this, [this, card] { emit cardAdded(card->getName(), DECK_ZONE_MAIN); });
     connect(addToSideboard, &QAction::triggered, this,
@@ -209,18 +209,18 @@ void CardDatabaseView::openCustomMenu(QPoint point)
             addToZoneMenu->addSeparator();
 
             QAction *newZoneAction = addToZoneMenu->addAction(tr("Create &new zone..."));
-            connect(newZoneAction, &QAction::triggered, this, [this, card] {
-                newZoneHandler(Dialogs::whileAlive(
+            connect(newZoneAction, &QAction::triggered, this, [this, card, handler = newZoneHandler] {
+                handler(Dialogs::whileAlive(
                     this, [this, card](const QString &zoneName) { emit cardAdded(card->getName(), zoneName); }));
             });
         }
     }
 
     if (canBeCommander(*card)) {
-        QAction *edhRecCommander = menu->addAction(tr("Show on EDHRec (Commander)"));
+        const QAction *edhRecCommander = menu->addAction(tr("Show on EDHRec (Commander)"));
         connect(edhRecCommander, &QAction::triggered, this, [this, card] { emit edhrecClicked(card, true); });
     }
-    QAction *edhRecCard = menu->addAction(tr("Show on EDHRec (Card)"));
+    const QAction *edhRecCard = menu->addAction(tr("Show on EDHRec (Card)"));
     connect(edhRecCard, &QAction::triggered, this, [this, card] { emit edhrecClicked(card, false); });
 
     // filling out the related cards submenu

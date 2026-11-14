@@ -46,7 +46,7 @@ public:
     static void promptIfRequired(QWidget *parent,
                                  const QString &filePath,
                                  const std::function<bool()> &convert,
-                                 std::function<void(bool convertible)> then);
+                                 const std::function<void(bool convertible)> &then);
 
 private:
     QVBoxLayout *layout;

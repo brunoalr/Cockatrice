@@ -233,8 +233,7 @@ void IntentUrlParser::askToOpenDeck(const QUrlQuery &query)
     }
 
     bool ok = false;
-    const quint16 port = ctx.serverContext.port.toUShort(&ok);
-    if (!ok || port == 0) {
+    if (const quint16 port = ctx.serverContext.port.toUShort(&ok); !ok || port == 0) {
         skipLink(tr("Open shared deck"), tr("Invalid or missing port in the share link"));
         return;
     }

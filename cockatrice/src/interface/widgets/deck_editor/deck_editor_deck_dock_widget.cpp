@@ -861,7 +861,7 @@ void DeckEditorDeckDockWidget::decklistCustomMenu(QPoint point)
         const QString zoneName =
             sourceIndex.siblingAtColumn(DeckListModelColumns::CARD_NAME).data(Qt::EditRole).toString();
 
-        QAction *renameAction = menu->addAction(tr("&Rename zone..."));
+        const QAction *renameAction = menu->addAction(tr("&Rename zone..."));
         connect(renameAction, &QAction::triggered, this, [this, zoneName] {
             // The unchanged name must not validate as a duplicate.
             DeckZoneDialog::promptForRename(
@@ -912,7 +912,7 @@ void DeckEditorDeckDockWidget::decklistCustomMenu(QPoint point)
     }
 
     // The menu stays up while the deck may change: show the card it was opened on before the selector.
-    QAction *selectPrinting = menu->addAction(tr("Select Printing"));
+    const QAction *selectPrinting = menu->addAction(tr("Select Printing"));
     connect(selectPrinting, &QAction::triggered, this, [this, card = isCardRow ? getCurrentCard() : ExactCard()] {
         if (card) {
             emit selectedCardChanged(card);
