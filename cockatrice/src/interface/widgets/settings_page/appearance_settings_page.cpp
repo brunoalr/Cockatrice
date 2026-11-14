@@ -28,7 +28,6 @@
 #include <QStringList>
 #include <QStringLiteral>
 #include <QStyleFactory>
-#include <QTimer>
 #include <QVBoxLayout>
 #include <QVariant>
 #include <QtGlobal>
@@ -553,16 +552,13 @@ void AppearanceSettingsPage::overrideAllCardArtWithPersonalPreferenceToggled(QT_
 {
     bool enable = static_cast<bool>(value);
 
-    bool accepted = OverridePrintingWarning::execMessageBox(this, enable);
-
-    if (!accepted) {
-        // If user cancels, revert the checkbox/state back
-        QTimer::singleShot(0, this, [this, enable]() {
+    OverridePrintingWarning::confirm(this, enable, [this, enable](bool accepted) {
+        if (!accepted) {
             overrideAllCardArtWithPersonalPreferenceCheckBox.blockSignals(true);
             overrideAllCardArtWithPersonalPreferenceCheckBox.setChecked(!enable);
             overrideAllCardArtWithPersonalPreferenceCheckBox.blockSignals(false);
-        });
-    }
+        }
+    });
 }
 
 /**

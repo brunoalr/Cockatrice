@@ -2,16 +2,15 @@
 
 #include "../../card_picture_loader/card_picture_loader.h"
 #include "../../client/settings/cache_settings.h"
+#include "../utility/non_blocking_dialogs.h"
 
-#include <QMessageBox>
 #include <QObject>
 #include <QString>
 #include <libcockatrice/settings/cards_display_settings.h>
-#include <libcockatrice/utility/qt_utils.h>
 
 class QWidget;
 
-bool OverridePrintingWarning::execMessageBox(QWidget *parent, bool enable)
+void OverridePrintingWarning::confirm(QWidget *parent, bool enable, std::function<void(bool accepted)> then)
 {
     QString message;
     if (enable) {
@@ -31,13 +30,15 @@ bool OverridePrintingWarning::execMessageBox(QWidget *parent, bool enable)
             "Are you sure you would like to disable this feature?");
     }
 
-    if (QtUtils::confirm(parent, QObject::tr("Confirm Change"), message)) {
-        SettingsCache::instance().cardsDisplay().setOverrideAllCardArtWithPersonalPreference(enable);
-        // Caches are now invalid.
-        CardPictureLoader::clearPixmapCache();
-        CardPictureLoader::clearNetworkCache();
-        return true;
-    }
-
-    return false;
+    Dialogs::confirm(parent, QObject::tr("Confirm Change"), message, [enable, then = std::move(then)](bool confirmed) {
+        if (confirmed) {
+            SettingsCache::instance().cardsDisplay().setOverrideAllCardArtWithPersonalPreference(enable);
+            // Caches are now invalid.
+            CardPictureLoader::clearPixmapCache();
+            CardPictureLoader::clearNetworkCache();
+        }
+        if (then) {
+            then(confirmed);
+        }
+    });
 }

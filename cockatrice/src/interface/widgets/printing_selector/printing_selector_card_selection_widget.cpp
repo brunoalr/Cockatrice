@@ -1,6 +1,7 @@
 #include "printing_selector_card_selection_widget.h"
 
 #include "../../../interface/widgets/dialogs/dlg_select_set_for_cards.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "printing_selector.h"
 
 #include <QHBoxLayout>
@@ -55,6 +56,6 @@ void PrintingSelectorCardSelectionWidget::connectSignals()
 
 void PrintingSelectorCardSelectionWidget::selectSetForCards()
 {
-    auto *setSelectionDialog = new DlgSelectSetForCards(nullptr, deckStateManager);
-    setSelectionDialog->exec();
+    auto *setSelectionDialog = new DlgSelectSetForCards(this, deckStateManager);
+    Dialogs::open(setSelectionDialog, {});
 }
