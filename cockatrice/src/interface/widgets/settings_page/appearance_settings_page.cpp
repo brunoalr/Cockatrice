@@ -444,7 +444,8 @@ void AppearanceSettingsPage::openThemeLocation()
 
 void AppearanceSettingsPage::editPalette()
 {
-    auto *dlg = new PaletteEditorDialog(themeManager->getCurrentThemePath(), SettingsCache::instance().getThemeName(), this);
+    auto *dlg =
+        new PaletteEditorDialog(themeManager->getCurrentThemePath(), SettingsCache::instance().getThemeName(), this);
     Dialogs::open(dlg, {});
 }
 

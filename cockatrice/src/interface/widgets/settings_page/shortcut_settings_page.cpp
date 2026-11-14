@@ -112,8 +112,8 @@ void ShortcutSettingsPage::currentItemChanged(const QString &key)
 
 void ShortcutSettingsPage::resetShortcuts()
 {
-    Dialogs::confirm(this, tr("Restore all default shortcuts"), tr("Do you really want to restore all default shortcuts?"),
-                     [](bool confirmed) {
+    Dialogs::confirm(this, tr("Restore all default shortcuts"),
+                     tr("Do you really want to restore all default shortcuts?"), [](bool confirmed) {
                          if (confirmed) {
                              SettingsCache::instance().shortcuts().resetAllShortcuts();
                          }

@@ -2,10 +2,10 @@
 
 #include "../theme_config.h"
 #include "../theme_manager.h"
+#include "../widgets/utility/non_blocking_dialogs.h"
 #include "font_grid_widget.h"
 #include "palette_generator.h"
 #include "palette_grid_widget.h"
-#include "../widgets/utility/non_blocking_dialogs.h"
 #include "quick_setup_panel.h"
 
 #include <QApplication>

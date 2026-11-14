@@ -40,11 +40,11 @@
 #include <libcockatrice/utility/string_limits.h>
 #include <memory>
 
-ThemeManager *themeManager = nullptr;                          // NOSONAR: the client declares it extern and assigns it
-RNG_Abstract *rng = nullptr;                                   // NOSONAR: the client declares it extern and assigns it
-QSystemTrayIcon *trayIcon = nullptr;                           // NOSONAR: the client declares it extern and assigns it
+ThemeManager *themeManager = nullptr;                           // NOSONAR: the client declares it extern and assigns it
+RNG_Abstract *rng = nullptr;                                    // NOSONAR: the client declares it extern and assigns it
+QSystemTrayIcon *trayIcon = nullptr;                            // NOSONAR: the client declares it extern and assigns it
 const QString translationPrefix = QStringLiteral("cockatrice"); // NOSONAR: the client declares it extern
-QString translationPath;                                       // NOSONAR: the client declares it extern
+QString translationPath;                                        // NOSONAR: the client declares it extern
 
 void PrintTo(const QString &text, std::ostream *out)
 {
@@ -241,7 +241,8 @@ protected:
     static bool showsPath(const QWidget *page, const QString &path)
     {
         const auto edits = page->findChildren<QLineEdit *>();
-        return std::any_of(edits.cbegin(), edits.cend(), [&path](const QLineEdit *edit) { return edit->text() == path; });
+        return std::any_of(edits.cbegin(), edits.cend(),
+                           [&path](const QLineEdit *edit) { return edit->text() == path; });
     }
 };
 
