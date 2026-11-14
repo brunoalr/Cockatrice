@@ -242,10 +242,35 @@ QStringList SettingsCache::getCountries() const
     return countries;
 }
 
+QString SettingsCache::getSessionDataPath()
+{
+#ifdef Q_OS_WASM
+    // the web build's data root is browser storage that every page of the origin can read
+    return getCachePath();
+#else
+    return getDataPath();
+#endif
+}
+
 void SettingsCache::loadPaths()
 {
     QString dataPath = getDataPath();
+    const QString sessionDataPath = getSessionDataPath();
     QSettings pathsIni(getSettingsPath() + "paths.ini", QSettings::IniFormat);
+    if (sessionDataPath != dataPath) {
+        for (const QString key : {"pics", "customPics", "cardDatabase", "tokenDatabase", "spoilerDatabase"}) {
+            pathsIni.remove("paths/" + key);
+        }
+        // what an earlier web build stored in the data root
+        for (const QString folder : {"/settings/logs", "/settings/sentry", "/pics"}) {
+            QDir(dataPath + folder).removeRecursively();
+        }
+        QDir dataRoot(dataPath);
+        const QStringList cardFiles = {"spoiler.xml", "cards.xml", "tokens.xml", "*.cache"};
+        for (const QString &file : dataRoot.entryList(cardFiles, QDir::Files)) {
+            dataRoot.remove(file);
+        }
+    }
 
     auto computePath = [&](const QString &key, const QString &defaultPath) -> QString {
         QString val = pathsIni.value("paths/" + key).toString();
@@ -272,7 +297,7 @@ void SettingsCache::loadPaths()
     computePath("filters", dataPath + "/filters/");
     computePath("replays", dataPath + "/replays/");
     computePath("themes", dataPath + "/themes/");
-    computePath("pics", dataPath + "/pics/");
+    computePath("pics", sessionDataPath + "/pics/");
     computePath("redirects", getCachePath() + "/redirects/");
 
     // customPicsPath derived from picsPath
@@ -284,9 +309,9 @@ void SettingsCache::loadPaths()
     }
 
     computePath("customSets", dataPath + "/customsets/");
-    computeFilePath("cardDatabase", dataPath + "/cards.xml");
-    computeFilePath("tokenDatabase", dataPath + "/tokens.xml");
-    computeFilePath("spoilerDatabase", dataPath + "/spoiler.xml");
+    computeFilePath("cardDatabase", sessionDataPath + "/cards.xml");
+    computeFilePath("tokenDatabase", sessionDataPath + "/tokens.xml");
+    computeFilePath("spoilerDatabase", sessionDataPath + "/spoiler.xml");
 }
 
 void SettingsCache::resetPaths()
