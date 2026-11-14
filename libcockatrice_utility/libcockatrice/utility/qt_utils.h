@@ -4,7 +4,6 @@
 #include <QFont>
 #include <QFontDatabase>
 #include <QLayout>
-#include <QMessageBox>
 #include <QObject>
 #include <QPropertyAnimation>
 #include <QScrollArea>
@@ -185,23 +184,6 @@ static inline QFont boldFont(QFont font)
 {
     font.setBold(true);
     return font;
-}
-
-/**
- * @brief Shows a Yes/No confirmation dialog and returns true when the user confirms.
- *
- * @param parent        Parent widget.
- * @param title         Dialog title.
- * @param text          Dialog text.
- * @param defaultButton Button focused by default. NoButton lets Qt choose.
- */
-static inline bool confirm(QWidget *parent,
-                           const QString &title,
-                           const QString &text,
-                           QMessageBox::StandardButton defaultButton = QMessageBox::NoButton)
-{
-    return QMessageBox::question(parent, title, text, QMessageBox::Yes | QMessageBox::No, defaultButton) ==
-           QMessageBox::Yes;
 }
 } // namespace QtUtils
 

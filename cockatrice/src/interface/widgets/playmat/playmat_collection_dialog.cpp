@@ -1,6 +1,7 @@
 #include "playmat_collection_dialog.h"
 
 #include "../../../client/settings/cache_settings.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "libcockatrice/interfaces/interface_interface_settings_provider.h"
 #include "libcockatrice/utility/card_ref.h"
 #include "libcockatrice/utility/playmat_params.h"
@@ -12,6 +13,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QListWidgetItem>
+#include <QPersistentModelIndex>
 #include <QPushButton>
 #include <QString>
 #include <QVBoxLayout>
@@ -115,16 +117,18 @@ void PlaymatCollectionDialog::selectionChanged()
 
 void PlaymatCollectionDialog::addPlaymat()
 {
-    PlaymatSettingsDialog dialog(CardRef{}, PlaymatParams{}, this);
-    if (dialog.exec() == QDialog::Accepted) {
-        const CardRef card = dialog.card();
-        if (!card.isEmpty()) {
-            PlaymatInfo res = {card, dialog.params()};
-            playmats.append(res);
-            playmatList->addItem(res.card.name);
-            playmatList->setCurrentRow(playmatList->count() - 1);
+    auto *dialog = new PlaymatSettingsDialog(CardRef{}, PlaymatParams{}, this);
+    Dialogs::open(dialog, [this, dialog](int result) {
+        if (result == QDialog::Accepted) {
+            const CardRef card = dialog->card();
+            if (!card.isEmpty()) {
+                PlaymatInfo res = {card, dialog->params()};
+                playmats.append(res);
+                playmatList->addItem(res.card.name);
+                playmatList->setCurrentRow(playmatList->count() - 1);
+            }
         }
-    }
+    });
 }
 
 void PlaymatCollectionDialog::editPlaymat()
@@ -135,15 +139,18 @@ void PlaymatCollectionDialog::editPlaymat()
     }
 
     const PlaymatInfo &current = playmats.at(row);
-    PlaymatSettingsDialog dialog(current.card, current.params, this);
-    if (dialog.exec() == QDialog::Accepted) {
-        const CardRef card = dialog.card();
-        if (card.isEmpty()) {
-            return; // Removal is handled by the Remove button
+    auto *dialog = new PlaymatSettingsDialog(current.card, current.params, this);
+    const QPersistentModelIndex edited(playmatList->model()->index(row, 0));
+    Dialogs::open(dialog, [this, dialog, edited](int result) {
+        if (result == QDialog::Accepted && edited.isValid()) {
+            const CardRef card = dialog->card();
+            if (card.isEmpty()) {
+                return; // Removal is handled by the Remove button
+            }
+            playmats[edited.row()] = {card, dialog->params()};
+            playmatList->item(edited.row())->setText(card.name);
         }
-        playmats[row] = {card, dialog.params()};
-        playmatList->item(row)->setText(card.name);
-    }
+    });
 }
 
 void PlaymatCollectionDialog::removePlaymat()

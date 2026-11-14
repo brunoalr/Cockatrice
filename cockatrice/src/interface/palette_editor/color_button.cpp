@@ -1,6 +1,7 @@
 #include "color_button.h"
 
 #include "../theme_manager.h"
+#include "../widgets/utility/non_blocking_dialogs.h"
 
 #include <QBrush>
 #include <QColorDialog>
@@ -38,10 +39,14 @@ void ColorButton::setColor(const QColor &c)
 
 void ColorButton::pickColor()
 {
-    QColor chosen = QColorDialog::getColor(color, this, tr("Pick colour"), QColorDialog::ShowAlphaChannel);
-    if (chosen.isValid()) {
-        setColor(chosen);
-    }
+    Dialogs::getColor(
+        color, this, tr("Pick colour"),
+        [this](const QColor &chosen) {
+            if (chosen.isValid()) {
+                setColor(chosen);
+            }
+        },
+        QColorDialog::ShowAlphaChannel);
 }
 
 void ColorButton::updateSwatch()
