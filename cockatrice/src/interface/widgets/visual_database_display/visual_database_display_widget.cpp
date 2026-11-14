@@ -117,7 +117,11 @@ VisualDatabaseDisplayWidget::VisualDatabaseDisplayWidget(QWidget *parent,
                 }
                 return result;
             },
-            [this] { return newZoneCreator ? newZoneCreator() : QString(); });
+            [this](std::function<void(const QString &zoneName)> thenCreated) {
+                if (newZoneCreator) {
+                    newZoneCreator(std::move(thenCreated));
+                }
+            });
     }
 
     searchEdit->setTreeView(databaseView);
@@ -242,7 +246,7 @@ void VisualDatabaseDisplayWidget::showEvent(QShowEvent *event)
     initializeFilters();
 }
 
-void VisualDatabaseDisplayWidget::setNewZoneCreator(const std::function<QString()> &creator)
+void VisualDatabaseDisplayWidget::setNewZoneCreator(const CardDatabaseView::NewZoneHandler &creator)
 {
     newZoneCreator = creator;
 }

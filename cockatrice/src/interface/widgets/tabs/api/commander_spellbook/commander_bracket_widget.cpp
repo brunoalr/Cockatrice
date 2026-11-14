@@ -2,6 +2,7 @@
 
 #include "../../../../../client/settings/cache_settings.h"
 #include "../../../../theme_icon.h"
+#include "../../../utility/non_blocking_dialogs.h"
 #include "commander_bracket_service.h"
 #include "libcockatrice/deck_list/deck_list.h"
 
@@ -15,6 +16,7 @@
 #include <QLabel>
 #include <QList>
 #include <QObject>
+#include <QPointer>
 #include <QPushButton>
 #include <QStringLiteral>
 #include <QTimer>
@@ -25,6 +27,16 @@
 #include <qnamespace.h>
 
 template <class T> class QSharedPointer;
+
+namespace
+{
+// The integration prompt open in any deck editor: the others wait for its answer instead of asking too.
+QPointer<QDialog> &openIntegrationPrompt()
+{
+    static QPointer<QDialog> prompt;
+    return prompt;
+}
+} // namespace
 
 CommanderBracketWidget::CommanderBracketWidget(QWidget *parent) : QWidget(parent)
 {
@@ -113,12 +125,12 @@ void CommanderBracketWidget::setDeck(const QSharedPointer<DeckList> &_deck)
     maybeAutoEstimateBracket();
 }
 
-bool CommanderBracketWidget::promptCommanderSpellbookIntegration()
+void CommanderBracketWidget::promptCommanderSpellbookIntegration(std::function<void(bool accepted)> then)
 {
-    QDialog dialog(this);
-    dialog.setWindowTitle(tr("CommanderSpellbook integration"));
+    auto *dialog = new QDialog(this);
+    dialog->setWindowTitle(tr("CommanderSpellbook integration"));
 
-    auto *mainLayout = new QVBoxLayout(&dialog);
+    auto *mainLayout = new QVBoxLayout(dialog);
 
     // Main text
     auto *label = new QLabel(tr("CommanderSpellbook can analyze your deck and estimate its Commander bracket.\n\n"
@@ -131,14 +143,14 @@ bool CommanderBracketWidget::promptCommanderSpellbookIntegration()
 
     // Naming selector
     auto *formLayout = new QFormLayout;
-    auto *namingCombo = new QComboBox(&dialog);
+    auto *namingCombo = new QComboBox(dialog);
     namingCombo->addItem(tr("CommanderSpellbook bracket names"));
     namingCombo->addItem(tr("Official Commander bracket names (approximate)"));
     namingCombo->setCurrentIndex(
         SettingsCache::instance().deckEditor().getCommanderSpellbookIntegrationUseOfficialBracketNames() ? 1 : 0);
 
     // Create label + explainer button
-    auto *labelWidget = new QWidget(&dialog);
+    auto *labelWidget = new QWidget(dialog);
     auto *labelLayout = QtUtils::makeLayout<QHBoxLayout>(labelWidget);
 
     auto *namingLabel = new QLabel(tr("Bracket naming:"), labelWidget);
@@ -157,45 +169,32 @@ bool CommanderBracketWidget::promptCommanderSpellbookIntegration()
     mainLayout->addLayout(formLayout);
 
     // Buttons
-    auto *buttonBox = new QDialogButtonBox(&dialog);
+    auto *buttonBox = new QDialogButtonBox(dialog);
     auto *enableBtn = buttonBox->addButton(tr("Enable"), QDialogButtonBox::AcceptRole);
     auto *automaticBtn = buttonBox->addButton(tr("Automatic"), QDialogButtonBox::ApplyRole);
     auto *disableBtn = buttonBox->addButton(tr("Disable"), QDialogButtonBox::RejectRole);
     mainLayout->addWidget(buttonBox);
 
-    // Track which button was clicked
-    QAbstractButton *clickedButton = nullptr;
-    QObject::connect(buttonBox, &QDialogButtonBox::clicked, &dialog, [&](QAbstractButton *btn) {
-        clickedButton = btn;
-        dialog.accept();
-    });
+    // Each button persists its choice; a window close persists nothing. Enable and Automatic accept.
+    const auto choose = [dialog, namingCombo](int mode) {
+        return [dialog, namingCombo, mode] {
+            if (mode != commanderSpellbookIntegrationEnabledIndexDisabled) {
+                bool useOfficial = namingCombo->currentIndex() == 1;
+                SettingsCache::instance().deckEditor().setCommanderSpellbookIntegrationUseOfficialBracketNames(
+                    useOfficial);
+            }
+            SettingsCache::instance().deckEditor().setCommanderSpellbookIntegrationEnabled(mode);
+            dialog->done(mode == commanderSpellbookIntegrationEnabledIndexDisabled ? QDialog::Rejected
+                                                                                   : QDialog::Accepted);
+        };
+    };
+    connect(enableBtn, &QAbstractButton::clicked, dialog, choose(commanderSpellbookIntegrationEnabledIndexEnabled));
+    connect(automaticBtn, &QAbstractButton::clicked, dialog,
+            choose(commanderSpellbookIntegrationEnabledIndexAutomatic));
+    connect(disableBtn, &QAbstractButton::clicked, dialog, choose(commanderSpellbookIntegrationEnabledIndexDisabled));
 
-    dialog.exec();
-
-    // Persist naming choice (if not disabled)
-    if (clickedButton == enableBtn || clickedButton == automaticBtn) {
-        bool useOfficial = namingCombo->currentIndex() == 1;
-        SettingsCache::instance().deckEditor().setCommanderSpellbookIntegrationUseOfficialBracketNames(useOfficial);
-    }
-
-    // Persist integration mode
-    if (clickedButton == disableBtn) {
-        SettingsCache::instance().deckEditor().setCommanderSpellbookIntegrationEnabled(
-            commanderSpellbookIntegrationEnabledIndexDisabled);
-        return false;
-    }
-    if (clickedButton == enableBtn) {
-        SettingsCache::instance().deckEditor().setCommanderSpellbookIntegrationEnabled(
-            commanderSpellbookIntegrationEnabledIndexEnabled);
-        return true;
-    }
-    if (clickedButton == automaticBtn) {
-        SettingsCache::instance().deckEditor().setCommanderSpellbookIntegrationEnabled(
-            commanderSpellbookIntegrationEnabledIndexAutomatic);
-        return true;
-    }
-
-    return false;
+    openIntegrationPrompt() = dialog;
+    Dialogs::open(dialog, [then = std::move(then)](int result) { then(result == QDialog::Accepted); });
 }
 
 void CommanderBracketWidget::updateBracketVisibility(bool visible)
@@ -299,7 +298,7 @@ void CommanderBracketWidget::maybeAutoEstimateBracket()
 
     const bool isCommander = (formatKey.compare("commander", Qt::CaseInsensitive) == 0);
 
-    int mode = SettingsCache::instance().deckEditor().getCommanderSpellbookIntegrationEnabled();
+    const int mode = SettingsCache::instance().deckEditor().getCommanderSpellbookIntegrationEnabled();
 
     if (!isCommander || mode == commanderSpellbookIntegrationEnabledIndexDisabled) {
         cancelEstimate();
@@ -308,24 +307,38 @@ void CommanderBracketWidget::maybeAutoEstimateBracket()
     }
 
     if (mode == commanderSpellbookIntegrationEnabledIndexUnprompted) {
+        if (const QDialog *otherPrompt = openIntegrationPrompt()) {
+            // Queued: the prompt counts as open until it is fully destroyed; its answer is stored by then.
+            connect(otherPrompt, &QObject::destroyed, this, &CommanderBracketWidget::maybeAutoEstimateBracket,
+                    static_cast<Qt::ConnectionType>(Qt::QueuedConnection | Qt::UniqueConnection));
+            return;
+        }
         const auto promptedDeck = deck;
         prompting = true;
-        const bool accepted = promptCommanderSpellbookIntegration();
-        prompting = false;
-        if (deck != promptedDeck || !deck || deck->getGameFormat().compare("commander", Qt::CaseInsensitive) != 0) {
-            maybeAutoEstimateBracket();
-            return;
-        }
-        if (!accepted) {
-            updateBracketVisibility(false);
-            return;
-        }
+        promptCommanderSpellbookIntegration([this, promptedDeck](bool accepted) {
+            prompting = false;
+            if (deck != promptedDeck || !deck || deck->getGameFormat().compare("commander", Qt::CaseInsensitive) != 0) {
+                maybeAutoEstimateBracket();
+                return;
+            }
+            if (!accepted) {
+                updateBracketVisibility(false);
+                return;
+            }
+            showBracket();
+        });
+        return;
     }
 
+    showBracket();
+}
+
+void CommanderBracketWidget::showBracket()
+{
     updateBracketVisibility(true);
 
-    mode = SettingsCache::instance().deckEditor().getCommanderSpellbookIntegrationEnabled();
-    if (mode != commanderSpellbookIntegrationEnabledIndexAutomatic) {
+    if (SettingsCache::instance().deckEditor().getCommanderSpellbookIntegrationEnabled() !=
+        commanderSpellbookIntegrationEnabledIndexAutomatic) {
         return;
     }
 

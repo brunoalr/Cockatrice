@@ -29,7 +29,6 @@
 #include <libcockatrice/card/database/card_database_manager.h>
 #include <libcockatrice/network/client/abstract/abstract_client.h>
 #include <libcockatrice/settings/servers_settings.h>
-#include <libcockatrice/utility/qt_utils.h>
 #include <memory>
 #include <qlogging.h>
 #include <qnamespace.h>
@@ -66,15 +65,13 @@ void IntentUrlParser::parseFirstLink()
         askToJoinGame(query);
         return;
     }
-
-    PendingIntentChain chain;
-    const Intent *firstIntent = nullptr;
     if (action == "opendeck") {
-        firstIntent = createOpenDeckIntent(query, chain);
-    } else {
-        qWarning() << "Unknown intent:" << action;
+        askToOpenDeck(query);
+        return;
     }
-    queueChain(chain, firstIntent);
+
+    qWarning() << "Unknown intent:" << action;
+    queueChain(PendingIntentChain(), nullptr);
 }
 
 void IntentUrlParser::queueChain(const PendingIntentChain &chain, const Intent *firstIntent)
@@ -101,12 +98,15 @@ void IntentUrlParser::finishLink()
     }
 }
 
+void IntentUrlParser::skipLink(const QString &title, const QString &message)
+{
+    Dialogs::warning(mainWindow, title, message,
+                     Dialogs::whileAlive(this, [this] { queueChain(PendingIntentChain(), nullptr); }));
+}
+
 void IntentUrlParser::askToJoinGame(const QUrlQuery &query)
 {
-    auto showError = [this](const QString &message) {
-        Dialogs::warning(mainWindow, tr("Open game"), message,
-                         Dialogs::whileAlive(this, [this] { queueChain(PendingIntentChain(), nullptr); }));
-    };
+    auto showError = [this](const QString &message) { skipLink(tr("Open game"), message); };
 
     ContextJoinGame ctx{};
 
@@ -216,38 +216,44 @@ QString IntentUrlParser::generateJoinGameMessage(const ContextJoinGame &context,
                    : tr("Join game \"%1\" (#%2) on %3?").arg(gameDescription, gameIdStr, server);
 }
 
-Intent *IntentUrlParser::createOpenDeckIntent(const QUrlQuery &query, PendingIntentChain &chain)
+void IntentUrlParser::askToOpenDeck(const QUrlQuery &query)
 {
-    auto showError = [this](const QString &message) {
-        QMessageBox::warning(mainWindow, tr("Open shared deck"), message);
-    };
+    ContextOpenDeck ctx;
 
-    auto ctx = std::make_unique<ContextOpenDeck>();
+    ctx.serverContext.hostname = query.queryItemValue("hostname");
+    ctx.serverContext.port = query.queryItemValue("port");
+    ctx.shareToken = query.queryItemValue("share");
 
-    ctx->serverContext.hostname = query.queryItemValue("hostname");
-    ctx->serverContext.port = query.queryItemValue("port");
-    ctx->shareToken = query.queryItemValue("share");
+    qCDebug(UrlParserLog) << "Open-deck intent: host" << ctx.serverContext.hostname << "port" << ctx.serverContext.port
+                          << "token length" << ctx.shareToken.length();
 
-    qCDebug(UrlParserLog) << "Open-deck intent: host" << ctx->serverContext.hostname << "port"
-                          << ctx->serverContext.port << "token length" << ctx->shareToken.length();
-
-    if (ctx->serverContext.hostname.isEmpty()) {
-        showError(tr("Missing or empty hostname in the share link"));
-        return nullptr;
+    if (ctx.serverContext.hostname.isEmpty()) {
+        skipLink(tr("Open shared deck"), tr("Missing or empty hostname in the share link"));
+        return;
     }
 
     bool ok = false;
-    const quint16 port = ctx->serverContext.port.toUShort(&ok);
-    if (!ok || port == 0) {
-        showError(tr("Invalid or missing port in the share link"));
-        return nullptr;
+    if (const quint16 port = ctx.serverContext.port.toUShort(&ok); !ok || port == 0) {
+        skipLink(tr("Open shared deck"), tr("Invalid or missing port in the share link"));
+        return;
     }
 
-    if (ctx->shareToken.isEmpty()) {
-        showError(tr("Missing or empty share value in the share link"));
-        return nullptr;
+    if (ctx.shareToken.isEmpty()) {
+        skipLink(tr("Open shared deck"), tr("Missing or empty share value in the share link"));
+        return;
     }
 
+    if (isConnectedTo(ctx.serverContext.hostname, ctx.serverContext.port)) {
+        PendingIntentChain chain;
+        const Intent *firstIntent = createOpenDeckIntent(ctx, chain);
+        queueChain(chain, firstIntent);
+        return;
+    }
+    confirmOpenDeckServer(ctx);
+}
+
+void IntentUrlParser::confirmOpenDeckServer(const ContextOpenDeck &context)
+{
     RemoteClient *client = mainWindow->getRemoteClient();
 
     // The open deck download needs a connection to the link's server. Ask before
@@ -257,43 +263,50 @@ Intent *IntentUrlParser::createOpenDeckIntent(const QUrlQuery &query, PendingInt
     // The hostname is link-supplied and percent-decoded, so escape it: QMessageBox
     // renders AutoText, and markup in a hostname would otherwise flip the whole
     // prompt to rich text and let a link pad the message the user is shown.
-    const bool alreadyConnected = isConnectedTo(ctx->serverContext.hostname, ctx->serverContext.port);
-    if (!alreadyConnected) {
-        const QString target =
-            QStringLiteral("%1:%2").arg(ctx->serverContext.hostname.toHtmlEscaped(), ctx->serverContext.port);
-
-        if (client->getStatus() == StatusLoggedIn) {
-            const QString current =
-                QStringLiteral("%1:%2").arg(client->serverName(), QString::number(client->serverPort()));
-            if (!QtUtils::confirm(
-                    mainWindow, tr("Open shared deck"),
-                    tr("Opening this share link connects you to %1 instead of %2.\n\nContinue?").arg(target, current),
-                    QMessageBox::Yes)) {
-                return nullptr;
-            }
-            chain.migrationTargetHost = ctx->serverContext.hostname;
-            chain.migrationTargetPort = ctx->serverContext.port;
+    const QString target =
+        QStringLiteral("%1:%2").arg(context.serverContext.hostname.toHtmlEscaped(), context.serverContext.port);
+    const bool migrating = client->getStatus() == StatusLoggedIn;
+    const auto answered = Dialogs::whileAlive(this, [this, context, migrating](bool confirmed) {
+        PendingIntentChain chain;
+        if (confirmed && migrating) {
+            chain.migrationTargetHost = context.serverContext.hostname;
+            chain.migrationTargetPort = context.serverContext.port;
             chain.pendingRestore = true;
-        } else {
-            // Fresh connection is harmless to wander away from, but a server the
-            // client has never been configured for deserves a harder warning (no
-            // by default) so a stray link cannot silently steer the client there.
-            const bool knownHost = SettingsCache::instance().servers().findHostIndex(ctx->serverContext.hostname) >= 0;
-            const QMessageBox::StandardButton answer =
-                knownHost
-                    ? QMessageBox::question(mainWindow, tr("Open shared deck"),
-                                            tr("Opening this share link connects you to %1.\n\nContinue?").arg(target))
-                    : QMessageBox::warning(mainWindow, tr("Open shared deck"),
-                                           tr("Opening this share link connects you to %1, a server you have "
-                                              "never connected to before.\n\nContinue?")
-                                               .arg(target),
-                                           QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-            if (answer != QMessageBox::Yes) {
-                return nullptr;
-            }
         }
+        const Intent *firstIntent = confirmed ? createOpenDeckIntent(context, chain) : nullptr;
+        queueChain(chain, firstIntent);
+    });
+
+    if (migrating) {
+        const QString current =
+            QStringLiteral("%1:%2").arg(client->serverName(), QString::number(client->serverPort()));
+        Dialogs::confirm(
+            mainWindow, tr("Open shared deck"),
+            tr("Opening this share link connects you to %1 instead of %2.\n\nContinue?").arg(target, current), answered,
+            QMessageBox::Yes);
+        return;
     }
 
+    // Fresh connection is harmless to wander away from, but a server the
+    // client has never been configured for deserves a harder warning (no
+    // by default) so a stray link cannot silently steer the client there.
+    if (SettingsCache::instance().servers().findHostIndex(context.serverContext.hostname) >= 0) {
+        Dialogs::confirm(mainWindow, tr("Open shared deck"),
+                         tr("Opening this share link connects you to %1.\n\nContinue?").arg(target), answered);
+        return;
+    }
+    Dialogs::ask(mainWindow, QMessageBox::Warning, tr("Open shared deck"),
+                 tr("Opening this share link connects you to %1, a server you have "
+                    "never connected to before.\n\nContinue?")
+                     .arg(target),
+                 QMessageBox::Yes | QMessageBox::No, QMessageBox::No,
+                 [answered](QMessageBox::StandardButton answer) { answered(answer == QMessageBox::Yes); });
+}
+
+Intent *IntentUrlParser::createOpenDeckIntent(const ContextOpenDeck &context, PendingIntentChain &chain)
+{
+    auto ctx = std::make_unique<ContextOpenDeck>(context);
+    RemoteClient *client = mainWindow->getRemoteClient();
     ContextConnectToServer *serverContext = &ctx->serverContext;
 
     // The open deck intent owns the context and the credential lookup; once
@@ -302,7 +315,8 @@ Intent *IntentUrlParser::createOpenDeckIntent(const QUrlQuery &query, PendingInt
         new IntentOpenSharedDeck(mainWindow->getTabSupervisor(), client, CardDatabaseManager::query(), std::move(ctx));
     openDeckIntent->setParent(this);
     chain.intents.append(openDeckIntent);
-    connect(openDeckIntent, &Intent::failed, this, [showError](const QString &reason) { showError(reason); });
+    connect(openDeckIntent, &Intent::failed, this,
+            [this](const QString &reason) { Dialogs::warning(mainWindow, tr("Open shared deck"), reason); });
 
     Intent *firstIntent = openDeckIntent;
     if (!isConnectedTo(serverContext->hostname, serverContext->port)) {

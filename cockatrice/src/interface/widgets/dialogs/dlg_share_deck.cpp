@@ -3,11 +3,11 @@
 #include "../../../client/settings/cache_settings.h"
 #include "../cards/additional_info/deck_color_identity.h"
 #include "../deck_share/deck_share_utils.h"
+#include "../utility/non_blocking_dialogs.h"
 
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QLineEdit>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QString>
 #include <QTimer>
@@ -79,23 +79,24 @@ void DlgShareDeck::shareFinished(const Response &response, const CommandContaine
     shareTimeoutTimer->stop();
     if (response.response_code() != Response::RespOk) {
         buttonBox->button(QDialogButtonBox::Ok)->setEnabled(true);
-        QMessageBox::critical(this, tr("Share deck"),
-                              tr("Failed to create the share link (server response code %1).")
-                                  .arg(QString::number(static_cast<int>(response.response_code()))));
+        Dialogs::critical(this, tr("Share deck"),
+                          tr("Failed to create the share link (server response code %1).")
+                              .arg(QString::number(static_cast<int>(response.response_code()))));
         return;
     }
 
     const DeckShareUtils::ShareResponse share = DeckShareUtils::handleShareResponse(client, response);
 
-    QMessageBox::information(this, tr("Share deck"),
-                             tr("Share link created and copied to the clipboard:\n\n%1\n\n"
-                                "The share expires on %2.")
-                                 .arg(share.link, DeckShareUtils::formatShareExpiry(share.expiry)));
-    accept();
+    // The notice is a child of this dialog: accepting first would close it with the dialog.
+    Dialogs::information(this, tr("Share deck"),
+                         tr("Share link created and copied to the clipboard:\n\n%1\n\n"
+                            "The share expires on %2.")
+                             .arg(share.link, DeckShareUtils::formatShareExpiry(share.expiry)),
+                         [this] { accept(); });
 }
 
 void DlgShareDeck::onShareTimeout()
 {
     buttonBox->button(QDialogButtonBox::Ok)->setEnabled(true);
-    QMessageBox::warning(this, tr("Share deck"), tr("The server did not respond in time. Try again."));
+    Dialogs::warning(this, tr("Share deck"), tr("The server did not respond in time. Try again."));
 }
