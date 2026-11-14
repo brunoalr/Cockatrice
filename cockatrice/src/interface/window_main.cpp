@@ -578,9 +578,12 @@ void MainWindow::createMenus()
     dbMenu->addAction(aManageSets);
     dbMenu->addAction(aEditTokens);
     dbMenu->addSeparator();
+#ifndef Q_OS_WASM
+    // A tab has no file manager to show a folder in, and the file picker of the last entry hangs a page.
     dbMenu->addAction(aOpenCustomFolder);
     dbMenu->addAction(aOpenCustomsetsFolder);
     dbMenu->addAction(aAddCustomSet);
+#endif
     dbMenu->addSeparator();
     dbMenu->addAction(aReloadCardDatabase);
 
@@ -600,7 +603,9 @@ void MainWindow::createMenus()
     helpMenu->addSeparator();
     helpMenu->addAction(aStatusBar);
     helpMenu->addAction(aViewLog);
+#ifndef Q_OS_WASM
     helpMenu->addAction(aOpenSettingsFolder);
+#endif
     helpMenu->addSeparator();
 #ifndef Q_OS_WASM
     helpMenu->addAction(aFirstRunWizard);
@@ -722,20 +727,20 @@ void MainWindow::startupConfigCheck()
     firstRunWizardActive = true;
     if (SettingsCache::instance().network().getClientVersion() == CLIENT_INFO_NOT_SET) {
         SettingsCache::instance().downloads().resetToDefaultURLs();
-        // The desktop start-up fills the saved servers from the public list. A page reaches a server only
-        // through its secure WebSocket port, so it starts with the one server that is known to offer it.
-        SettingsCache::instance().servers().addNewServer(QStringLiteral("Rooster Ranges"), SERVERSETTINGS_DEFAULT_HOST,
-                                                         QStringLiteral("443"), QString(), QString(), false);
+        DlgConnect::ensureWebServer(SettingsCache::instance().servers());
     }
     SettingsCache::instance().network().setClientVersion(VERSION_STRING);
     const QUrl page(QString::fromStdString(emscripten::val::global("location")["href"].as<std::string>()));
     auto *fetcher = new CardDatabaseFetcher(page, SettingsCache::instance().getCachePath(), this);
+    cardDatabaseFetcher = fetcher;
     connect(fetcher, &CardDatabaseFetcher::fetched, this, &MainWindow::reloadCardDatabaseAndCheckSets);
     connect(fetcher, &CardDatabaseFetcher::failed, this, [this, fetcher](const QString &what) {
-        auto *warning =
-            new QMessageBox(QMessageBox::Warning, tr("Card database"),
-                            tr("The card database could not be downloaded, so cards are missing.\n\n%1").arg(what),
-                            QMessageBox::Retry | QMessageBox::Close, this);
+        const auto noticeName = QStringLiteral("cardDatabaseDownloadFailed");
+        delete findChild<QMessageBox *>(noticeName, Qt::FindDirectChildrenOnly); // NOSONAR: one notice, not a stack
+        auto *warning = new QMessageBox(QMessageBox::Warning, tr("Card database"),
+                                        tr("The card database could not be downloaded.\n\n%1").arg(what),
+                                        QMessageBox::Retry | QMessageBox::Close, this);
+        warning->setObjectName(noticeName);
         // Modeless and not focused: without cards a player can still connect and chat.
         warning->setWindowModality(Qt::NonModal);
         warning->setAttribute(Qt::WA_ShowWithoutActivating);
@@ -748,7 +753,6 @@ void MainWindow::startupConfigCheck()
         warning->show();
     });
     fetcher->fetch();
-    actCheckCommanderBracketDefinitionUpdates();
 #else
     AtRiskDataWarning::warnAboutDataPathsInProgramDir(this, [this] { continueStartupConfigCheck(); });
 #endif
@@ -1837,10 +1841,15 @@ int MainWindow::getNextCustomSetPrefix(QDir dataDir)
 
 void MainWindow::actReloadCardDatabase()
 {
+#ifdef Q_OS_WASM
+    // The files live in memory only, so a reload downloads them again; that also retries a failed download.
+    cardDatabaseFetcher->fetch();
+#else
     const auto reloadOk1 = QtConcurrent::run([] {
         CardDatabaseManager::getInstance()->reloadCardDatabasesAndNotify();
         SettingsCache::instance().downloads().sync();
     });
+#endif
 }
 
 void MainWindow::actManageSets()
