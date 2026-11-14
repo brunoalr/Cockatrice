@@ -822,6 +822,7 @@ if(WITH_CLIENT)
     deck_dialogs_test
     SOURCES
     ${CLIENT_SRC}/client/network/parsers/deck_link_to_api_transformer.cpp
+    ${CLIENT_SRC}/client/network/web_relay.cpp
     ${CLIENT_SRC}/interface/deck_loader/card_node_function.cpp
     ${CLIENT_SRC}/interface/key_signals.cpp
     ${CLIENT_SRC}/interface/pixel_map_generator.cpp

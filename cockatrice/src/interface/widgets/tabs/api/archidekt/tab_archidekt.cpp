@@ -1,5 +1,6 @@
 #include "tab_archidekt.h"
 
+#include "../../../../../client/network/web_relay.h"
 #include "../../../../../client/settings/cache_settings.h"
 #include "../../../../theme_icon.h"
 #include "../../../cards/additional_info/mana_symbol_widget.h"
@@ -81,6 +82,11 @@ TabArchidekt::~TabArchidekt()
     cancelRequest();
 }
 
+bool TabArchidekt::isReachable()
+{
+    return WebRelay::reaches(QUrl(archidektApiLink));
+}
+
 void TabArchidekt::cancelRequest()
 {
     const QPointer<QNetworkReply> previousReply = activeReply;
@@ -104,8 +110,11 @@ void TabArchidekt::startRequest(QUrl url, RequestKind kind, int page)
     requestStatusLabel->setText(kind == RequestKind::Deck ? tr("Loading deck…") : tr("Loading decks…"));
     requestStatusLabel->show();
 
-    QNetworkRequest request(url);
+    QNetworkRequest request(WebRelay::route(url));
+#ifndef Q_OS_WASM
+    // A browser preflights a named User-Agent, and the relay answers a preflight for Content-Type only.
     request.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
+#endif
     auto *reply = networkManager->get(request);
     activeReply = reply;
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { processApiJson(reply); });
@@ -643,9 +652,11 @@ void TabArchidekt::processApiJson(QNetworkReply *reply)
         }
         currentPage = requestedPage;
         const QString next = jsonObj.value("next").toString();
-        nextPageUrl = next.isEmpty() ? QUrl() : reply->url().resolved(QUrl(next));
+        // A relative link belongs to Archidekt, not to the relay the answer came through.
+        const QUrl base = reply->url() == WebRelay::route(requestUrl) ? requestUrl : reply->url();
+        nextPageUrl = next.isEmpty() ? QUrl() : base.resolved(QUrl(next));
         // An empty or self-repeating page cannot make forward progress.
-        if (jsonObj.value("results").toArray().isEmpty() || nextPageUrl == reply->url()) {
+        if (jsonObj.value("results").toArray().isEmpty() || WebRelay::route(nextPageUrl) == reply->url()) {
             nextPageUrl.clear();
         }
         requestStatusLabel->setText(
