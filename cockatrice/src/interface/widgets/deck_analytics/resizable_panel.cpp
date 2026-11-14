@@ -310,6 +310,7 @@ void ResizablePanel::updateSizeConstraints()
 
 void ResizablePanel::startDrag()
 {
+#ifndef Q_OS_WASM // the browser build cannot run the drag's nested event loop, so a panel stays put there
     QDrag *drag = new QDrag(this);
     QMimeData *mimeData = new QMimeData;
 
@@ -328,12 +329,13 @@ void ResizablePanel::startDrag()
 
     autoScrollTimer->start();
 
-    Qt::DropAction result = drag->exec(Qt::MoveAction);
+    Qt::DropAction result = drag->exec(Qt::MoveAction); // blocking-ok: a drag runs its own loop until the drop
     Q_UNUSED(result);
 
     autoScrollTimer->stop();
     dragButton->setCursor(Qt::OpenHandCursor);
     isDraggingPanel = false;
+#endif
 }
 
 void ResizablePanel::performAutoScroll()

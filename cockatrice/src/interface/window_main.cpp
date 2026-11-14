@@ -368,7 +368,8 @@ void MainWindow::actOpenSettingsFolder()
 #ifdef WITH_GUI_TEST
 void MainWindow::actRecord()
 {
-    QString filename = QFileDialog::getSaveFileName(this, tr("Test File Name"), QString(), tr("XML Files (*.xml)"));
+    const QString filename = QFileDialog::getSaveFileName( // blocking-ok: GUI test recording, WITH_GUI_TEST builds only
+        this, tr("Test File Name"), QString(), tr("XML Files (*.xml)"));
     if (!filename.isEmpty()) {
         testUtility->recordTests(filename);
     }
@@ -376,7 +377,8 @@ void MainWindow::actRecord()
 
 void MainWindow::actPlayRecording()
 {
-    QString filename = QFileDialog::getOpenFileName(this, tr("Test File Name"), QString(), tr("XML Files (*.xml)"));
+    const QString filename = QFileDialog::getOpenFileName( // blocking-ok: GUI test playback, WITH_GUI_TEST builds only
+        this, tr("Test File Name"), QString(), tr("XML Files (*.xml)"));
     if (!filename.isEmpty()) {
         testUtility->playTests(filename);
     }
