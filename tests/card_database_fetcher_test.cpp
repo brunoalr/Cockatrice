@@ -10,6 +10,7 @@
 #include <QNetworkRequest>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QTest>
 #include <QUrl>
 #include <gtest/gtest.h>
 
@@ -33,10 +34,13 @@ class CardDatabaseFetcherTest : public ::testing::Test // NOSONAR: TEST_F reads 
 protected:
     QTemporaryDir site;
     QTemporaryDir target;
-    const QByteArray cards = QByteArray("<cockatrice_carddatabase version=\"4\"><cards>") +
+    // As in the published files, the root element starts some hundred bytes into the document.
+    const QByteArray prolog =
+        QByteArray("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- ") + QByteArray(300, 'x') + QByteArray(" -->\n");
+    const QByteArray cards = prolog + QByteArray("<cockatrice_carddatabase version=\"4\"><cards>") +
                              QByteArray("<card><name>Example</name></card>").repeated(5000) +
                              QByteArray("</cards></cockatrice_carddatabase>\n");
-    const QByteArray tokens = "<cockatrice_carddatabase version=\"4\"><cards/></cockatrice_carddatabase>\n";
+    const QByteArray tokens = prolog + "<cockatrice_carddatabase version=\"4\"><cards/></cockatrice_carddatabase>\n";
 
     // The web build passes the page's own address: the files sit beside it.
     QUrl page() const
@@ -57,6 +61,21 @@ protected:
     bool targetIsEmpty() const
     {
         return QDir(target.path()).isEmpty(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot);
+    }
+
+    void expectAFailureThatNames(const QString &name) const
+    {
+        CardDatabaseFetcher fetcher(page(), target.path());
+        const QSignalSpy fetched(&fetcher, &CardDatabaseFetcher::fetched);
+        QSignalSpy failed(&fetcher, &CardDatabaseFetcher::failed);
+
+        fetcher.fetch();
+
+        ASSERT_TRUE(failed.wait(5000));
+        EXPECT_TRUE(failed.first().first().toString().contains(name));
+        QTest::qWait(200);
+        EXPECT_TRUE(fetched.isEmpty());
+        EXPECT_TRUE(targetIsEmpty());
     }
 };
 
@@ -79,63 +98,40 @@ TEST_F(CardDatabaseFetcherTest, BothFilesGiveFetchedAndTwoIdenticalCopies)
 TEST_F(CardDatabaseFetcherTest, MissingTokensGiveFailedAndLeaveNoCardsBehind)
 {
     publishCards();
-    CardDatabaseFetcher fetcher(page(), target.path());
-    QSignalSpy fetched(&fetcher, &CardDatabaseFetcher::fetched);
-    QSignalSpy failed(&fetcher, &CardDatabaseFetcher::failed);
 
-    fetcher.fetch();
-
-    ASSERT_TRUE(failed.wait(5000));
-    EXPECT_TRUE(failed.first().first().toString().contains(QStringLiteral("tokens.xml")));
-    EXPECT_FALSE(fetched.wait(200));
-    EXPECT_TRUE(targetIsEmpty());
+    expectAFailureThatNames(QStringLiteral("tokens.xml"));
 }
 
 TEST_F(CardDatabaseFetcherTest, MissingCardsGiveFailedAndLeaveNoTokensBehind)
 {
     publishTokens();
-    CardDatabaseFetcher fetcher(page(), target.path());
-    QSignalSpy fetched(&fetcher, &CardDatabaseFetcher::fetched);
-    QSignalSpy failed(&fetcher, &CardDatabaseFetcher::failed);
 
-    fetcher.fetch();
-
-    ASSERT_TRUE(failed.wait(5000));
-    EXPECT_TRUE(failed.first().first().toString().contains(QStringLiteral("cards.xml")));
-    EXPECT_FALSE(fetched.wait(200));
-    EXPECT_TRUE(targetIsEmpty());
+    expectAFailureThatNames(QStringLiteral("cards.xml"));
 }
 
 TEST_F(CardDatabaseFetcherTest, ABodyThatIsNotACardDatabaseGivesFailedAndLeavesNothingBehind)
 {
     publishCards();
     writeFile(site.filePath(QStringLiteral("tokens.xml")), "<!doctype html><html><body>Not found</body></html>\n");
-    CardDatabaseFetcher fetcher(page(), target.path());
-    QSignalSpy fetched(&fetcher, &CardDatabaseFetcher::fetched);
-    QSignalSpy failed(&fetcher, &CardDatabaseFetcher::failed);
 
-    fetcher.fetch();
+    expectAFailureThatNames(QStringLiteral("tokens.xml"));
+}
 
-    ASSERT_TRUE(failed.wait(5000));
-    EXPECT_TRUE(failed.first().first().toString().contains(QStringLiteral("tokens.xml")));
-    EXPECT_FALSE(fetched.wait(200));
-    EXPECT_TRUE(targetIsEmpty());
+TEST_F(CardDatabaseFetcherTest, ABodyWithoutTheRootElementAtItsStartGivesFailed)
+{
+    publishCards();
+    writeFile(site.filePath(QStringLiteral("tokens.xml")),
+              QByteArray("<html>") + QByteArray(2000, ' ') + QByteArray("</cockatrice_carddatabase>\n"));
+
+    expectAFailureThatNames(QStringLiteral("tokens.xml"));
 }
 
 TEST_F(CardDatabaseFetcherTest, ADatabaseCutShortGivesFailedAndLeavesNothingBehind)
 {
     writeFile(site.filePath(QStringLiteral("cards.xml")), cards.left(cards.size() / 2));
     publishTokens();
-    CardDatabaseFetcher fetcher(page(), target.path());
-    QSignalSpy fetched(&fetcher, &CardDatabaseFetcher::fetched);
-    QSignalSpy failed(&fetcher, &CardDatabaseFetcher::failed);
 
-    fetcher.fetch();
-
-    ASSERT_TRUE(failed.wait(5000));
-    EXPECT_TRUE(failed.first().first().toString().contains(QStringLiteral("cards.xml")));
-    EXPECT_FALSE(fetched.wait(200));
-    EXPECT_TRUE(targetIsEmpty());
+    expectAFailureThatNames(QStringLiteral("cards.xml"));
 }
 
 TEST_F(CardDatabaseFetcherTest, ATokensFileThatCannotBeSavedLeavesNoCardsBehind)
@@ -159,15 +155,24 @@ TEST_F(CardDatabaseFetcherTest, AQueryAndAFragmentInThePageAddressAreLeftOut)
     publishCards();
     publishTokens();
     QUrl address = QUrl::fromLocalFile(site.path() + QLatin1Char('/'));
-    address.setQuery(QStringLiteral("connect=secret"));
+    address.setQuery(QStringLiteral("connect=example"));
     address.setFragment(QStringLiteral("part"));
     CardDatabaseFetcher fetcher(address, target.path());
+    const auto *network = fetcher.findChild<QNetworkAccessManager *>();
+    ASSERT_NE(network, nullptr);
+    QList<QUrl> requested;
+    QObject::connect(network, &QNetworkAccessManager::finished,
+                     [&requested](const QNetworkReply *reply) { requested.append(reply->request().url()); });
     QSignalSpy fetched(&fetcher, &CardDatabaseFetcher::fetched);
 
     fetcher.fetch();
 
     ASSERT_TRUE(fetched.wait(5000));
-    EXPECT_EQ(readFile(target.filePath(QStringLiteral("cards.xml"))), cards);
+    ASSERT_EQ(requested.size(), 2);
+    for (const QUrl &url : requested) {
+        EXPECT_FALSE(url.hasQuery()) << url.toString().toStdString();
+        EXPECT_FALSE(url.hasFragment()) << url.toString().toStdString();
+    }
 }
 
 TEST_F(CardDatabaseFetcherTest, SecondFetchWhileOneRunsStartsNothing)
