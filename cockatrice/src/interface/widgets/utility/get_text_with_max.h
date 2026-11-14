@@ -12,17 +12,22 @@
 #include <libcockatrice/utility/string_limits.h>
 #include <qnamespace.h>
 
+class QInputDialog;
 class QWidget;
 
+QInputDialog *newTextDialogWithMax(QWidget *parent,
+                                   const QString &title,
+                                   const QString &label,
+                                   QLineEdit::EchoMode echo = QLineEdit::Normal,
+                                   const QString &text = QString(),
+                                   int max = MAX_NAME_LENGTH);
 QString getTextWithMax(QWidget *parent,
                        const QString &title,
                        const QString &label,
                        QLineEdit::EchoMode echo = QLineEdit::Normal,
                        const QString &text = QString(),
                        bool *ok = nullptr,
-                       int max = MAX_NAME_LENGTH,
-                       Qt::WindowFlags flags = Qt::WindowFlags(),
-                       Qt::InputMethodHints inputMethodHints = Qt::ImhNone);
+                       int max = MAX_NAME_LENGTH);
 static inline QString getTextWithMax(QWidget *parent, const QString &title, const QString &label, int max)
 {
     return getTextWithMax(parent, title, label, QLineEdit::Normal, QString(), nullptr, max);

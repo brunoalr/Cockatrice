@@ -698,6 +698,7 @@ if(WITH_ORACLE OR WITH_CLIENT)
       ${CMAKE_SOURCE_DIR}/cockatrice/src/client/settings/cache_settings.cpp
       ${CMAKE_SOURCE_DIR}/cockatrice/src/client/settings/card_counter_settings.cpp
       ${CMAKE_SOURCE_DIR}/cockatrice/src/client/settings/shortcuts_settings.cpp
+      ${CMAKE_SOURCE_DIR}/cockatrice/src/interface/widgets/utility/non_blocking_dialogs.cpp
       ${VERSION_STRING_CPP}
   )
   set(SETTINGS_LIBS libcockatrice_network libcockatrice_settings)
@@ -730,5 +731,59 @@ if(WITH_ORACLE OR WITH_CLIENT)
     ${SETTINGS_LIBS}
     INCLUDE_DIRS
     ${SETTINGS_INCLUDE_DIRS}
+  )
+endif()
+
+if(WITH_CLIENT)
+  set(CLIENT_SRC ${CMAKE_SOURCE_DIR}/cockatrice/src)
+  cockatrice_add_test(
+    NAME
+    connection_controller_test
+    SOURCES
+    ${CLIENT_SRC}/client/network/connection_controller/remote_connection_controller.cpp
+    ${CLIENT_SRC}/interface/intents/intent.cpp
+    ${CLIENT_SRC}/interface/intents/intent_login.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_connect.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_password.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_forgot_password_challenge.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_forgot_password_request.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_forgot_password_reset.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_login_prompt.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_register.cpp
+    ${CLIENT_SRC}/interface/widgets/server/handle_public_servers.cpp
+    ${CLIENT_SRC}/interface/widgets/server/user/user_info_connection.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/get_text_with_max.cpp
+    ${CLIENT_SRC}/interface/pixel_map_generator.cpp
+    ${CLIENT_SRC}/interface/theme_config.cpp
+    ${CLIENT_SRC}/interface/theme_icon.cpp
+    ${CLIENT_SRC}/interface/theme_icon_badge.cpp
+    ${CLIENT_SRC}/interface/theme_icon_fill.cpp
+    ${CLIENT_SRC}/interface/theme_icon_ink.cpp
+    ${CLIENT_SRC}/interface/theme_icon_sticker.cpp
+    ${CLIENT_SRC}/interface/theme_manager.cpp
+    ${SETTINGS_SOURCES}
+    connection_controller_test.cpp
+    LIBS
+    libcockatrice_network_client_remote
+    libcockatrice_protocol
+    ${SETTINGS_LIBS}
+    INCLUDE_DIRS
+    ${SETTINGS_INCLUDE_DIRS}
+  )
+  cockatrice_add_test(
+    NAME
+    crash_report_dialog_test
+    SOURCES
+    ${CLIENT_SRC}/client/crash/crash_reporter.cpp
+    ${CLIENT_SRC}/interface/logger.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_crash_report.cpp
+    ${SETTINGS_SOURCES}
+    crash_report_dialog_test.cpp
+    LIBS
+    ${SETTINGS_LIBS}
+    INCLUDE_DIRS
+    ${SETTINGS_INCLUDE_DIRS}
+    DEFINITIONS
+    COCKATRICE_WITH_CRASH_REPORTING=0
   )
 endif()

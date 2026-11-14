@@ -1,12 +1,13 @@
 #include "dlg_forgot_password_reset.h"
 
 #include "../../../client/settings/cache_settings.h"
+#include "../utility/non_blocking_dialogs.h"
+#include "forgot_password_server.h"
 
 #include <QDialogButtonBox>
 #include <QGridLayout>
 #include <QIntValidator>
 #include <QLabel>
-#include <QMessageBox>
 #include <QSharedPointer>
 #include <QSize>
 #include <QVBoxLayout>
@@ -16,27 +17,13 @@
 class QVBoxLayout;
 class QWidget;
 
-DlgForgotPasswordReset::DlgForgotPasswordReset(QWidget *parent) : QDialog(parent)
+DlgForgotPasswordReset::DlgForgotPasswordReset(QWidget *parent)
+    : QDialog(parent), tokenEdit(new QLineEdit()), newpasswordEdit(new QLineEdit()),
+      newpasswordverifyEdit(new QLineEdit())
 {
-    QString lastfphost;
-    QString lastfpport;
-    QString lastfpplayername;
-    ServersSettings &servers = SettingsCache::instance().servers();
-    lastfphost = servers.getHostname();
-    lastfpport = servers.getPort();
-    lastfpplayername = servers.getPlayerName();
-
-    if (!servers.getFPHostname().isEmpty() && !servers.getFPPort().isEmpty() && !servers.getFPPlayerName().isEmpty()) {
-        lastfphost = servers.getFPHostname();
-        lastfpport = servers.getFPPort();
-        lastfpplayername = servers.getFPPlayerName();
-    }
-
-    if (servers.getFPHostname().isEmpty() && servers.getFPPort().isEmpty() && servers.getFPPlayerName().isEmpty()) {
-        QMessageBox::warning(this, tr("Reset Password Warning"),
-                             tr("A problem has occurred. Please try to request a new password again."));
-        reject();
-    }
+    const auto [lastfphost, lastfpport, lastfpplayername] = lastForgotPasswordServer();
+    rejectWithoutPasswordRequest(this, tr("Reset Password Warning"),
+                                 tr("A problem has occurred. Please try to request a new password again."));
 
     infoLabel = new QLabel(tr("Enter the received token and the new password in order to set your new password."));
     infoLabel->setWordWrap(true);
@@ -58,23 +45,20 @@ DlgForgotPasswordReset::DlgForgotPasswordReset(QWidget *parent) : QDialog(parent
 
     //: Code mailed to the player so they can reset their password. Not a game token.
     tokenLabel = new QLabel(tr("Token:"));
-    tokenEdit = new QLineEdit();
     tokenEdit->setMaxLength(MAX_NAME_LENGTH);
     tokenLabel->setBuddy(tokenLabel);
 
     newpasswordLabel = new QLabel(tr("New Password:"));
-    newpasswordEdit = new QLineEdit();
     newpasswordEdit->setMaxLength(MAX_NAME_LENGTH);
     newpasswordLabel->setBuddy(newpasswordEdit);
     newpasswordEdit->setEchoMode(QLineEdit::Password);
 
     newpasswordverifyLabel = new QLabel(tr("New Password:"));
-    newpasswordverifyEdit = new QLineEdit();
     newpasswordverifyEdit->setMaxLength(MAX_NAME_LENGTH);
     newpasswordverifyLabel->setBuddy(newpasswordEdit);
     newpasswordverifyEdit->setEchoMode(QLineEdit::Password);
 
-    if (!servers.getFPHostname().isEmpty() && !servers.getFPPort().isEmpty() && !servers.getFPPlayerName().isEmpty()) {
+    if (hasSavedPasswordRequest()) {
         hostLabel->hide();
         hostEdit->hide();
         portLabel->hide();
@@ -115,27 +99,27 @@ DlgForgotPasswordReset::DlgForgotPasswordReset(QWidget *parent) : QDialog(parent
 void DlgForgotPasswordReset::actOk()
 {
     if (playernameEdit->text().isEmpty()) {
-        QMessageBox::critical(this, tr("Reset Password Error"), tr("The player name can't be empty."));
+        Dialogs::critical(this, tr("Reset Password Error"), tr("The player name can't be empty."));
         return;
     }
 
     if (tokenEdit->text().isEmpty()) {
-        QMessageBox::critical(this, tr("Reset Password Error"), tr("The token can't be empty."));
+        Dialogs::critical(this, tr("Reset Password Error"), tr("The token can't be empty."));
         return;
     }
 
     if (newpasswordEdit->text().isEmpty()) {
-        QMessageBox::critical(this, tr("Reset Password Error"), tr("The new password can't be empty."));
+        Dialogs::critical(this, tr("Reset Password Error"), tr("The new password can't be empty."));
         return;
     }
 
     //! \todo This stuff should be using QValidators.
     if (newpasswordEdit->text().length() < 8) {
-        QMessageBox::critical(this, tr("Error"), tr("Your password is too short."));
+        Dialogs::critical(this, tr("Error"), tr("Your password is too short."));
         return;
     }
     if (newpasswordEdit->text() != newpasswordverifyEdit->text()) {
-        QMessageBox::critical(this, tr("Reset Password Error"), tr("The passwords do not match."));
+        Dialogs::critical(this, tr("Reset Password Error"), tr("The passwords do not match."));
         return;
     }
 
