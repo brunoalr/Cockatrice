@@ -185,20 +185,20 @@ void IntentOpenSharedDeck::onItemFailure(const QString &reason)
     }
 
     const int downloadedCount = loadedDecks.size();
-    Dialogs::confirm(previewDialog, tr("Open shared decks"),
-                     tr("Could not download the deck \"%1\".\n\n%n deck(s) were already downloaded. Open them?", "",
-                        downloadedCount)
-                         .arg(itemNames.value(currentItemId, tr("Unknown deck"))),
-                     Dialogs::whileAlive(this,
-                                         [this](bool confirmed) {
-                                             if (confirmed) {
-                                                 finishAll();
-                                             } else {
-                                                 previewDialog->deleteLater();
-                                                 emitCancelled();
-                                             }
-                                         }),
-                     QMessageBox::Yes);
+    Dialogs::confirm(
+        previewDialog, tr("Open shared decks"),
+        tr("Could not download the deck \"%1\".\n\n%n deck(s) were already downloaded. Open them?", "", downloadedCount)
+            .arg(itemNames.value(currentItemId, tr("Unknown deck"))),
+        Dialogs::whileAlive(this,
+                            [this](bool confirmed) {
+                                if (confirmed) {
+                                    finishAll();
+                                } else {
+                                    previewDialog->deleteLater();
+                                    emitCancelled();
+                                }
+                            }),
+        QMessageBox::Yes);
 }
 
 void IntentOpenSharedDeck::onDownloadTimeout()

@@ -592,9 +592,9 @@ void DeckPreviewWidget::actDeleteFile()
     }
 
     // read input
-    Dialogs::ask(this, QMessageBox::Warning, tr("Delete file"), tr("Are you sure you want to delete the selected file?"),
-                 QMessageBox::Yes | QMessageBox::No, QMessageBox::NoButton,
-                 [this](QMessageBox::StandardButton answer) {
+    Dialogs::ask(this, QMessageBox::Warning, tr("Delete file"),
+                 tr("Are you sure you want to delete the selected file?"), QMessageBox::Yes | QMessageBox::No,
+                 QMessageBox::NoButton, [this](QMessageBox::StandardButton answer) {
                      const int current = row();
                      if (current == -1 || answer != QMessageBox::Yes) {
                          return;

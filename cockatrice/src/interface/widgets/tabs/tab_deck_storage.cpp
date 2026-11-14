@@ -460,9 +460,9 @@ void TabDeckStorage::uploadDeck(const QString &filePath, const QString &targetPa
         return;
     }
 
-    auto *prompt =
-        newTextDialogWithMax(this, tr("Enter deck name"), tr("This decklist does not have a name.\nPlease enter a name:"),
-                             QLineEdit::Normal, deckFileInfo.completeBaseName());
+    auto *prompt = newTextDialogWithMax(this, tr("Enter deck name"),
+                                        tr("This decklist does not have a name.\nPlease enter a name:"),
+                                        QLineEdit::Normal, deckFileInfo.completeBaseName());
     Dialogs::open(prompt, [this, prompt, deck, targetPath, thenNext](int result) mutable {
         if (result != QDialog::Accepted) {
             thenNext();

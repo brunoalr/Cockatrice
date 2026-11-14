@@ -940,16 +940,16 @@ void DeckEditorDeckDockWidget::addMoveToZoneMenu(QMenu *menu,
         }
     }
 
-    const auto addMoveAction = [this, card = QPersistentModelIndex(sourceCardIndex)](
-                                   QMenu *targetMenu, const QString &targetZoneName, const QString &label,
-                                   bool enabled) {
-        QAction *action = targetMenu->addAction(label);
-        action->setEnabled(enabled);
-        if (enabled) {
-            connect(action, &QAction::triggered, this,
-                    [this, card, targetZoneName] { deckStateManager->moveCardToZone(card, targetZoneName); });
-        }
-    };
+    const auto addMoveAction =
+        [this, card = QPersistentModelIndex(sourceCardIndex)](QMenu *targetMenu, const QString &targetZoneName,
+                                                              const QString &label, bool enabled) {
+            QAction *action = targetMenu->addAction(label);
+            action->setEnabled(enabled);
+            if (enabled) {
+                connect(action, &QAction::triggered, this,
+                        [this, card, targetZoneName] { deckStateManager->moveCardToZone(card, targetZoneName); });
+            }
+        };
 
     const auto tree = deckStateManager->getDeckListShared()->getTree();
 
@@ -1033,9 +1033,8 @@ void DeckEditorDeckDockWidget::addChangeBoardMenu(QMenu *menu, const QString &zo
 void DeckEditorDeckDockWidget::addNewZoneAction(QMenu *menu, const QString &initialBoardName)
 {
     QAction *newZoneAction = menu->addAction(tr("Create &new zone..."));
-    connect(newZoneAction, &QAction::triggered, this, [this, initialBoardName] {
-        DeckZoneDialog::promptToCreateZone(this, deckStateManager, initialBoardName);
-    });
+    connect(newZoneAction, &QAction::triggered, this,
+            [this, initialBoardName] { DeckZoneDialog::promptToCreateZone(this, deckStateManager, initialBoardName); });
 }
 
 void DeckEditorDeckDockWidget::refreshShortcuts()

@@ -16,8 +16,8 @@
 #include <QString>
 #include <QStringList>
 #include <QVariant>
-#include <libcockatrice/network/client/abstract/abstract_client.h>
 #include <functional>
+#include <libcockatrice/network/client/abstract/abstract_client.h>
 #include <qtmetamacros.h>
 
 class DeckList;

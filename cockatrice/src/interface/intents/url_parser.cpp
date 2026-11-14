@@ -224,8 +224,8 @@ void IntentUrlParser::askToOpenDeck(const QUrlQuery &query)
     ctx.serverContext.port = query.queryItemValue("port");
     ctx.shareToken = query.queryItemValue("share");
 
-    qCDebug(UrlParserLog) << "Open-deck intent: host" << ctx.serverContext.hostname << "port"
-                          << ctx.serverContext.port << "token length" << ctx.shareToken.length();
+    qCDebug(UrlParserLog) << "Open-deck intent: host" << ctx.serverContext.hostname << "port" << ctx.serverContext.port
+                          << "token length" << ctx.shareToken.length();
 
     if (ctx.serverContext.hostname.isEmpty()) {
         skipLink(tr("Open shared deck"), tr("Missing or empty hostname in the share link"));
@@ -279,7 +279,8 @@ void IntentUrlParser::confirmOpenDeckServer(const ContextOpenDeck &context)
     });
 
     if (migrating) {
-        const QString current = QStringLiteral("%1:%2").arg(client->serverName(), QString::number(client->serverPort()));
+        const QString current =
+            QStringLiteral("%1:%2").arg(client->serverName(), QString::number(client->serverPort()));
         Dialogs::confirm(
             mainWindow, tr("Open shared deck"),
             tr("Opening this share link connects you to %1 instead of %2.\n\nContinue?").arg(target, current), answered,

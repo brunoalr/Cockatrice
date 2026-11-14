@@ -177,7 +177,7 @@ void CommanderBracketWidget::promptCommanderSpellbookIntegration(std::function<v
             // Persist integration mode
             SettingsCache::instance().deckEditor().setCommanderSpellbookIntegrationEnabled(mode);
             dialog->done(mode == commanderSpellbookIntegrationEnabledIndexDisabled ? QDialog::Rejected
-                                                                                    : QDialog::Accepted);
+                                                                                   : QDialog::Accepted);
         };
     };
     connect(enableBtn, &QAbstractButton::clicked, dialog, choose(commanderSpellbookIntegrationEnabledIndexEnabled));
@@ -302,8 +302,7 @@ void CommanderBracketWidget::maybeAutoEstimateBracket()
         prompting = true;
         promptCommanderSpellbookIntegration([this, promptedDeck](bool accepted) {
             prompting = false;
-            if (deck != promptedDeck || !deck ||
-                deck->getGameFormat().compare("commander", Qt::CaseInsensitive) != 0) {
+            if (deck != promptedDeck || !deck || deck->getGameFormat().compare("commander", Qt::CaseInsensitive) != 0) {
                 maybeAutoEstimateBracket();
                 return;
             }

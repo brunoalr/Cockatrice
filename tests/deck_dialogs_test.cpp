@@ -536,9 +536,8 @@ protected:
 
     void select(const QString &cardName) const
     {
-        const QModelIndexList found =
-            display->match(display->index(0, CardDatabaseModel::NameColumn), Qt::DisplayRole, cardName, 1,
-                           Qt::MatchExactly);
+        const QModelIndexList found = display->match(display->index(0, CardDatabaseModel::NameColumn), Qt::DisplayRole,
+                                                     cardName, 1, Qt::MatchExactly);
         ASSERT_EQ(found.size(), 1);
         view->setCurrentIndex(found.first());
     }

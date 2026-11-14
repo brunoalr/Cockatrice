@@ -105,8 +105,7 @@ void DialogConvertDeckToCodFormat::promptIfRequired(QWidget *parent,
             return;
         }
 
-        confirmOverwriteIfExists(parent, filePath,
-                                 [convert, then](bool overwrite) { then(overwrite && convert()); });
+        confirmOverwriteIfExists(parent, filePath, [convert, then](bool overwrite) { then(overwrite && convert()); });
         return;
     }
 

@@ -69,21 +69,20 @@ void FilterDisplayWidget::loadFilter()
 void FilterDisplayWidget::deleteFilter()
 {
     // Show confirmation dialog before deleting the filter
-    Dialogs::confirm(this, tr("Confirm Delete"),
-                     tr("Are you sure you want to delete the filter '%1'?").arg(filterFilename), [this](bool confirmed) {
-                         if (!confirmed) {
-                             return;
-                         }
-                         // If confirmed, delete the filter
-                         QString filePath =
-                             SettingsCache::instance().paths().getFiltersPath() + QDir::separator() + filterFilename;
-                         QFile file(filePath);
-                         if (file.remove()) {
-                             emit filterDeleted(filterFilename); // Emit signal for deletion
-                             delete this;                        // Delete this widget
-                         } else {
-                             Dialogs::warning(this, tr("Delete Failed"),
-                                              tr("Failed to delete filter '%1'.").arg(filterFilename));
-                         }
-                     });
+    Dialogs::confirm(
+        this, tr("Confirm Delete"), tr("Are you sure you want to delete the filter '%1'?").arg(filterFilename),
+        [this](bool confirmed) {
+            if (!confirmed) {
+                return;
+            }
+            // If confirmed, delete the filter
+            QString filePath = SettingsCache::instance().paths().getFiltersPath() + QDir::separator() + filterFilename;
+            QFile file(filePath);
+            if (file.remove()) {
+                emit filterDeleted(filterFilename); // Emit signal for deletion
+                delete this;                        // Delete this widget
+            } else {
+                Dialogs::warning(this, tr("Delete Failed"), tr("Failed to delete filter '%1'.").arg(filterFilename));
+            }
+        });
 }
