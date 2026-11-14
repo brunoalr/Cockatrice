@@ -285,7 +285,7 @@ void CardDatabase::adoptLoadedSets()
         set->setSortKeyInMemory(saved.sortKey);
         set->setIsKnownInMemory(saved.isKnown);
     }
-    const bool firstVisit = std::none_of(loaded.cbegin(), loaded.cend(), [](const CardSetPtr &set) {
+    const bool firstVisit = std::ranges::none_of(loaded, [](const CardSetPtr &set) {
         return (set->getIsKnown() && !set->getIsKnownIgnored()) || set->getSortKey() != 0;
     });
     if (firstVisit) {

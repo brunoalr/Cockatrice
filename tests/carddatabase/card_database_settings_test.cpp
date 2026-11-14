@@ -90,7 +90,8 @@ private:
     QString root;
 };
 
-class CardDatabaseSettingsUnsavedSetsTest : public ::testing::Test
+class CardDatabaseSettingsUnsavedSetsTest
+    : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:
     void SetUp() override
@@ -146,7 +147,7 @@ TEST_F(CardDatabaseSettingsUnsavedSetsTest, SwitchOnKeepsSavedDisabledSet)
 
 // The checked-in fixtures declare no set metadata, so every one of their sets counts as ignored and could
 // never become known.
-class WebSetAdoptionTest : public ::testing::Test
+class WebSetAdoptionTest : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:
     void SetUp() override
