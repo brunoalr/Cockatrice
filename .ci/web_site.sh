@@ -112,9 +112,12 @@ assemble() {
   hash=$(app_hash "$app")
   mkdir -p "$staging/app/$hash"
   cp "${app_files[@]/#/$app/}" "$staging/app/$hash/"
-  cp "$database/cards.xml" "$database/tokens.xml" "$worker" "$web/coi-serviceworker.LICENSE" "$repo/LICENSE" "$staging/"
+  cp "$database/cards.xml" "$database/tokens.xml" "$worker" "$staging/"
+  # With an extension a static host serves them as text; without one a browser downloads them
+  cp "$web/coi-serviceworker.LICENSE" "$staging/coi-serviceworker.LICENSE.txt"
+  cp "$repo/LICENSE" "$staging/LICENSE.txt"
   if [[ -n $source ]]; then
-    echo "$source" >"$staging/SOURCE"
+    echo "$source" >"$staging/SOURCE.txt"
     sed "s|app/@HASH@/|app/$hash/|g; s|@SOURCE@|$source|" "$web/index.html" >"$staging/index.html"
   else
     sed "s|app/@HASH@/|app/$hash/|g; /@SOURCE@/d" "$web/index.html" >"$staging/index.html"
@@ -196,7 +199,7 @@ self_test() {
   local a
   a=$(cd "$work/app" && cat "${app_files[@]}" | sha256 | cut -c1-16)
   assembles "$work/app" "$work/database" "$work/a"
-  for file in index.html coi-serviceworker.js coi-serviceworker.LICENSE LICENSE versions.json cards.xml tokens.xml \
+  for file in index.html coi-serviceworker.js coi-serviceworker.LICENSE.txt LICENSE.txt versions.json cards.xml tokens.xml \
     "${app_files[@]/#/app/$a/}"; do
     if [[ ! -s $work/a/$file ]]; then
       echo "self-test FAILED: the site has no $file"
@@ -311,13 +314,13 @@ self_test() {
     return 1
   fi
 
-  if grep -q '@SOURCE@' "$work/a/index.html" || [[ -e $work/a/SOURCE ]]; then
+  if grep -qE '@SOURCE@|Source code' "$work/a/index.html" || [[ -e $work/a/SOURCE.txt ]]; then
     echo "self-test FAILED: a site without a source address still names one"
     return 1
   fi
   local source=https://example.org/source/tree/0123abc
   WEB_SITE_SOURCE_URL=$source assembles "$work/app" "$work/database" "$work/sourced"
-  if ! grep -q "href=\"$source\"" "$work/sourced/index.html" || [[ $(<"$work/sourced/SOURCE") != "$source" ]]; then
+  if ! grep -q "href=\"$source\"" "$work/sourced/index.html" || [[ $(<"$work/sourced/SOURCE.txt") != "$source" ]]; then
     echo "self-test FAILED: the site does not link its source address $source"
     return 1
   fi
@@ -341,9 +344,10 @@ self_test() {
     echo "self-test FAILED: the missing licence was not named: $(<"$out")"
     return 1
   fi
+  cp "$(dirname "$0")/../cockatrice/web/coi-serviceworker.LICENSE" "$web/"
   rm "$work/repo/LICENSE"
   refuses "a site without the licence" "$work/app" "$work/database" "$work/x13"
-  if ! grep -q 'LICENSE' "$out"; then
+  if ! grep -q '/\.\./LICENSE is missing' "$out"; then
     echo "self-test FAILED: the missing licence was not named: $(<"$out")"
     return 1
   fi
