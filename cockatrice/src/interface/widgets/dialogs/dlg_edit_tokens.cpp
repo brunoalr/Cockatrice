@@ -206,7 +206,9 @@ void DlgEditTokens::actRemoveToken()
 void DlgEditTokens::colorChanged(int colorIndex)
 {
     if (currentCard) {
-        currentCard->setColors(QString(colorEdit->itemData(colorIndex).toChar()));
+        // "colorless" and no selection both hold a null QChar, which QString(QChar) would turn into one NUL character
+        const QChar color = colorEdit->itemData(colorIndex).toChar();
+        currentCard->setColors(color.isNull() ? QString() : QString(color));
     }
 }
 

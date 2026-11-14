@@ -17,6 +17,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
@@ -29,6 +30,7 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QTemporaryDir>
+#include <QTreeView>
 #include <cstring>
 #include <gtest/gtest.h>
 #include <libcockatrice/card/card_info.h>
@@ -515,6 +517,26 @@ TEST_F(TokenDialog, AFreeNameAddsTheToken)
     ASSERT_TRUE(token);
     EXPECT_TRUE(token->getIsToken());
     EXPECT_TRUE(openDialogs<QInputDialog>().isEmpty());
+}
+
+TEST_F(TokenDialog, AColourlessTokenGetsAnEmptyColour)
+{
+    QInputDialog *prompt = askForAToken();
+    ASSERT_NE(prompt, nullptr);
+    enter(prompt, "Wurm");
+    auto *tokens = dialog->findChild<QTreeView *>();
+    auto *colour = dialog->findChild<QComboBox *>();
+    ASSERT_NE(tokens, nullptr);
+    ASSERT_NE(colour, nullptr);
+    const QModelIndex first = tokens->model()->index(0, 0);
+    tokens->setCurrentIndex(first);
+
+    colour->setCurrentIndex(colour->findText("green"));
+    colour->setCurrentIndex(colour->findText("colorless"));
+
+    const CardInfoPtr token = CardDatabaseManager::query()->getCardInfo(first.data().toString());
+    ASSERT_TRUE(token);
+    EXPECT_EQ(token->getColors(), QString());
 }
 
 class DatabaseMenu : public DeckDialogs // NOSONAR: TEST_F reads fixture members from a subclass
