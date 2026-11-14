@@ -32,6 +32,7 @@
 #include <QItemSelectionModel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QMetaObject>
 #include <QModelIndex>
 #include <QModelIndexList>
 #include <QPersistentModelIndex>
@@ -494,7 +495,8 @@ void TabDeckStorage::sendDeck(const DeckList &deck, const QString &targetPath, c
     PendingCommand *pend = client->prepareSessionCommand(cmd);
     connect(pend, &PendingCommand::finished, this, &TabDeckStorage::uploadFinished);
     client->sendCommand(pend);
-    thenNext();
+    // From the event loop: calling it here nests one stack frame per deck of a large upload.
+    QMetaObject::invokeMethod(this, thenNext, Qt::QueuedConnection);
 }
 
 void TabDeckStorage::uploadFinished(const Response &r, const CommandContainer &commandContainer)
