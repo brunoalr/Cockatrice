@@ -25,7 +25,8 @@ require_files() {
 }
 
 app_hash() {
-  (cd "$1" && cat "${app_files[@]}") | sha256 | cut -c1-16
+  local dir=$1
+  (cd "$dir" && cat "${app_files[@]}") | sha256 | cut -c1-16
 }
 
 keep_previous() {
@@ -175,7 +176,8 @@ self_test() {
     fi
   }
   versions_of() {
-    ls "$1/app"
+    local site=$1
+    ls "$site/app"
   }
 
   local a

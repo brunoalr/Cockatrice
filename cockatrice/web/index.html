@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, height=device-height, user-scalable=0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cockatrice</title>
     <style>
       html, body { padding: 0; margin: 0; overflow: hidden; height: 100%; font-family: system-ui, sans-serif; }
@@ -62,9 +62,10 @@
         console.error(message.textContent);
       };
 
-      const start = async () => {
-        try {
-          await qtLoad({
+      const start = () =>
+        // a script that failed to load leaves qtLoad undefined: the call must sit inside the chain to be caught
+        Promise.resolve()
+          .then(() => qtLoad({
             // qtloader passes Emscripten bare file names, which would resolve beside this page
             locateFile: file => 'app/@HASH@/' + file,
             qt: {
@@ -81,15 +82,14 @@
               entryFunction: window.cockatrice_entry,
               containerElements: [container],
             },
+          }))
+          .catch(e => {
+            message.textContent = `Cockatrice could not start: ${e?.message ?? e}`;
+            container.hidden = true;
+            statusBox.hidden = false;
+            console.error(e);
+            console.error(e?.stack);
           });
-        } catch (e) {
-          message.textContent = `Cockatrice could not start: ${e?.message ?? e}`;
-          container.hidden = true;
-          statusBox.hidden = false;
-          console.error(e);
-          console.error(e?.stack);
-        }
-      };
 
       if (window.crossOriginIsolated)
         start();
