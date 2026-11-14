@@ -225,6 +225,10 @@ int main(int argc, char **argv)
     QTemporaryDir home;
     if (home.isValid()) {
         qputenv("HOME", home.path().toLocal8Bit());
+#ifdef Q_OS_MACOS
+        // The standard paths ignore HOME on macOS.
+        qputenv("CFFIXED_USER_HOME", home.path().toLocal8Bit());
+#endif
     }
 
     QCoreApplication app(argc, argv);
@@ -232,8 +236,8 @@ int main(int argc, char **argv)
     // Every TEST() runs as its own process and CI runs them in parallel (ctest -j4),
     // while the picture paths round-trip through the process-global SettingsCache
     // file. Parallel cases must therefore never share one settings directory: on
-    // platforms where QStandardPaths ignores the $HOME override above (macOS
-    // resolves the home directory via system APIs), every case would otherwise read
+    // platforms where QStandardPaths ignores the $HOME override above (Windows
+    // resolves its known folders via system APIs), every case would otherwise read
     // and write the same paths.ini, and a sibling's setPicsPath can land between our
     // own set and the loader's get — so the loader searches a foreign (or empty)
     // directory and flakily returns a null image. Scope the settings to this process
@@ -257,8 +261,8 @@ int main(int argc, char **argv)
     }
 
     // Best-effort cleanup of this process's settings sandbox. QStandardPaths test
-    // mode is never auto-cleaned, and on macOS the $HOME override above is ignored,
-    // so without this every run litters ~/.qttest with one pid-unique directory.
+    // mode is never auto-cleaned, and on Windows the $HOME override above is ignored,
+    // so without this every run litters the real profile with one pid-unique directory.
     // Safe under parallel runs: the pid-unique application name above guarantees
     // this directory belongs to this process alone.
     const auto cleanupSandbox = qScopeGuard([] {

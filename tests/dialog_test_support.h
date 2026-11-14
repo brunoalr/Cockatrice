@@ -25,6 +25,7 @@
 #include <QFileDialog>
 #include <QLineEdit>
 #include <QList>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QString>
 #include <QTemporaryDir>
@@ -155,6 +156,8 @@ template <typename RunTests> int run(int argc, char **argv, const QString &appli
     qputenv("CFFIXED_USER_HOME", home.path().toUtf8());
 #endif
     QStandardPaths::setTestModeEnabled(true);
+    // The native format on macOS is CFPreferences, which writes to the real Library whatever the home is.
+    QSettings::setDefaultFormat(QSettings::IniFormat);
     // A platform theme's native file dialog has none of the widgets the tests answer through.
     QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
     QApplication app(argc, argv);
@@ -177,10 +180,14 @@ template <typename RunTests> int run(int argc, char **argv, const QString &appli
     }
 #ifndef Q_OS_WIN
     // Not on Windows: its known folders follow no environment variable, so they cannot be moved for a test.
-    if (const QString data = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-        !data.startsWith(home.path() + QLatin1Char('/'))) {
-        qCritical() << "the settings would be written to" << data << "outside the temporary home: refusing to run";
-        return 1;
+    for (const QString &path :
+         {QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation),
+          QStandardPaths::writableLocation(QStandardPaths::CacheLocation),
+          QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation), QSettings().fileName()}) {
+        if (!home.isValid() || !path.startsWith(home.path() + QLatin1Char('/'))) {
+            qCritical() << "the test would write to" << path << "outside the temporary home: refusing to run";
+            return 1;
+        }
     }
 #endif
     return runTests();
