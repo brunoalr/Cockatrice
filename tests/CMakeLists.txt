@@ -222,6 +222,15 @@ cockatrice_add_test(
   ${CMAKE_SOURCE_DIR}/cockatrice/src
   ${CMAKE_SOURCE_DIR}/libcockatrice_network
 )
+cockatrice_add_test(
+  NAME
+  web_relay_test
+  SOURCES
+  ${CMAKE_SOURCE_DIR}/cockatrice/src/client/network/web_relay.cpp
+  web_relay_test.cpp
+  INCLUDE_DIRS
+  ${CMAKE_SOURCE_DIR}/cockatrice/src
+)
 # The installer's holder probe is Windows-only, but the wording it produces and the
 # question which programs are the payload's own are plain C++ and are what a stuck user
 # has to act on, so they are tested everywhere.
