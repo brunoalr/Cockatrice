@@ -451,8 +451,8 @@ self_test() {
     echo "fixture $file" >"$fonts/$file"
   done
   WEB_SITE_FONTS=$fonts assembles "$work/app" "$work/database" "$work/fonts-site"
-  if [[ $(cd "$work/fonts-site/fonts" && echo *) != "a.LICENSE.txt a.ttf b.LICENSE.txt b.ttc index.txt" ]]; then
-    echo "self-test FAILED: the site's fonts directory holds $(cd "$work/fonts-site/fonts" && echo *)"
+  if [[ $(cd "$work/fonts-site/fonts" && echo ./*) != "./a.LICENSE.txt ./a.ttf ./b.LICENSE.txt ./b.ttc ./index.txt" ]]; then
+    echo "self-test FAILED: the site's fonts directory holds $(cd "$work/fonts-site/fonts" && echo ./*)"
     return 1
   fi
   for file in index.txt a.ttf b.LICENSE.txt; do
