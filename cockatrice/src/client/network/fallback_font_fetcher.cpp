@@ -85,10 +85,18 @@ void FallbackFontFetcher::manifestFetched(QNetworkReply *reply)
         emit finished();
         return;
     }
+    // A browser counts the compressed bytes while a download runs, so only the decoded size is certain.
+    const QByteArray manifest = reply->readAll();
+    if (manifest.size() > maxManifestBytes) {
+        qCWarning(FallbackFontFetcherLog)
+            << "No fallback fonts: the list is larger than" << maxManifestBytes << "bytes";
+        emit finished();
+        return;
+    }
     // A name with no slash, colon, percent sign or leading dot resolves inside fonts/ and nowhere else.
     static const QRegularExpression plainName(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._-]*$"));
     QStringList refused;
-    for (const QString &line : QString::fromUtf8(reply->readAll()).split(QLatin1Char('\n'))) {
+    for (const QString &line : QString::fromUtf8(manifest).split(QLatin1Char('\n'))) {
         const QString name = line.trimmed();
         if (name.isEmpty()) {
             continue;
@@ -135,7 +143,7 @@ void FallbackFontFetcher::addFetched()
     if (fetched.isEmpty()) {
         return;
     }
-#ifdef Q_OS_WASM
+#if defined(Q_OS_WASM) && QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     // The site's collection has a face for each of these, with the Han forms the language expects.
     static const QHash<QString, QString> hanFaces = {
         {QStringLiteral("ja"), QStringLiteral("Noto Sans CJK JP")},

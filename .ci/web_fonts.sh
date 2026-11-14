@@ -25,6 +25,7 @@ font() {
   names+=("$1") urls+=("$2") sums+=("$3") licence_urls+=("$4") licence_sums+=("$5") notices+=("${6:-}")
 }
 
+adobe_notice="Copyright © 2014-2021 Adobe (http://www.adobe.com/)." # NOSONAR: the font's own copyright line
 font NotoSansThai-Regular.ttf "$noto/NotoSansThai/unhinted/ttf/NotoSansThai-Regular.ttf" \
   d4303fe9c63ebb72759ca8b6d2040c8ae81689f7d08d7b91c656154382b49313 \
   "$raw/notofonts/thai/f8b482c158650260bba5d5edba9da3e8bb7185b4/OFL.txt" \
@@ -41,13 +42,14 @@ font NotoSansCJK-Regular.ttc "$raw/notofonts/noto-cjk/a99a4354c68964f6bfac488d01
   b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a \
   "$raw/notofonts/noto-cjk/a99a4354c68964f6bfac488d01010b1fb6d9178a/Sans/LICENSE" \
   6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2 \
-  "Copyright © 2014-2021 Adobe (http://www.adobe.com/)."
+  "$adobe_notice"
 
 sha256() {
+  local file=$1
   if command -v sha256sum >/dev/null; then
-    sha256sum "$1" | cut -c1-64
+    sha256sum "$file" | cut -c1-64
   else
-    shasum -a 256 "$1" | cut -c1-64
+    shasum -a 256 "$file" | cut -c1-64
   fi
 }
 
@@ -169,7 +171,8 @@ self_test() {
     fi
   }
   requests_for() {
-    grep -c "GET /$1 " "$requests" || true
+    local name=$1
+    grep -c "GET /$name " "$requests" || true
   }
 
   downloads "$work/all"
@@ -179,11 +182,11 @@ self_test() {
   fi
   if [[ $(<"$work/all/a.ttf") != "font a" || $(<"$work/all/b.ttc") != "font b" ]] ||
     [[ $(<"$work/all/a.LICENSE.txt") != "licence a" || $(<"$work/all/b.LICENSE.txt") != $'Copyright b\n\nlicence b' ]]; then
-    echo "self-test FAILED: the directory does not hold the fonts and their licences: $(cd "$work/all" && echo *)"
+    echo "self-test FAILED: the directory does not hold the fonts and their licences: $(cd "$work/all" && echo ./*)"
     return 1
   fi
-  if [[ $(cd "$work/all" && echo *) != "a.LICENSE.txt a.ttf b.LICENSE.txt b.ttc index.txt" ]]; then
-    echo "self-test FAILED: the directory holds $(cd "$work/all" && echo *)"
+  if [[ $(cd "$work/all" && echo ./*) != "./a.LICENSE.txt ./a.ttf ./b.LICENSE.txt ./b.ttc ./index.txt" ]]; then
+    echo "self-test FAILED: the directory holds $(cd "$work/all" && echo ./*)"
     return 1
   fi
 
@@ -201,7 +204,7 @@ self_test() {
 
   downloads "$work/one" b.ttc
   if [[ $(<"$work/one/index.txt") != "b.ttc" || -e $work/one/a.ttf ]]; then
-    echo "self-test FAILED: a download of b.ttc alone holds $(cd "$work/one" && echo *)"
+    echo "self-test FAILED: a download of b.ttc alone holds $(cd "$work/one" && echo ./*)"
     return 1
   fi
   if (fixture && download "$work/x1" c.ttf) >"$out" 2>&1 || ! grep -q 'c.ttf is not one of the fonts' "$out"; then

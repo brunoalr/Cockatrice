@@ -68,7 +68,7 @@ QByteArray bigEndian32(quint32 value)
 // The smallest TrueType font the platforms accept: two square glyphs, one of them for 'A'.
 QByteArray tinyFont(const QString &family, qsizetype padding = 0)
 {
-    const QByteArray square = bigEndian16({1, 100, 0, 500, 400, 3, 0}) + QByteArray(4, '\x01') +
+    const QByteArray square = bigEndian16({1, 100, 0, 500, 400, 3, 0}) + QByteArray(4, char(1)) +
                               bigEndian16({100, 0, 400, 0, 0, 400, 0, -400});
     QByteArray names = bigEndian16({0, 4, 6 + 4 * 12});
     QByteArray strings;
@@ -123,12 +123,16 @@ void writeFile(const QString &path, const QByteArray &data)
     ASSERT_EQ(file.write(data), data.size());
 }
 
-QStringList logged;
+QStringList &logged()
+{
+    static QStringList lines;
+    return lines;
+}
 
 void keepFetcherMessages(QtMsgType, const QMessageLogContext &context, const QString &message)
 {
     if (QLatin1String(context.category) == QLatin1String("fallback_font_fetcher")) {
-        logged.append(message);
+        logged().append(message);
     }
 }
 
@@ -164,7 +168,7 @@ protected:
             });
         }
         QSignalSpy finished(&fetcher, &FallbackFontFetcher::finished);
-        logged.clear();
+        logged().clear();
         const QtMessageHandler previous = qInstallMessageHandler(keepFetcherMessages);
         for (int call = 0; call < calls; ++call) {
             fetcher.fetch();
@@ -218,7 +222,7 @@ TEST_F(FallbackFontFetcherTest, AMissingManifestFetchesNothingElseAndLogsOneLine
     publish(QStringLiteral("a.ttf"), tinyFont(QStringLiteral("Fetcher Unlisted")));
 
     EXPECT_EQ(fetchAll().join(QLatin1Char(' ')).toStdString(), "fonts/index.txt");
-    EXPECT_EQ(logged.size(), 1) << logged.join(QLatin1Char('\n')).toStdString();
+    EXPECT_EQ(logged().size(), 1) << logged().join(QLatin1Char('\n')).toStdString();
     EXPECT_FALSE(QFontDatabase::families().contains(QStringLiteral("Fetcher Unlisted")));
 }
 
@@ -323,7 +327,9 @@ public:
 protected:
     void changeEvent(QEvent *event) override
     {
-        fontChanges += event->type() == QEvent::FontChange;
+        if (event->type() == QEvent::FontChange) {
+            ++fontChanges;
+        }
         QWidget::changeEvent(event);
     }
 };
@@ -358,18 +364,18 @@ TEST_F(FallbackFontFetcherTest, ACachedBoardItemIsPaintedAgain)
     publish(QStringLiteral("a.ttf"), tinyFont(QStringLiteral("Fetcher Board")));
     publishManifest({QStringLiteral("a.ttf")});
     QGraphicsScene scene;
-    auto *item = new PaintCounter;
-    item->setRect(0, 0, 20, 20);
-    item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
-    scene.addItem(item);
+    PaintCounter item;
+    item.setRect(0, 0, 20, 20);
+    item.setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+    scene.addItem(&item);
     QGraphicsView view(&scene);
     view.show();
-    ASSERT_TRUE(QTest::qWaitFor([item] { return item->paints > 0; }, 5000));
-    const int before = item->paints;
+    ASSERT_TRUE(QTest::qWaitFor([&item] { return item.paints > 0; }, 5000));
+    const int before = item.paints;
 
     fetchAll();
 
-    EXPECT_TRUE(QTest::qWaitFor([item, before] { return item->paints > before; }, 2000));
+    EXPECT_TRUE(QTest::qWaitFor([&item, before] { return item.paints > before; }, 2000));
 }
 
 TEST_F(FallbackFontFetcherTest, TheGeneratedFontsAreAccepted)
