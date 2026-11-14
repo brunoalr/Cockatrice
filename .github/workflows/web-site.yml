@@ -1,0 +1,121 @@
+name: Build Web Site
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+
+jobs:
+  card-database:
+    name: Card database
+    runs-on: ubuntu-latest    # https://github.com/actions/runner-images
+    timeout-minutes: 30
+    env:
+      CACHE: ${{ github.workspace }}/.cache/Debian13
+      NAME: Debian13
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: "Build Debian 13 Docker image"
+        shell: bash
+        run: source .ci/docker.sh --build
+
+      - name: "Build Oracle and the card database"
+        shell: bash
+        run: |
+          source .ci/docker.sh
+          BUILD_SCRIPT=.ci/card_database.sh RUN card-database
+
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: card-database
+          path: |
+            card-database/cards.xml
+            card-database/tokens.xml
+          if-no-files-found: error
+
+  site:
+    # A job-level block replaces the workflow-level one: this job reads another run's artifact
+    permissions:
+      actions: read
+      contents: read
+    name: Site
+    needs: card-database
+    runs-on: ubuntu-latest    # https://github.com/actions/runner-images
+    timeout-minutes: 15
+
+    steps:
+      - name: "Find the WebAssembly build of the last successful push to master"
+        id: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run=$(gh run list -R "$GITHUB_REPOSITORY" -w desktop-build.yml -b master -e push -s success -L 1 \
+            --json databaseId,headSha --jq '.[] | "\(.databaseId) \(.headSha)"')
+          if [[ -z $run ]]; then
+            echo "::error::No Build Desktop run for a push to master has succeeded, so there is no application for the site"
+            exit 1
+          fi
+          read -r id sha <<<"$run"
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$id"
+          artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/artifacts?name=Cockatrice-wasm" \
+            --jq '.artifacts[0] // empty | "\(.expired) \(.expires_at)"')
+          if [[ -z $artifact ]]; then
+            echo "::error::$url, the last successful Build Desktop run for a push to master, has no artifact Cockatrice-wasm"
+            exit 1
+          fi
+          read -r expired expires_at <<<"$artifact"
+          if [[ $expired == true ]]; then
+            echo "::error::The artifact Cockatrice-wasm of $url, the last successful Build Desktop run for a push to master, expired on $expires_at"
+            exit 1
+          fi
+          echo "Cockatrice-wasm of $url, commit $sha"
+          echo "run-id=$id" >>"$GITHUB_OUTPUT"
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
+
+      # index.html and the application it loads must come from the same commit
+      - name: "Checkout"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.app.outputs.sha }}
+          persist-credentials: false
+
+      - name: "Download the WebAssembly build"
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: Cockatrice-wasm
+          path: ${{ runner.temp }}/app
+          run-id: ${{ steps.app.outputs.run-id }}
+          github-token: ${{ github.token }}
+
+      - name: "Download the card database"
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: card-database
+          path: ${{ runner.temp }}/database
+
+      # Unset means there is no live site yet, and so no previous version to keep
+      - name: "Assemble the site"
+        env:
+          WEB_SITE_URL: ${{ vars.WEB_SITE_URL }}
+        run: .ci/web_site.sh "$RUNNER_TEMP/app" "$RUNNER_TEMP/database" "$RUNNER_TEMP/site" ${WEB_SITE_URL:+"$WEB_SITE_URL"}
+
+      - name: "Start the client from the site as a static host serves it"
+        env:
+          # The runner image forbids the unprivileged user namespaces that Chrome's sandbox needs
+          CHROME_FLAGS: --no-sandbox
+          WASM_SMOKE_ISOLATION_HEADERS: 0
+        run: .ci/wasm_smoke.sh "$RUNNER_TEMP/site"
+
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-site
+          path: ${{ runner.temp }}/site/
+          if-no-files-found: error
