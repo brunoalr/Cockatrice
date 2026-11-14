@@ -7,7 +7,8 @@ tokens_floor=$((600 * 1000))
 
 # Prints the root element's name and the number of tags elements; fails on a document that is not well-formed
 inspect_xml() {
-  python3 - "$1" <<'EOF'
+  local path=$1
+  python3 - "$path" <<'EOF'
 import sys
 import xml.etree.ElementTree as ElementTree
 
