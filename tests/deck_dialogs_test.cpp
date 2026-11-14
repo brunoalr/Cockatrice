@@ -490,6 +490,81 @@ TEST_F(TokenDialog, AFreeNameAddsTheToken)
     EXPECT_TRUE(openDialogs<QInputDialog>().isEmpty());
 }
 
+class DatabaseMenu : public DeckDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    CardDatabaseModel *source = new CardDatabaseModel(CardDatabaseManager::getInstance(), false, window.get());
+    CardDatabaseDisplayModel *display = new CardDatabaseDisplayModel(window.get());
+    CardDatabaseView *view = nullptr;
+    QStringList heard;
+
+    void SetUp() override
+    {
+        CardDatabaseManager::getInstance()->addCard(CardInfo::newInstance("Alpha"));
+        CardDatabaseManager::getInstance()->addCard(CardInfo::newInstance("Beta"));
+        display->setSourceModel(source);
+        view = new CardDatabaseView(window.get(), display);
+        QObject::connect(view, &CardDatabaseView::cardAdded, view,
+                         [this](const QString &cardName, const QString &zoneName) {
+                             heard.append(QStringLiteral("added %1 to %2").arg(cardName, zoneName));
+                         });
+        QObject::connect(view, &CardDatabaseView::cardChanged, view,
+                         [this](const QString &cardName) { heard.append("shows " + cardName); });
+        QObject::connect(view, &CardDatabaseView::selectPrintingClicked, view,
+                         [this] { heard.append("select printing"); });
+    }
+
+    void TearDown() override
+    {
+        for (QWidget *widget : QApplication::topLevelWidgets()) {
+            if (auto *menu = qobject_cast<QMenu *>(widget); menu && menu->isVisible()) {
+                menu->close();
+            }
+        }
+        settle();
+    }
+
+    void select(const QString &cardName) const
+    {
+        const QModelIndexList found =
+            display->match(display->index(0, CardDatabaseModel::NameColumn), Qt::DisplayRole, cardName, 1,
+                           Qt::MatchExactly);
+        ASSERT_EQ(found.size(), 1);
+        view->setCurrentIndex(found.first());
+    }
+
+    QMenu *openMenuOn(const QString &cardName)
+    {
+        select(cardName);
+        emit view->customContextMenuRequested(QPoint(1, 1));
+        settle();
+        heard.clear();
+        return onlyOpenTopLevel<QMenu>();
+    }
+};
+
+TEST_F(DatabaseMenu, AddToDeckAddsTheCardTheMenuWasOpenedOn)
+{
+    const QMenu *menu = openMenuOn("Alpha");
+    ASSERT_NE(menu, nullptr);
+    select("Beta");
+    heard.clear();
+
+    actionWithText(menu, "Add to Deck")->trigger();
+    EXPECT_EQ(heard, QStringList{QStringLiteral("added Alpha to %1").arg(DECK_ZONE_MAIN)});
+}
+
+TEST_F(DatabaseMenu, SelectPrintingShowsTheCardTheMenuWasOpenedOnFirst)
+{
+    const QMenu *menu = openMenuOn("Alpha");
+    ASSERT_NE(menu, nullptr);
+    select("Beta");
+    heard.clear();
+
+    actionWithText(menu, "Select Printing")->trigger();
+    EXPECT_EQ(heard, (QStringList{"shows Alpha", "select printing"}));
+}
+
 class CodConversion : public DeckDialogs // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:

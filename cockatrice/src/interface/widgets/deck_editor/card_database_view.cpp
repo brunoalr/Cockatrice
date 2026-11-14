@@ -27,6 +27,7 @@
 #include <libcockatrice/card/relation/card_relation.h>
 #include <libcockatrice/deck_list/tree/inner_deck_list_node.h>
 #include <libcockatrice/settings/layouts_settings.h>
+#include <memory>
 #include <qnamespace.h>
 #include <utility>
 
@@ -157,19 +158,24 @@ void CardDatabaseView::openCustomMenu(QPoint point)
         return;
     }
 
-    QMenu menu;
+    auto menu = std::make_unique<QMenu>();
+    menu->setAttribute(Qt::WA_DeleteOnClose);
     // add to deck and sideboard options
-    QAction *addToDeck = menu.addAction(tr("Add to Deck"));
-    QAction *addToSideboard = menu.addAction(tr("Add to Sideboard"));
-    QAction *selectPrinting = menu.addAction(tr("Select Printing"));
+    QAction *addToDeck = menu->addAction(tr("Add to Deck"));
+    QAction *addToSideboard = menu->addAction(tr("Add to Sideboard"));
+    QAction *selectPrinting = menu->addAction(tr("Select Printing"));
 
     connect(addToDeck, &QAction::triggered, this, [this, card] { emit cardAdded(card->getName(), DECK_ZONE_MAIN); });
     connect(addToSideboard, &QAction::triggered, this,
             [this, card] { emit cardAdded(card->getName(), DECK_ZONE_SIDE); });
-    connect(selectPrinting, &QAction::triggered, this, &CardDatabaseView::selectPrintingClicked);
+    // The menu stays up while the selection may move: show the card it was opened on before the selector.
+    connect(selectPrinting, &QAction::triggered, this, [this, card] {
+        emit cardChanged(card->getName());
+        emit selectPrintingClicked();
+    });
 
     if (zoneMenuProvider) {
-        QMenu *addToZoneMenu = menu.addMenu(tr("Add to Zone"));
+        QMenu *addToZoneMenu = menu->addMenu(tr("Add to Zone"));
         const auto zoneBoards = zoneMenuProvider();
         for (const QString &boardName : InnerDecklistNode::boardZoneNames()) {
             // Boards with zones nest their children so no two menu entries
@@ -211,15 +217,15 @@ void CardDatabaseView::openCustomMenu(QPoint point)
     }
 
     if (canBeCommander(*card)) {
-        QAction *edhRecCommander = menu.addAction(tr("Show on EDHRec (Commander)"));
+        QAction *edhRecCommander = menu->addAction(tr("Show on EDHRec (Commander)"));
         connect(edhRecCommander, &QAction::triggered, this, [this, card] { emit edhrecClicked(card, true); });
     }
-    QAction *edhRecCard = menu.addAction(tr("Show on EDHRec (Card)"));
+    QAction *edhRecCard = menu->addAction(tr("Show on EDHRec (Card)"));
     connect(edhRecCard, &QAction::triggered, this, [this, card] { emit edhrecClicked(card, false); });
 
     // filling out the related cards submenu
-    auto *relatedMenu = new QMenu(tr("Show Related cards"));
-    menu.addMenu(relatedMenu);
+    auto *relatedMenu = new QMenu(tr("Show Related cards"), menu.get());
+    menu->addMenu(relatedMenu);
     auto relatedCards = card->getAllRelatedCards();
     if (relatedCards.isEmpty()) {
         relatedMenu->setDisabled(true);
@@ -232,5 +238,5 @@ void CardDatabaseView::openCustomMenu(QPoint point)
         }
     }
 
-    menu.exec(mapToGlobal(point));
+    menu.release()->popup(mapToGlobal(point));
 }
