@@ -86,7 +86,7 @@ assemble() {
   worker="$web/coi-serviceworker.js"
   require_files "$app" "${app_files[@]}"
   require_files "$database" cards.xml tokens.xml
-  require_files "$web" index.html coi-serviceworker.js
+  require_files "$web" index.html coi-serviceworker.js coi-serviceworker.LICENSE
   if [[ $(head -n 1 "$worker" | grep -oE '[0-9a-f]{64}') != "$(tail -n +2 "$worker" | sha256 | cut -c1-64)" ]]; then
     echo "::error::$worker differs from the upstream file its first line names"
     exit 1
@@ -104,7 +104,7 @@ assemble() {
   hash=$(app_hash "$app")
   mkdir -p "$staging/app/$hash"
   cp "${app_files[@]/#/$app/}" "$staging/app/$hash/"
-  cp "$database/cards.xml" "$database/tokens.xml" "$worker" "$staging/"
+  cp "$database/cards.xml" "$database/tokens.xml" "$worker" "$web/coi-serviceworker.LICENSE" "$staging/"
   sed "s|app/@HASH@/|app/$hash/|g" "$web/index.html" >"$staging/index.html"
   if ! grep -q "app/$hash/" "$staging/index.html" || grep -q '@HASH@' "$staging/index.html"; then
     echo "::error::$web/index.html does not name app/@HASH@/"
@@ -135,7 +135,7 @@ self_test() {
   local script="$work/repo/.ci/web_site.sh" web="$work/repo/cockatrice/web" served="$work/served" out="$work/out"
   mkdir -p "$work/repo/.ci" "$web" "$work/app" "$work/database" "$served"
   cp "$0" "$script"
-  cp "$(dirname "$0")"/../cockatrice/web/{index.html,coi-serviceworker.js} "$web/"
+  cp "$(dirname "$0")"/../cockatrice/web/{index.html,coi-serviceworker.js,coi-serviceworker.LICENSE} "$web/"
   local file
   for file in "${app_files[@]}"; do
     echo "fixture $file" >"$work/app/$file"
@@ -181,7 +181,7 @@ self_test() {
   local a
   a=$(cd "$work/app" && cat "${app_files[@]}" | sha256 | cut -c1-16)
   assembles "$work/app" "$work/database" "$work/a"
-  for file in index.html coi-serviceworker.js versions.json cards.xml tokens.xml "${app_files[@]/#/app/$a/}"; do
+  for file in index.html coi-serviceworker.js coi-serviceworker.LICENSE versions.json cards.xml tokens.xml "${app_files[@]/#/app/$a/}"; do
     if [[ ! -s $work/a/$file ]]; then
       echo "self-test FAILED: the site has no $file"
       return 1
@@ -303,6 +303,13 @@ self_test() {
   refuses "a site with an altered isolation worker" "$work/app" "$work/database" "$work/x6"
   if ! grep -q 'coi-serviceworker.js' "$out"; then
     echo "self-test FAILED: the altered isolation worker was not named: $(<"$out")"
+    return 1
+  fi
+  mv "$web/coi-serviceworker.js.orig" "$web/coi-serviceworker.js"
+  rm "$web/coi-serviceworker.LICENSE"
+  refuses "a site without the isolation worker's licence" "$work/app" "$work/database" "$work/x11"
+  if ! grep -q 'coi-serviceworker.LICENSE' "$out"; then
+    echo "self-test FAILED: the missing licence was not named: $(<"$out")"
     return 1
   fi
   rm "$web/coi-serviceworker.js"
