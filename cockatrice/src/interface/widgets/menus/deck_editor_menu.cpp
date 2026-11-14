@@ -82,9 +82,12 @@ DeckEditorMenu::DeckEditorMenu(AbstractTabDeckEditor *parent) : QMenu(parent), d
     analyzeDeckMenu = new QMenu(this);
     analyzeDeckMenu->addAction(aExportDeckDecklist);
     analyzeDeckMenu->addAction(aExportDeckDecklistXyz);
+#ifndef Q_OS_WASM
+    // Neither site admits a request from a page on another origin.
     analyzeDeckMenu->addSeparator();
     analyzeDeckMenu->addAction(aAnalyzeDeckDeckstats);
     analyzeDeckMenu->addAction(aAnalyzeDeckTappedout);
+#endif
 
     aClose = new QAction(QString(), this);
     connect(aClose, &QAction::triggered, deckEditor, &AbstractTabDeckEditor::closeRequest);
@@ -111,7 +114,10 @@ DeckEditorMenu::DeckEditorMenu(AbstractTabDeckEditor *parent) : QMenu(parent), d
     addMenu(saveDeckToClipboardMenu);
     addSeparator();
     addAction(aPrintDeck);
+#ifndef Q_OS_WASM
+    // No deck site admits a request from a page on another origin.
     addAction(aLoadDeckFromWebsite);
+#endif
     addMenu(analyzeDeckMenu);
     addSeparator();
     addAction(deckEditor->filterDockWidget->aClearFilterOne);
