@@ -392,19 +392,33 @@ TEST_F(ConnectionControllerDialogs, CancellingTheLoginPromptCancelsTheLink)
     EXPECT_TRUE(context.username.isEmpty());
 }
 
-TEST(WebProfile, ACleanProfileListsOnlyRoosterRangesOnItsSecureWebSocketPort)
+TEST(WebProfile, AProfileWithoutServersGetsRoosterRangesOnItsSecureWebSocketPort)
 {
     QTemporaryDir profile;
     ASSERT_TRUE(profile.isValid());
     ServersSettings servers(profile.path() + "/");
 
-    DlgConnect::saveWebServer(servers);
+    DlgConnect::ensureWebServer(servers);
 
     const QList<ServersSettings::ServerEntry> saved = servers.getServers();
     ASSERT_EQ(saved.size(), 1);
     EXPECT_EQ(saved[0].saveName, "Rooster Ranges");
     EXPECT_EQ(saved[0].host, "server.cockatrice.us");
     EXPECT_EQ(saved[0].port, "443");
+}
+
+TEST(WebProfile, AProfileWithASavedServerGetsNoSecondOne)
+{
+    QTemporaryDir profile;
+    ASSERT_TRUE(profile.isValid());
+    ServersSettings servers(profile.path() + "/");
+    servers.addNewServer("Mine", "example.org", "4748", QString(), QString(), false);
+
+    DlgConnect::ensureWebServer(servers);
+
+    const QList<ServersSettings::ServerEntry> saved = servers.getServers();
+    ASSERT_EQ(saved.size(), 1);
+    EXPECT_EQ(saved[0].saveName, "Mine");
 }
 } // namespace
 

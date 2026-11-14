@@ -5,6 +5,7 @@
 #include "../server/handle_public_servers.h"
 #include "../server/user/user_info_connection.h"
 #include "../utility/non_blocking_dialogs.h"
+#include "dlg_connect.h"
 
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -438,6 +439,7 @@ void DlgRegister::preRebuildComboBoxList()
 #ifdef Q_OS_WASM
     // The public list would add servers that a page is not known to reach.
     btnRefreshServers->hide();
+    DlgConnect::ensureWebServer(SettingsCache::instance().servers());
     rebuildComboBoxList();
 #else
     if (savedHostList.size() == 1) {

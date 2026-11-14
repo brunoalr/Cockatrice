@@ -94,7 +94,10 @@ AppearanceSettingsPage::AppearanceSettingsPage()
     auto *themeGrid = new QGridLayout;
     themeGrid->addWidget(&themeLabel, 0, 0);
     themeGrid->addWidget(&themeBox, 0, 1);
+#ifndef Q_OS_WASM
+    // A tab has no file manager to show a folder in.
     themeGrid->addWidget(&openThemeButton, 1, 1);
+#endif
     themeGrid->addWidget(&schemeComboLabel, 2, 0);
     themeGrid->addWidget(&schemeCombo, 2, 1);
     themeGrid->addWidget(&styleComboLabel, 3, 0);

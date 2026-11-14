@@ -204,7 +204,10 @@ QGroupBox *TabReplays::createLeftLayout()
     toolBar->addAction(aNewLocalFolder);
     toolBar->addAction(aDeleteLocalReplay);
 
+#ifndef Q_OS_WASM
+    // A tab has no file manager to show a folder in.
     rightmostToolBar->addAction(aOpenReplaysFolder);
+#endif
 
     return groupBox;
 }

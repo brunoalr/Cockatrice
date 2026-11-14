@@ -496,7 +496,7 @@ void TabSupervisor::resetTabsMenu()
     tabsMenu->addAction(aTabVisualDeckEditor);
     tabsMenu->addAction(aTabEdhRec);
 #ifndef Q_OS_WASM
-    // Archidekt admits no origin but its own, so a page cannot read it.
+    // Archidekt admits only http://localhost:3000, so a page cannot read it.
     tabsMenu->addAction(aTabArchidekt);
 #endif
     tabsMenu->addSeparator();

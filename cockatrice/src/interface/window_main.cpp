@@ -579,11 +579,11 @@ void MainWindow::createMenus()
     dbMenu->addAction(aEditTokens);
     dbMenu->addSeparator();
 #ifndef Q_OS_WASM
-    // A tab has no file manager to show a folder in.
+    // A tab has no file manager to show a folder in, and the file picker of the last entry hangs a page.
     dbMenu->addAction(aOpenCustomFolder);
     dbMenu->addAction(aOpenCustomsetsFolder);
-#endif
     dbMenu->addAction(aAddCustomSet);
+#endif
     dbMenu->addSeparator();
     dbMenu->addAction(aReloadCardDatabase);
 
@@ -603,7 +603,9 @@ void MainWindow::createMenus()
     helpMenu->addSeparator();
     helpMenu->addAction(aStatusBar);
     helpMenu->addAction(aViewLog);
+#ifndef Q_OS_WASM
     helpMenu->addAction(aOpenSettingsFolder);
+#endif
     helpMenu->addSeparator();
 #ifndef Q_OS_WASM
     helpMenu->addAction(aFirstRunWizard);
@@ -725,7 +727,7 @@ void MainWindow::startupConfigCheck()
     firstRunWizardActive = true;
     if (SettingsCache::instance().network().getClientVersion() == CLIENT_INFO_NOT_SET) {
         SettingsCache::instance().downloads().resetToDefaultURLs();
-        DlgConnect::saveWebServer(SettingsCache::instance().servers());
+        DlgConnect::ensureWebServer(SettingsCache::instance().servers());
     }
     SettingsCache::instance().network().setClientVersion(VERSION_STRING);
     const QUrl page(QString::fromStdString(emscripten::val::global("location")["href"].as<std::string>()));
@@ -733,10 +735,12 @@ void MainWindow::startupConfigCheck()
     cardDatabaseFetcher = fetcher;
     connect(fetcher, &CardDatabaseFetcher::fetched, this, &MainWindow::reloadCardDatabaseAndCheckSets);
     connect(fetcher, &CardDatabaseFetcher::failed, this, [this, fetcher](const QString &what) {
-        auto *warning =
-            new QMessageBox(QMessageBox::Warning, tr("Card database"),
-                            tr("The card database could not be downloaded, so cards are missing.\n\n%1").arg(what),
-                            QMessageBox::Retry | QMessageBox::Close, this);
+        const auto noticeName = QStringLiteral("cardDatabaseDownloadFailed");
+        delete findChild<QMessageBox *>(noticeName, Qt::FindDirectChildrenOnly); // NOSONAR: one notice, not a stack
+        auto *warning = new QMessageBox(QMessageBox::Warning, tr("Card database"),
+                                        tr("The card database could not be downloaded.\n\n%1").arg(what),
+                                        QMessageBox::Retry | QMessageBox::Close, this);
+        warning->setObjectName(noticeName);
         // Modeless and not focused: without cards a player can still connect and chat.
         warning->setWindowModality(Qt::NonModal);
         warning->setAttribute(Qt::WA_ShowWithoutActivating);
@@ -749,7 +753,6 @@ void MainWindow::startupConfigCheck()
         warning->show();
     });
     fetcher->fetch();
-    actCheckCommanderBracketDefinitionUpdates();
 #else
     AtRiskDataWarning::warnAboutDataPathsInProgramDir(this, [this] { continueStartupConfigCheck(); });
 #endif

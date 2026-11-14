@@ -40,7 +40,7 @@ signals:
 public:
     explicit DlgConnect(QWidget *parent = nullptr);
     ~DlgConnect() override;
-    static void saveWebServer(ServersSettings &servers);
+    static void ensureWebServer(ServersSettings &servers);
     [[nodiscard]] QString getHost() const;
     [[nodiscard]] int getPort() const
     {
