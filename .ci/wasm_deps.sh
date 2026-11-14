@@ -25,11 +25,15 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 vcpkg="$root/vcpkg"
 triplet=wasm32-emscripten-mt
 triplets=$(mktemp -d)
-trap 'rm -rf "$triplets"' EXIT
+log=$(mktemp)
+trap 'rm -rf "$triplets" "$log"' EXIT
+# vcpkg hashes the emcc launcher script, not the compiler it starts, so the triplet names the release
+emscripten=$(emcc -dumpversion)
 
 {
   cat "$vcpkg/triplets/community/wasm32-emscripten.cmake"
   echo
+  echo "# Emscripten $emscripten"
   echo 'set(VCPKG_C_FLAGS "-pthread")'
   echo 'set(VCPKG_CXX_FLAGS "-pthread")'
   echo 'set(VCPKG_LINKER_FLAGS "-pthread")'
@@ -42,8 +46,13 @@ trap 'rm -rf "$triplets"' EXIT
   # vcpkg hashes the tools it builds with into every package: its own pinned ones keep that hash stable
   # across runner images, where the runner's cmake would not
   "$vcpkg/vcpkg" install --classic protobuf openssl --triplet "$triplet" --overlay-triplets="$triplets" \
-    --x-abi-tools-use-exact-versions
+    --x-abi-tools-use-exact-versions 2>&1 | tee "$log"
 } >&2
+# vcpkg prints a failed binary cache push as an error but still exits 0, and every later run then builds from source
+if [[ ${VCPKG_REQUIRE_PUSH:-} ]] && grep -q 'binary cache submission failed' "$log"; then
+  echo "::error file=$0::vcpkg could not publish to the NuGet feed, see the error above" >&2
+  exit 1
+fi
 
 deps="$vcpkg/installed/$triplet"
 protoc=$(find "$vcpkg/installed" -path '*/tools/protobuf/protoc' -not -path "*/$triplet/*" | head -n 1)
