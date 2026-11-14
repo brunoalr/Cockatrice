@@ -14,11 +14,16 @@ start_seconds=${START_SECONDS:-120}
 settle_seconds=${SETTLE_SECONDS:-15}
 started='ui\.show\(\) finished'
 fatal='Aborted\(|Uncaught|is not supported on Qt for WebAssembly'
+not_isolated='is not supported for now'
+serve_flag=
+if [[ ${WASM_SMOKE_ISOLATION_HEADERS:-1} == 0 ]]; then
+  serve_flag=--no-isolation-headers
+fi
 
 work=$(mktemp -d)
 log="$work/chrome.log"
 : >"$log"
-python3 "$(dirname "$0")/wasm_serve.py" "$port" "$dir" &
+python3 "$(dirname "$0")/wasm_serve.py" "$port" "$dir" ${serve_flag:+"$serve_flag"} >"$work/server.log" &
 server=$!
 for ((attempt = 0; attempt < 20; attempt++)); do
   if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
@@ -36,6 +41,12 @@ started_at=
 for ((second = 0; second <= start_seconds + settle_seconds; second++)); do
   if grep -aqE "$fatal" "$log"; then
     result="the page aborted"
+    break
+  fi
+  if grep -aqF "$not_isolated" "$log"; then
+    result="the page is not cross-origin isolated"
+    # a reload loop would show up as more page loads
+    sleep "$settle_seconds"
     break
   fi
   if ! kill -0 "$browser" 2>/dev/null; then
@@ -71,6 +82,14 @@ fi
 kill "$browser" "$server" 2>/dev/null
 wait "$browser" "$server" 2>/dev/null
 grep -a 'CONSOLE' "$log" | sed -E 's/^\[[^]]*\] //; s/", source: .*//' | cut -c1-400
+if [[ -n $serve_flag ]]; then
+  loads=$(grep -cF "GET /$page HTTP" "$work/server.log")
+  echo "page loads: $loads"
+  # the isolation worker reloads the page once
+  if ((loads > 2)); then
+    result="the page loaded $loads times"
+  fi
+fi
 if [[ $result != started ]]; then
   echo "--- last lines of the browser log"
   tail -n 40 "$log" | cut -c1-300
