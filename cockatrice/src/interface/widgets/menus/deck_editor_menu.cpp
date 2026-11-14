@@ -28,10 +28,10 @@ DeckEditorMenu::DeckEditorMenu(AbstractTabDeckEditor *parent) : QMenu(parent), d
     updateRecentlyOpened();
 
     aSaveDeck = new QAction(QString(), this);
-    connect(aSaveDeck, &QAction::triggered, deckEditor, &AbstractTabDeckEditor::actSaveDeck);
+    connect(aSaveDeck, &QAction::triggered, deckEditor, [editor = deckEditor] { editor->actSaveDeck(); });
 
     aSaveDeckAs = new QAction(QString(), this);
-    connect(aSaveDeckAs, &QAction::triggered, deckEditor, &AbstractTabDeckEditor::actSaveDeckAs);
+    connect(aSaveDeckAs, &QAction::triggered, deckEditor, [editor = deckEditor] { editor->actSaveDeckAs(); });
 
     aShareDeck = new QAction(QString(), this);
     connect(aShareDeck, &QAction::triggered, deckEditor, &AbstractTabDeckEditor::actShareDeck);

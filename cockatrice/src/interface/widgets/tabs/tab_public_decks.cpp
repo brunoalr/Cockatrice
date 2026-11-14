@@ -165,10 +165,10 @@ void TabPublicDecks::retranslateUi()
     emit tabTextChanged(this, getTabText());
 }
 
-bool TabPublicDecks::closeRequest()
+void TabPublicDecks::closeRequest()
 {
     emit closing(this);
-    return Tab::closeRequest();
+    Tab::closeRequest();
 }
 
 void TabPublicDecks::rebuildGrid()
