@@ -24,6 +24,10 @@ case ${WASM_SMOKE_CARDS:-} in
     ;;
   *) expected="cards\\.xml.* Cards = $WASM_SMOKE_CARDS Sets" ;;
 esac
+if [[ ${WASM_SMOKE_PERSIST:-0} == 1 && ${WASM_SMOKE_ISOLATION_HEADERS:-1} == 0 ]]; then
+  echo "WASM_SMOKE_PERSIST=1 reloads the page, and WASM_SMOKE_ISOLATION_HEADERS=0 expects exactly two page loads: set one of them only" >&2
+  exit 3
+fi
 serve_flag=
 if [[ ${WASM_SMOKE_ISOLATION_HEADERS:-1} == 0 ]]; then
   serve_flag=--no-isolation-headers
@@ -89,6 +93,14 @@ if [[ $result == started ]]; then
     elif ! kill -0 "$browser" 2>/dev/null; then
       result="the browser exited after the connect dialog opened"
     fi
+  fi
+fi
+
+if [[ $result == started && ${WASM_SMOKE_PERSIST:-0} == 1 ]]; then
+  if ! node --experimental-websocket "$(dirname "$0")/wasm_persist.mjs" "$devtools_port" "$start_seconds"; then
+    result="the data root did not persist"
+  elif grep -aqE "$fatal" "$log"; then
+    result="the page aborted during the persistence checks"
   fi
 fi
 

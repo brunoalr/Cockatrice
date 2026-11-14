@@ -1336,6 +1336,14 @@ jobs:
           WASM_SMOKE_CARDS: 5
         run: .ci/wasm_smoke.sh "$RUNNER_TEMP/site"
 
+      - name: "Keep the player's data across reloads of the site"
+        env:
+          CHROME_FLAGS: --no-sandbox
+          WASM_SMOKE_CARDS: 5
+          # Reloads and opens more tabs, so the server sends the isolation headers and loads are not counted
+          WASM_SMOKE_PERSIST: 1
+        run: .ci/wasm_smoke.sh "$RUNNER_TEMP/site"
+
       - name: "Upload artifact"
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
