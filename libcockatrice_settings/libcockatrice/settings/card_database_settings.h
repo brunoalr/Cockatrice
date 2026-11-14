@@ -25,6 +25,8 @@ class CardDatabaseSettings : public SettingsManager, public ICardSetPriorityCont
     friend class SettingsCache;
 
 public:
+    explicit CardDatabaseSettings(const QString &settingPath, QObject *parent = nullptr);
+
     void setSortKey(QString shortName, unsigned int sortKey) override;
     void setEnabled(QString shortName, bool enabled) override;
     void setIsKnown(QString shortName, bool isknown) override;
@@ -39,9 +41,9 @@ public:
 
     void saveSets(const QVector<SetSaveData> &data) override;
 
-private:
-    explicit CardDatabaseSettings(const QString &settingPath, QObject *parent = nullptr);
+    void setUnsavedSetsEnabled(bool enabled);
 
+private:
     // In-memory cache of set priority options. QSettings re-opens and re-parses
     // the whole .ini on every access, which is catastrophic when CardSet
     // construction calls getSortKey/isEnabled/isKnown once per set during the
@@ -50,6 +52,8 @@ private:
     mutable QMutex setOptionsMutex;
     mutable QHash<QString, SetOptions> setOptionsCache;
     mutable bool setOptionsLoaded = false;
+
+    SetOptions unsavedSetOptions;
 
     void ensureSetOptionsLoaded() const;
 };
