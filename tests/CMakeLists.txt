@@ -855,10 +855,12 @@ if(WITH_CLIENT)
     ${CLIENT_SRC}/interface/widgets/settings_page/abstract_settings_page.cpp
     ${CLIENT_SRC}/interface/widgets/settings_page/deck_editor_settings_page.cpp
     ${CLIENT_SRC}/interface/widgets/settings_page/general_settings_page.cpp
+    ${CLIENT_SRC}/interface/widgets/settings_page/messages_settings_page.cpp
     ${CLIENT_SRC}/interface/widgets/server/user/user_info_connection.cpp
     ${CLIENT_SRC}/interface/widgets/settings_page/settings_search_model.cpp
     ${CLIENT_SRC}/interface/widgets/settings_page/shortcut_settings_page.cpp
     ${CLIENT_SRC}/interface/widgets/utility/custom_line_edit.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/get_text_with_max.cpp
     ${CLIENT_SRC}/interface/widgets/utility/sequence_edit.cpp
     ${SETTINGS_SOURCES}
     settings_dialogs_test.cpp

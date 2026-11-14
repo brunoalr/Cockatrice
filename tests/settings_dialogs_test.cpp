@@ -6,6 +6,7 @@
 #include "interface/widgets/dialogs/settings_close_check.h"
 #include "interface/widgets/settings_page/deck_editor_settings_page.h"
 #include "interface/widgets/settings_page/general_settings_page.h"
+#include "interface/widgets/settings_page/messages_settings_page.h"
 #include "interface/widgets/settings_page/shortcut_settings_page.h"
 #include "interface/widgets/utility/non_blocking_dialogs.h"
 #include "main.h"
@@ -26,7 +27,9 @@
 #include <libcockatrice/card/database/card_database.h>
 #include <libcockatrice/card/database/card_database_manager.h>
 #include <libcockatrice/settings/download_settings.h>
+#include <libcockatrice/settings/message_settings.h>
 #include <libcockatrice/settings/paths_settings.h>
+#include <libcockatrice/utility/string_limits.h>
 #include <memory>
 
 ThemeManager *themeManager = nullptr;                          // NOSONAR: the client declares it extern and assigns it
@@ -449,6 +452,94 @@ TEST_F(UrlPrompts, ACancelledRateLimitChangesNothing)
     settle();
 
     EXPECT_TRUE(limits().isEmpty());
+}
+class MessagePrompts : public SettingsDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    QWidget *page = nullptr;
+    QListWidget *messages = nullptr;
+
+    void SetUp() override
+    {
+        SettingsCache::instance().messages().setCount(2);
+        SettingsCache::instance().messages().setMessageAt(0, "gg");
+        SettingsCache::instance().messages().setMessageAt(1, "brb");
+        page = addPage<MessagesSettingsPage>();
+        messages = page->findChild<QListWidget *>();
+    }
+
+    static QStringList stored()
+    {
+        QStringList texts;
+        for (int index = 0; index < SettingsCache::instance().messages().getCount(); ++index) {
+            texts.append(SettingsCache::instance().messages().getMessageAt(index));
+        }
+        return texts;
+    }
+
+    static void type(const QInputDialog *prompt, const QString &text)
+    {
+        prompt->findChild<QLineEdit *>()->setText(text);
+    }
+};
+
+TEST_F(MessagePrompts, AnAcceptedMessageIsAdded)
+{
+    QInputDialog *prompt = openPrompt(page, "actAdd");
+    ASSERT_NE(prompt, nullptr);
+    type(prompt, "glhf");
+    accept(prompt);
+
+    EXPECT_EQ(stored(), (QStringList{"gg", "brb", "glhf"}));
+    EXPECT_EQ(messages->count(), 3);
+}
+
+TEST_F(MessagePrompts, ACancelledMessageIsNotAdded)
+{
+    QInputDialog *prompt = openPrompt(page, "actAdd");
+    ASSERT_NE(prompt, nullptr);
+    type(prompt, "glhf");
+    prompt->reject();
+    settle();
+
+    EXPECT_EQ(stored(), (QStringList{"gg", "brb"}));
+}
+
+TEST_F(MessagePrompts, AMessageIsCutToTheTextLimit)
+{
+    QInputDialog *prompt = openPrompt(page, "actAdd");
+    ASSERT_NE(prompt, nullptr);
+    type(prompt, QString(MAX_TEXT_LENGTH + 10, 'a'));
+    accept(prompt);
+
+    EXPECT_EQ(stored().value(2), QString(MAX_TEXT_LENGTH, 'a'));
+}
+
+TEST_F(MessagePrompts, AnEditChangesTheMessageItWasOpenedOn)
+{
+    messages->setCurrentRow(0);
+    QInputDialog *prompt = openPrompt(page, "actEdit");
+    ASSERT_NE(prompt, nullptr);
+    EXPECT_EQ(prompt->textValue(), "gg");
+    EXPECT_EQ(prompt->findChild<QLineEdit *>()->maxLength(), MAX_TEXT_LENGTH);
+
+    messages->setCurrentRow(1);
+    type(prompt, "wp");
+    accept(prompt);
+
+    EXPECT_EQ(stored(), (QStringList{"wp", "brb"}));
+}
+
+TEST_F(MessagePrompts, ACancelledEditKeepsTheMessage)
+{
+    messages->setCurrentRow(0);
+    QInputDialog *prompt = openPrompt(page, "actEdit");
+    ASSERT_NE(prompt, nullptr);
+    type(prompt, "wp");
+    prompt->reject();
+    settle();
+
+    EXPECT_EQ(stored(), (QStringList{"gg", "brb"}));
 }
 } // namespace
 
