@@ -5,9 +5,28 @@ set -euo pipefail
 cards_floor=$((30 * 1000 * 1000))
 tokens_floor=$((600 * 1000))
 
+# Prints the root element's name and the number of tags elements; fails on a document that is not well-formed
+inspect_xml() {
+  python3 - "$1" <<'EOF'
+import sys
+import xml.etree.ElementTree as ElementTree
+
+root = None
+tags = 0
+for event, element in ElementTree.iterparse(sys.argv[1], events=("start", "end")):
+    if event == "start":
+        if root is None:
+            root = element.tag
+    else:
+        if element.tag == "tags":
+            tags += 1
+        element.clear()
+print(root, tags)
+EOF
+}
+
 validate_card_database() {
-  local dir=$1 failed=0 name floor path size start
-  local root_pattern='<([A-Za-z_][^[:space:]/>]*)'
+  local dir=$1 failed=0 name floor path size root_name tags
   for name in cards.xml tokens.xml; do
     floor=$cards_floor
     [[ $name == tokens.xml ]] && floor=$tokens_floor
@@ -23,14 +42,18 @@ validate_card_database() {
       failed=1
       continue
     fi
-    start=$(head -c 4096 "$path")
-    if [[ ! $start =~ $root_pattern || ${BASH_REMATCH[1]} != cockatrice_carddatabase ]]; then
+    if ! read -r root_name tags < <(inspect_xml "$path" 2>/dev/null); then
+      echo "::error::$path is not well-formed XML"
+      failed=1
+      continue
+    fi
+    if [[ $root_name != cockatrice_carddatabase ]]; then
       echo "::error::$path does not have cockatrice_carddatabase as its root element"
       failed=1
       continue
     fi
     # Oracle finishes without card tags when their download fails
-    if [[ $name == cards.xml ]] && ! grep -q '<tags>' "$path"; then
+    if [[ $name == cards.xml ]] && ((tags == 0)); then
       echo "::error::$path holds no card tags"
       failed=1
     fi
@@ -65,9 +88,9 @@ build_card_database() {
 }
 
 make_database() {
-  local file=$1 root=$2 padding=$3 body=${4:-}
+  local file=$1 root=$2 padding=$3 body=${4:-} prolog=${5:-}
   {
-    printf '<?xml version="1.0" encoding="UTF-8"?>\n<%s version="4">\n%s\n' "$root" "$body"
+    printf '<?xml version="1.0" encoding="UTF-8"?>\n%s\n<%s version="4">\n%s\n' "$prolog" "$root" "$body"
     head -c "$padding" /dev/zero | tr '\0' ' '
     printf '\n</%s>\n' "$root"
   } >"$file"
@@ -90,8 +113,8 @@ self_test() {
   root=$(mktemp -d)
   trap 'rm -rf "$root"' EXIT
   mkdir "$root/good" "$root/no-cards" "$root/no-tokens" "$root/small-cards" "$root/small-tokens" "$root/other-root" \
-    "$root/no-tags"
-  make_database "$root/good/cards.xml" cockatrice_carddatabase "$cards_floor" '<tags>'
+    "$root/no-tags" "$root/cut-short" "$root/root-in-comment"
+  make_database "$root/good/cards.xml" cockatrice_carddatabase "$cards_floor" '<tags/>'
   make_database "$root/good/tokens.xml" cockatrice_carddatabase "$tokens_floor"
   ln "$root/good/tokens.xml" "$root/no-cards/tokens.xml"
   ln "$root/good/cards.xml" "$root/no-tokens/cards.xml"
@@ -103,6 +126,11 @@ self_test() {
   make_database "$root/other-root/tokens.xml" cockatrice_deck "$tokens_floor"
   make_database "$root/no-tags/cards.xml" cockatrice_carddatabase "$cards_floor"
   ln "$root/good/tokens.xml" "$root/no-tags/tokens.xml"
+  head -c "$cards_floor" "$root/good/cards.xml" >"$root/cut-short/cards.xml"
+  ln "$root/good/tokens.xml" "$root/cut-short/tokens.xml"
+  make_database "$root/root-in-comment/cards.xml" other "$cards_floor" '<!-- <cockatrice_carddatabase> <tags> -->' \
+    '<!-- <cockatrice_carddatabase> -->'
+  ln "$root/good/tokens.xml" "$root/root-in-comment/tokens.xml"
 
   local output
   if ! output=$(validate_card_database "$root/good" 2>&1); then
@@ -115,6 +143,8 @@ self_test() {
   expect_failure "$root/small-tokens" tokens.xml "a tokens.xml below the floor" || return 1
   expect_failure "$root/other-root" tokens.xml "a tokens.xml with another root element" || return 1
   expect_failure "$root/no-tags" cards.xml "a cards.xml without card tags" || return 1
+  expect_failure "$root/cut-short" cards.xml "a cards.xml cut short" || return 1
+  expect_failure "$root/root-in-comment" cards.xml "a cards.xml that names the root and tags only in comments" || return 1
   echo "self-test passed"
 }
 
