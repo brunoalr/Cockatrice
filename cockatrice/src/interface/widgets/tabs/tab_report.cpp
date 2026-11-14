@@ -2,6 +2,7 @@
 
 #include "../interface/theme_manager.h"
 #include "../server/user/user_context_menu.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "../utility/report_utils.h"
 #include "abstract_client.h"
 #include "libcockatrice/protocol/pb/response.pb.h"
@@ -19,7 +20,6 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
-#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -795,27 +795,23 @@ void TabReport::resolveReport(bool dismissed)
         return;
     }
 
-    bool ok;
-    QString note = QInputDialog::getText(this, dismissed ? tr("Dismiss Report") : tr("Resolve Report"),
-                                         dismissed ? tr("Optional note:") : tr("Resolution note (optional):"),
-                                         QLineEdit::Normal, QString(), &ok);
-    if (!ok) {
-        return;
-    }
+    Dialogs::getText(this, dismissed ? tr("Dismiss Report") : tr("Resolve Report"),
+                     dismissed ? tr("Optional note:") : tr("Resolution note (optional):"), QString(),
+                     [this, reportId, dismissed](const QString &note) {
+                         setActionsEnabled(false);
+                         statusLabel->setText(dismissed ? tr("Dismissing...") : tr("Resolving..."));
 
-    setActionsEnabled(false);
-    statusLabel->setText(dismissed ? tr("Dismissing...") : tr("Resolving..."));
+                         Command_ReportResolve cmd;
+                         cmd.set_report_id(reportId);
+                         cmd.set_dismissed(dismissed);
+                         if (!note.isEmpty()) {
+                             cmd.set_resolution_note(note.toStdString());
+                         }
 
-    Command_ReportResolve cmd;
-    cmd.set_report_id(reportId);
-    cmd.set_dismissed(dismissed);
-    if (!note.isEmpty()) {
-        cmd.set_resolution_note(note.toStdString());
-    }
-
-    PendingCommand *pend = client->prepareModeratorCommand(cmd);
-    connect(pend, &PendingCommand::finished, this, &TabReport::resolveResponse);
-    client->sendCommand(pend);
+                         PendingCommand *pend = client->prepareModeratorCommand(cmd);
+                         connect(pend, &PendingCommand::finished, this, &TabReport::resolveResponse);
+                         client->sendCommand(pend);
+                     });
 }
 
 void TabReport::resolveResponse(const Response &response)
@@ -836,25 +832,21 @@ void TabReport::reopenReport()
         return;
     }
 
-    bool ok;
-    QString note = QInputDialog::getText(this, tr("Reopen Report"), tr("Reopening note (optional):"), QLineEdit::Normal,
-                                         QString(), &ok);
-    if (!ok) {
-        return;
-    }
+    Dialogs::getText(this, tr("Reopen Report"), tr("Reopening note (optional):"), QString(),
+                     [this, reportId](const QString &note) {
+                         setActionsEnabled(false);
+                         statusLabel->setText(tr("Reopening..."));
 
-    setActionsEnabled(false);
-    statusLabel->setText(tr("Reopening..."));
+                         Command_ReportReopen cmd;
+                         cmd.set_report_id(reportId);
+                         if (!note.isEmpty()) {
+                             cmd.set_reopen_note(note.toStdString());
+                         }
 
-    Command_ReportReopen cmd;
-    cmd.set_report_id(reportId);
-    if (!note.isEmpty()) {
-        cmd.set_reopen_note(note.toStdString());
-    }
-
-    PendingCommand *pend = client->prepareModeratorCommand(cmd);
-    connect(pend, &PendingCommand::finished, this, &TabReport::reopenResponse);
-    client->sendCommand(pend);
+                         PendingCommand *pend = client->prepareModeratorCommand(cmd);
+                         connect(pend, &PendingCommand::finished, this, &TabReport::reopenResponse);
+                         client->sendCommand(pend);
+                     });
 }
 
 void TabReport::reopenResponse(const Response &response)

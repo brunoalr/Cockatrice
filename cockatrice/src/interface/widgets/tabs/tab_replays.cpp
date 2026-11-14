@@ -3,6 +3,7 @@
 #include "../../../client/settings/cache_settings.h"
 #include "../../theme_icon.h"
 #include "../interface/widgets/server/remote/remote_replay_list_tree_widget.h"
+#include "../interface/widgets/utility/non_blocking_dialogs.h"
 #include "libcockatrice/protocol/pb/commands.pb.h"
 #include "libcockatrice/protocol/pb/serverinfo_replay.pb.h"
 #include "libcockatrice/protocol/pb/serverinfo_replay_match.pb.h"
@@ -25,15 +26,14 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QIODevice>
-#include <QInputDialog>
 #include <QItemSelectionModel>
-#include <QLineEdit>
 #include <QList>
 #include <QLoggingCategory>
 #include <QMessageBox>
 #include <QMessageLogger>
 #include <QModelIndex>
 #include <QModelIndexList>
+#include <QPersistentModelIndex>
 #include <QPushButton>
 #include <QSet>
 #include <QSharedPointer>
@@ -60,6 +60,7 @@
 #include <libcockatrice/protocol/pending_command.h>
 #include <libcockatrice/settings/paths_settings.h>
 #include <libcockatrice/utility/qt_utils.h>
+#include <memory>
 #include <qlogging.h>
 #include <qnamespace.h>
 #include <string>
@@ -72,6 +73,38 @@ namespace
 {
 // File name filters for the local replay files Cockatrice can load.
 const QStringList REPLAY_FILE_NAME_FILTERS = {"*.cor"};
+
+void renameLocalInTurn(TabReplays *tab, QList<QFileInfo> files)
+{
+    if (files.isEmpty()) {
+        return;
+    }
+    const QFileInfo info = files.takeFirst();
+
+    const QString oldName = info.baseName();
+    const QString title = info.isDir() ? TabReplays::tr("Rename local folder") : TabReplays::tr("Rename local file");
+
+    // terminate all remaining selections if user cancels
+    Dialogs::getText(tab, title, TabReplays::tr("New name:"), oldName, [tab, info, files](const QString &newName) {
+        if (newName.isEmpty() || info.baseName() == newName) {
+            renameLocalInTurn(tab, files);
+            return;
+        }
+
+        QString newFileName = newName;
+        if (!info.suffix().isEmpty()) {
+            newFileName += "." + info.suffix();
+        }
+
+        if (const QString newFilePath = QFileInfo(info.dir(), newFileName).filePath();
+            !QFile::rename(info.filePath(), newFilePath)) {
+            Dialogs::critical(tab, TabReplays::tr("Error"), TabReplays::tr("Rename failed"),
+                              [tab, files] { renameLocalInTurn(tab, files); });
+            return;
+        }
+        renameLocalInTurn(tab, files);
+    });
+}
 } // namespace
 
 TabReplays::TabReplays(TabSupervisor *_tabSupervisor, AbstractClient *_client, const ServerInfo_User *currentUserInfo)
@@ -329,32 +362,11 @@ void TabReplays::actOpenLocalReplay()
 
 void TabReplays::actRenameLocal()
 {
-    QModelIndexList curLefts = localDirView->selectionModel()->selectedRows();
-    for (const auto &curLeft : curLefts) {
-        const QFileInfo info = localDirModel->fileInfo(curLeft);
-
-        const QString oldName = info.baseName();
-        const QString title = info.isDir() ? tr("Rename local folder") : tr("Rename local file");
-
-        bool ok;
-        QString newName = QInputDialog::getText(this, title, tr("New name:"), QLineEdit::Normal, oldName, &ok);
-        if (!ok) { // terminate all remaining selections if user cancels
-            return;
-        }
-        if (newName.isEmpty() || oldName == newName) {
-            continue;
-        }
-
-        QString newFileName = newName;
-        if (!info.suffix().isEmpty()) {
-            newFileName += "." + info.suffix();
-        }
-        const QString newFilePath = QFileInfo(info.dir(), newFileName).filePath();
-
-        if (!QFile::rename(info.filePath(), newFilePath)) {
-            QMessageBox::critical(this, tr("Error"), tr("Rename failed"));
-        }
+    QList<QFileInfo> files;
+    for (const auto &curLeft : localDirView->selectionModel()->selectedRows()) {
+        files.append(localDirModel->fileInfo(curLeft));
     }
+    renameLocalInTurn(this, files);
 }
 
 void TabReplays::actNewLocalFolder()
@@ -368,34 +380,36 @@ void TabReplays::actNewLocalFolder()
         dirIndex = curLeft;
     }
 
-    bool ok;
-    QString folderName =
-        QInputDialog::getText(this, tr("New folder"), tr("Name of new folder:"), QLineEdit::Normal, "", &ok);
-    if (!ok || folderName.isEmpty()) {
-        return;
-    }
-
-    localDirModel->mkdir(dirIndex, folderName);
+    Dialogs::getText(this, tr("New folder"), tr("Name of new folder:"), "",
+                     [this, dirIndex = QPersistentModelIndex(dirIndex)](const QString &folderName) {
+                         if (!folderName.isEmpty()) {
+                             localDirModel->mkdir(dirIndex, folderName);
+                         }
+                     });
 }
 
 void TabReplays::actDeleteLocalReplay()
 {
-    QModelIndexList curLefts = localDirView->selectionModel()->selectedRows();
+    const QModelIndexList selected = localDirView->selectionModel()->selectedRows();
 
-    if (curLefts.isEmpty()) {
+    if (selected.isEmpty()) {
         return;
     }
 
-    if (QMessageBox::warning(this, tr("Delete local file"), tr("Are you sure you want to delete the selected files?"),
-                             QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
-        return;
-    }
-
-    for (const auto &curLeft : curLefts) {
-        if (curLeft.isValid()) {
-            localDirModel->remove(curLeft);
-        }
-    }
+    // The file system model changes while the question is open: plain indexes could name other files by then.
+    const QList<QPersistentModelIndex> curLefts(selected.cbegin(), selected.cend());
+    Dialogs::ask(this, QMessageBox::Warning, tr("Delete local file"),
+                 tr("Are you sure you want to delete the selected files?"), QMessageBox::Yes | QMessageBox::No,
+                 QMessageBox::NoButton, [this, curLefts](QMessageBox::StandardButton answer) {
+                     if (answer != QMessageBox::Yes) {
+                         return;
+                     }
+                     for (const auto &curLeft : curLefts) {
+                         if (curLeft.isValid()) {
+                             localDirModel->remove(curLeft);
+                         }
+                     }
+                 });
 }
 
 void TabReplays::actOpenReplaysFolder()
@@ -551,20 +565,26 @@ void TabReplays::actDeleteRemoteReplay()
         return;
     }
 
-    if (QMessageBox::warning(this, tr("Delete remote replay"),
-                             tr("Are you sure you want to delete the selected replays?"),
-                             QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
-        return;
-    }
-
+    // The selected matches belong to the replay tree, which may be rebuilt while the question is open.
+    QList<int> gameIds;
     for (const auto curRight : curRights) {
-        Command_ReplayDeleteMatch cmd;
-        cmd.set_game_id(curRight->game_id());
-
-        PendingCommand *pend = client->prepareSessionCommand(cmd);
-        connect(pend, &PendingCommand::finished, this, &TabReplays::deleteRemoteReplayFinished);
-        client->sendCommand(pend);
+        gameIds.append(curRight->game_id());
     }
+    Dialogs::ask(this, QMessageBox::Warning, tr("Delete remote replay"),
+                 tr("Are you sure you want to delete the selected replays?"), QMessageBox::Yes | QMessageBox::No,
+                 QMessageBox::NoButton, [this, gameIds](QMessageBox::StandardButton answer) {
+                     if (answer != QMessageBox::Yes) {
+                         return;
+                     }
+                     for (const int gameId : gameIds) {
+                         Command_ReplayDeleteMatch cmd;
+                         cmd.set_game_id(gameId);
+
+                         PendingCommand *pend = AbstractClient::prepareSessionCommand(cmd);
+                         connect(pend, &PendingCommand::finished, this, &TabReplays::deleteRemoteReplayFinished);
+                         client->sendCommand(pend);
+                     }
+                 });
 }
 
 void TabReplays::deleteRemoteReplayFinished(const Response &r, const CommandContainer &commandContainer)
@@ -598,77 +618,72 @@ void TabReplays::actGetReplayCode()
 void TabReplays::getReplayCodeFinished(const Response &r, const CommandContainer & /*commandContainer*/)
 {
     if (r.response_code() == Response::RespFunctionNotAllowed) {
-        QMessageBox msgBox;
-        msgBox.setIcon(QMessageBox::Warning);
-        msgBox.setText(tr("Failed to get code"));
-        msgBox.setInformativeText(
+        auto msgBox = std::make_unique<QMessageBox>();
+        msgBox->setIcon(QMessageBox::Warning);
+        msgBox->setText(tr("Failed to get code"));
+        msgBox->setInformativeText(
             tr("Either this server does not support replay sharing, or does not permit replay sharing for you."));
-        msgBox.exec();
+        Dialogs::open(msgBox.release(), {});
         return;
     }
 
     if (r.response_code() != Response::RespOk) {
-        QMessageBox::warning(this, tr("Failed"), tr("Could not get replay code"));
+        Dialogs::warning(this, tr("Failed"), tr("Could not get replay code"));
         return;
     }
 
     const Response_ReplayGetCode &resp = r.GetExtension(Response_ReplayGetCode::ext);
     QString code = QString::fromStdString(resp.replay_code());
 
-    QMessageBox msgBox;
-    msgBox.setText(tr("Replay Share Code"));
-    msgBox.setInformativeText(
+    auto msgBox = std::make_unique<QMessageBox>();
+    msgBox->setText(tr("Replay Share Code"));
+    msgBox->setInformativeText(
         tr("Others can use this code to add the replay to their list of remote replays:\n%1").arg(code));
-    msgBox.setStandardButtons(QMessageBox::Ok);
-    QPushButton *copyToClipboardButton = msgBox.addButton(tr("Copy to clipboard"), QMessageBox::ActionRole);
+    msgBox->setStandardButtons(QMessageBox::Ok);
+    QPushButton *copyToClipboardButton = msgBox->addButton(tr("Copy to clipboard"), QMessageBox::ActionRole);
     connect(copyToClipboardButton, &QPushButton::clicked, this, [code] { QApplication::clipboard()->setText(code); });
-    msgBox.setDefaultButton(copyToClipboardButton);
-    msgBox.exec();
+    msgBox->setDefaultButton(copyToClipboardButton);
+    Dialogs::open(msgBox.release(), {});
 }
 
 void TabReplays::actSubmitReplayCode()
 {
-    bool ok;
-    QString code = QInputDialog::getText(this, tr("Look up replay by share code"), tr("Replay share code"),
-                                         QLineEdit::Normal, "", &ok);
+    Dialogs::getText(this, tr("Look up replay by share code"), tr("Replay share code"), "",
+                     [this](const QString &code) {
+                         Command_ReplaySubmitCode cmd;
+                         cmd.set_replay_code(code.toStdString());
 
-    if (!ok) {
-        return;
-    }
-
-    Command_ReplaySubmitCode cmd;
-    cmd.set_replay_code(code.toStdString());
-
-    PendingCommand *pend = client->prepareSessionCommand(cmd);
-    connect(pend, &PendingCommand::finished, this, &TabReplays::submitReplayCodeFinished);
-    client->sendCommand(pend);
+                         PendingCommand *pend = client->prepareSessionCommand(cmd);
+                         connect(pend, &PendingCommand::finished, this, &TabReplays::submitReplayCodeFinished);
+                         client->sendCommand(pend);
+                     });
 }
 
 void TabReplays::submitReplayCodeFinished(const Response &r, const CommandContainer & /*commandContainer*/)
 {
     switch (r.response_code()) {
         case Response::RespOk: {
-            QMessageBox msgBox;
-            msgBox.setIcon(QMessageBox::Information);
-            msgBox.setText(tr("Replay code found"));
-            msgBox.setInformativeText(tr("Replay was added, or you already had access to it."));
-            msgBox.exec();
+            auto msgBox = std::make_unique<QMessageBox>();
+            msgBox->setIcon(QMessageBox::Information);
+            msgBox->setText(tr("Replay code found"));
+            msgBox->setInformativeText(tr("Replay was added, or you already had access to it."));
+            Dialogs::open(msgBox.release(), {});
             break;
         }
         case Response::RespNameNotFound:
-            QMessageBox::warning(this, tr("Failed"), tr("Replay code not found"));
+            Dialogs::warning(this, tr("Failed"), tr("Replay code not found"));
             break;
         case Response::RespFunctionNotAllowed: {
-            QMessageBox msgBox;
-            msgBox.setIcon(QMessageBox::Warning);
-            msgBox.setText(tr("Failed to submit code"));
-            msgBox.setInformativeText(
+            auto msgBox = std::make_unique<QMessageBox>();
+            msgBox->setIcon(QMessageBox::Warning);
+            msgBox->setText(tr("Failed to submit code"));
+            msgBox->setInformativeText(
                 tr("Either this server does not support replay sharing, or does not permit replay sharing for you."));
-            msgBox.exec();
+            Dialogs::open(msgBox.release(), {});
             break;
         }
         default:
-            QMessageBox::warning(this, tr("Failed"), tr("Unexpected error"));
+            Dialogs::warning(this, tr("Failed"), tr("Unexpected error"));
             break;
     }
 }

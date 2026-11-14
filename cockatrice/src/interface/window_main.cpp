@@ -242,14 +242,15 @@ void MainWindow::startLocalGame(const LocalGameOptions &options)
 
 void MainWindow::actWatchReplay()
 {
-    QFileDialog dlg(this, tr("Load replay"));
-    dlg.setDirectory(SettingsCache::instance().paths().getReplaysPath());
-    dlg.setNameFilters(QStringList() << QObject::tr("Cockatrice replays (*.cor)"));
-    if (!dlg.exec()) {
-        return;
-    }
+    auto *dlg = new QFileDialog(this, tr("Load replay"));
+    dlg->setDirectory(SettingsCache::instance().paths().getReplaysPath());
+    dlg->setNameFilters(QStringList() << QObject::tr("Cockatrice replays (*.cor)"));
+    connect(dlg, &QFileDialog::fileSelected, this, &MainWindow::watchReplayFile);
+    Dialogs::open(dlg, {});
+}
 
-    QString fileName = dlg.selectedFiles().at(0);
+void MainWindow::watchReplayFile(const QString &fileName)
+{
     QFile file(fileName);
     if (!file.open(QIODevice::ReadOnly)) {
         return;
