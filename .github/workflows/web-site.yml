@@ -25,15 +25,27 @@ on:
         description: Publish the site on GitHub Pages
         type: boolean
         default: false
+  # Publishes after each build of master. The branch filter also matches a fork's branch of that name,
+  # so the first job admits only a push to this repository.
+  workflow_run:
+    workflows: [Build Desktop]
+    types: [completed]
+    branches: [master]
 
 # One publishing run at a time: each reads the live site to keep its version. A trial run has a group of
 # its own, or it would take the one waiting place in the group from a publish.
 concurrency:
-  group: web-site-${{ inputs.publish && 'publish' || github.run_id }}
+  group: web-site-${{ (inputs.publish || github.event_name == 'workflow_run') && 'publish' || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   app:
+    # A build that master has already moved past is left to the run that the newer build starts
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_sha == github.sha)
     # A job-level block replaces the workflow-level one: this job reads other runs
     permissions:
       actions: read
@@ -162,7 +174,7 @@ jobs:
       # Without the live site's address its version cannot be kept: fine for a trial build, not for a publish
       - name: "Assemble the site"
         env:
-          PUBLISH: ${{ inputs.publish }}
+          PUBLISH: ${{ (inputs.publish || github.event_name == 'workflow_run') }}
           WEB_SITE_URL: ${{ vars.WEB_SITE_URL }}
           WEB_SITE_SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}/tree/${{ needs.app.outputs.sha }}
         run: |
@@ -192,14 +204,14 @@ jobs:
           if-no-files-found: error
 
       - name: "Upload the site for GitHub Pages"
-        if: inputs.publish
+        if: (inputs.publish || github.event_name == 'workflow_run')
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           name: ${{ steps.pages-artifact.outputs.name }}
           path: ${{ runner.temp }}/site/
 
   publish:
-    if: inputs.publish
+    if: (inputs.publish || github.event_name == 'workflow_run')
     # A job-level block replaces the workflow-level one: publishing needs these two and nothing else
     permissions:
       pages: write
