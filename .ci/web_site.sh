@@ -29,7 +29,8 @@ app_hash() {
 }
 
 keep_previous() {
-  local url=${1%/} site=$2 response status file
+  local url=${1%/} site=$2 response status live file
+  local version='^[0-9a-f]{16}$' version_or_null='^("[0-9a-f]{16}"|null)$'
   if ! response=$(curl -sSL --retry 3 -w '%{http_code}' "$url/versions.json"); then
     echo "::error::cannot read $url/versions.json"
     exit 1
@@ -46,14 +47,23 @@ keep_previous() {
       exit 1
       ;;
   esac
-  previous=$(sed -nE 's/.*"current": *"([0-9a-f]{16})".*/\1/p' <<<"${response%???}")
-  if [[ ! $previous =~ ^[0-9a-f]{16}$ ]]; then
+  live=${response%???}
+  previous=$(sed -nE 's/.*"current": *"([0-9a-f]{16})".*/\1/p' <<<"$live")
+  if [[ ! $previous =~ $version ]]; then
     echo "::error::$url/versions.json names no current version"
     exit 1
   fi
   if [[ $previous == "$hash" ]]; then
-    previous=
-    return
+    previous=$(sed -nE 's/.*"previous": *("[0-9a-f]{16}"|null).*/\1/p' <<<"$live")
+    if [[ ! $previous =~ $version_or_null ]]; then
+      echo "::error::$url/versions.json names no previous version"
+      exit 1
+    fi
+    previous=${previous//\"/}
+    if [[ $previous == null ]]; then
+      previous=
+      return
+    fi
   fi
   mkdir "$site/app/$previous"
   for file in "${app_files[@]}"; do
@@ -226,6 +236,19 @@ self_test() {
   assembles "$work/app" "$work/database" "$work/a-again" "$url/a"
   if [[ $(versions_of "$work/a-again") != "$a" ]] || [[ $(<"$work/a-again/versions.json") != *'"previous": null}' ]]; then
     echo "self-test FAILED: a site over its own version holds '$(versions_of "$work/a-again")': $(<"$work/a-again/versions.json")"
+    return 1
+  fi
+  cp -R "$work/b" "$served/b"
+  assembles "$work/app-b" "$work/database" "$work/b-again" "$url/b"
+  if [[ $(versions_of "$work/b-again") != "$(versions_of "$work/b")" ]] || [[ $(<"$work/b-again/versions.json") != "$(<"$work/b/versions.json")" ]]; then
+    echo "self-test FAILED: a site over its own version with a previous one holds '$(versions_of "$work/b-again")': $(<"$work/b-again/versions.json")"
+    return 1
+  fi
+  cp -R "$work/b" "$served/b-garbled"
+  echo "{\"current\": \"$b\", \"previous\": \"x\"}" >"$served/b-garbled/versions.json"
+  refuses "a site over its own version with a garbled previous one" "$work/app-b" "$work/database" "$work/x9" "$url/b-garbled"
+  if ! grep -q 'names no previous version' "$out"; then
+    echo "self-test FAILED: a garbled previous version was not named: $(<"$out")"
     return 1
   fi
 
