@@ -6,16 +6,14 @@
 #ifndef DLG_SETTINGS_H
 #define DLG_SETTINGS_H
 
+#include "settings_close_check.h"
 #include "settings_view.h"
 
 #include <QDialog>
-#include <QLoggingCategory>
 #include <qtmetamacros.h>
 
 class QPushButton;
 class AbstractSettingsPage;
-
-inline Q_LOGGING_CATEGORY(DlgSettingsLog, "dlg_settings");
 
 /**
  * @brief Main application settings dialog hosting the shared SettingsView
@@ -50,11 +48,9 @@ private slots:
 private:
     SettingsView *settingsView; ///< Shared settings content
     QPushButton *okButton;      ///< Button to close the dialog
+    SettingsCloseCheck closeCheck{this};
 
     void retranslateUi();
-
-protected:
-    void closeEvent(QCloseEvent *event) override;
 };
 
 #endif // DLG_SETTINGS_H
