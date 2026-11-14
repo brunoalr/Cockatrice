@@ -39,6 +39,10 @@ case ${WASM_SMOKE_CARDS:-} in
     ;;
   *) expected="cards\\.xml.* Cards = $WASM_SMOKE_CARDS Sets" ;;
 esac
+font_expected=
+if [[ -n ${WASM_SMOKE_FONT:-} ]]; then
+  font_expected="Fallback font registered: \"$WASM_SMOKE_FONT\""
+fi
 if [[ ${WASM_SMOKE_PERSIST:-0} == 1 && ${WASM_SMOKE_ISOLATION_HEADERS:-1} == 0 ]]; then
   echo "WASM_SMOKE_PERSIST=1 reloads the page, and WASM_SMOKE_ISOLATION_HEADERS=0 expects exactly two page loads: set one of them only" >&2
   exit 3
@@ -83,12 +87,13 @@ for ((second = 0; second <= start_seconds + settle_seconds; second++)); do
   fi
   if [[ -z $started_at ]] && grep -aqE "$started" "$log"; then
     started_at=$second
-    if [[ -n $expected ]]; then
-      result="started, but no line matched '$expected'"
+    if [[ -n $expected$font_expected ]]; then
+      result="started, but no line matched '$expected' and '$font_expected'"
     fi
   fi
   if [[ -n $started_at ]] && ((second - started_at >= settle_seconds)) &&
-    { [[ -z $expected ]] || grep -aqE "$expected" "$log"; }; then
+    { [[ -z $expected ]] || grep -aqE "$expected" "$log"; } &&
+    { [[ -z $font_expected ]] || grep -aqF "$font_expected" "$log"; }; then
     result=started
     break
   fi
