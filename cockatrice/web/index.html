@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, user-scalable=0">
+    <title>Cockatrice</title>
+    <style>
+      html, body { padding: 0; margin: 0; overflow: hidden; height: 100%; font-family: system-ui, sans-serif; }
+      #screen { width: 100%; height: 100%; }
+      #status { box-sizing: border-box; max-width: 36em; margin: 0 auto; padding: 1.5em 1em; text-align: center; line-height: 1.5; }
+      #status img { display: block; width: min(320px, 80vw); height: auto; margin: 0 auto 1em; }
+    </style>
+    <script>
+      let isolationReloaded = false;
+      try {
+        isolationReloaded = sessionStorage.getItem('isolation-reload') !== null;
+        sessionStorage.removeItem('isolation-reload');
+      } catch {}
+      window.coi = {
+        // require-corp only: credentialless is missing in some browsers, and falling back from it costs a second reload
+        coepCredentialless: () => false,
+        coepDegrade: () => false,
+        doReload: () => {
+          if (isolationReloaded)
+            return;
+          try {
+            sessionStorage.setItem('isolation-reload', '1');
+          } catch {
+            return;
+          }
+          // the worker asks on updatefound, before it is active: a reload then would not be controlled
+          navigator.serviceWorker.ready.then(() => location.reload());
+        },
+      };
+    </script>
+    <script src="coi-serviceworker.js"></script>
+  </head>
+  <body>
+    <div id="status">
+      <img src="app/@HASH@/qtlogo.svg" alt="">
+      <p id="message">Loading...</p>
+      <noscript>JavaScript is disabled. Enable it to run Cockatrice.</noscript>
+    </div>
+    <div id="screen" hidden></div>
+    <script src="app/@HASH@/cockatrice.js"></script>
+    <script src="app/@HASH@/qtloader.js"></script>
+    <script>
+      const statusBox = document.querySelector('#status');
+      const container = document.querySelector('#screen');
+      const message = document.querySelector('#message');
+
+      const notIsolated = () => {
+        message.textContent = 'This browser is not supported for now: it did not allow the cross-origin isolation ' +
+          'that Cockatrice needs. Private windows in some browsers do not allow it; a normal window may.';
+        console.error(message.textContent);
+      };
+
+      const start = async () => {
+        try {
+          await qtLoad({
+            // qtloader passes Emscripten bare file names, which would resolve beside this page
+            locateFile: file => 'app/@HASH@/' + file,
+            qt: {
+              onLoaded: () => {
+                statusBox.hidden = true;
+                container.hidden = false;
+              },
+              onExit: exit => {
+                message.textContent = 'Application exit' + (exit.code !== undefined ? ` with code ${exit.code}` : '') +
+                  (exit.text !== undefined ? ` (${exit.text})` : '');
+                container.hidden = true;
+                statusBox.hidden = false;
+              },
+              entryFunction: window.cockatrice_entry,
+              containerElements: [container],
+            },
+          });
+        } catch (e) {
+          console.error(e);
+          console.error(e.stack);
+        }
+      };
+
+      if (window.crossOriginIsolated)
+        start();
+      else if (isolationReloaded || !window.isSecureContext || !navigator.serviceWorker || navigator.serviceWorker.controller)
+        notIsolated();
+      else
+        // the worker reloads once it controls the page; where registration fails it only logs
+        setTimeout(notIsolated, 10000);
+    </script>
+  </body>
+</html>
