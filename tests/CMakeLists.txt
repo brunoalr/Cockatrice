@@ -804,6 +804,7 @@ if(WITH_CLIENT)
     ${CLIENT_SRC}/interface/theme_manager.cpp
     ${CLIENT_SRC}/interface/widgets/deck_editor/deck_state_manager.cpp
     ${CLIENT_SRC}/interface/widgets/deck_editor/deck_zone_dialog.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_convert_deck_to_cod_format.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_default_tags_editor.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_tokens.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_load_deck_from_website.cpp

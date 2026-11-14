@@ -490,6 +490,101 @@ TEST_F(TokenDialog, AFreeNameAddsTheToken)
     EXPECT_TRUE(openDialogs<QInputDialog>().isEmpty());
 }
 
+class CodConversion : public DeckDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    QTemporaryDir folder;
+    int conversions = 0;
+    std::optional<bool> canStoreTags;
+
+    void SetUp() override
+    {
+        SettingsCache::instance().visualDeckStorage().setVisualDeckStoragePromptForConversion(true);
+        SettingsCache::instance().visualDeckStorage().setVisualDeckStorageAlwaysConvert(false);
+    }
+
+    void prompt(const QString &fileName)
+    {
+        DialogConvertDeckToCodFormat::promptIfRequired(
+            window.get(), folder.filePath(fileName),
+            [this] {
+                ++conversions;
+                return true;
+            },
+            [this](bool convertible) {
+                EXPECT_FALSE(canStoreTags.has_value()) << "answered twice";
+                canStoreTags = convertible;
+            });
+        settle();
+    }
+
+    void answerConversion(bool yes) const
+    {
+        auto *dialog = onlyOpen<DialogConvertDeckToCodFormat>();
+        ASSERT_NE(dialog, nullptr);
+        yes ? dialog->accept() : dialog->reject();
+        settle();
+    }
+
+    void createCodVersion() const
+    {
+        QFile file(folder.filePath("deck.cod"));
+        ASSERT_TRUE(file.open(QIODevice::WriteOnly));
+    }
+};
+
+TEST_F(CodConversion, ACodDeckNeedsNoPrompt)
+{
+    prompt("deck.cod");
+
+    EXPECT_EQ(canStoreTags, true);
+    EXPECT_EQ(conversions, 0);
+    EXPECT_TRUE(openDialogs<QDialog>().isEmpty());
+}
+
+TEST_F(CodConversion, YesConvertsTheDeck)
+{
+    prompt("deck.txt");
+    EXPECT_FALSE(canStoreTags.has_value());
+    answerConversion(true);
+
+    EXPECT_EQ(conversions, 1);
+    EXPECT_EQ(canStoreTags, true);
+}
+
+TEST_F(CodConversion, NoLeavesTheDeckAndKeepsAsking)
+{
+    prompt("deck.txt");
+    answerConversion(false);
+
+    EXPECT_EQ(conversions, 0);
+    EXPECT_EQ(canStoreTags, false);
+    EXPECT_TRUE(SettingsCache::instance().visualDeckStorage().getVisualDeckStoragePromptForConversion());
+}
+
+TEST_F(CodConversion, AnExistingCodFileIsOverwrittenOnlyAfterYes)
+{
+    createCodVersion();
+    prompt("deck.txt");
+    answerConversion(true);
+    EXPECT_FALSE(canStoreTags.has_value());
+
+    clickInOnlyBox(QMessageBox::Yes, "A .cod version of this deck already exists. Overwrite it?");
+    EXPECT_EQ(conversions, 1);
+    EXPECT_EQ(canStoreTags, true);
+}
+
+TEST_F(CodConversion, NoToOverwritingKeepsTheExistingCodFile)
+{
+    createCodVersion();
+    prompt("deck.txt");
+    answerConversion(true);
+
+    clickInOnlyBox(QMessageBox::No);
+    EXPECT_EQ(conversions, 0);
+    EXPECT_EQ(canStoreTags, false);
+}
+
 } // namespace
 
 int main(int argc, char **argv)

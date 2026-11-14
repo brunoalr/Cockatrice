@@ -1,6 +1,7 @@
 #include "dlg_convert_deck_to_cod_format.h"
 
 #include "../../../client/settings/cache_settings.h"
+#include "../utility/non_blocking_dialogs.h"
 
 #include <QCheckBox>
 #include <QDialogButtonBox>
@@ -8,12 +9,10 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QLabel>
-#include <QMessageBox>
 #include <QObject>
 #include <QVBoxLayout>
 #include <libcockatrice/deck_list/deck_file_format.h>
 #include <libcockatrice/settings/visual_deck_storage_settings.h>
-#include <libcockatrice/utility/qt_utils.h>
 
 DialogConvertDeckToCodFormat::DialogConvertDeckToCodFormat(QWidget *parent) : QDialog(parent)
 {
@@ -52,64 +51,77 @@ bool DialogConvertDeckToCodFormat::dontAskAgain() const
 namespace
 {
 
-bool confirmOverwriteIfExists(QWidget *parent, const QString &filePath)
+void confirmOverwriteIfExists(QWidget *parent, const QString &filePath, std::function<void(bool overwrite)> then)
 {
     QFileInfo fileInfo(filePath);
     QString newFileName = QDir::toNativeSeparators(fileInfo.path() + "/" + fileInfo.completeBaseName() + ".cod");
 
     if (QFile::exists(newFileName)) {
-        return QtUtils::confirm(parent, QObject::tr("Overwrite Existing File?"),
-                                QObject::tr("A .cod version of this deck already exists. Overwrite it?"));
+        Dialogs::confirm(parent, QObject::tr("Overwrite Existing File?"),
+                         QObject::tr("A .cod version of this deck already exists. Overwrite it?"), std::move(then));
+        return;
     }
-    return true; // Safe to proceed
+    then(true); // Safe to proceed
+}
+
+void convertAccepted(QWidget *parent,
+                     const QString &filePath,
+                     const std::function<bool()> &convert,
+                     bool dontAskAgain,
+                     const std::function<void(bool convertible)> &then)
+{
+    // Try to convert file
+    confirmOverwriteIfExists(parent, filePath, [convert, dontAskAgain, then](bool overwrite) {
+        if (!overwrite || !convert()) {
+            then(false);
+            return;
+        }
+
+        if (dontAskAgain) {
+            SettingsCache::instance().visualDeckStorage().setVisualDeckStoragePromptForConversion(false);
+            SettingsCache::instance().visualDeckStorage().setVisualDeckStorageAlwaysConvert(true);
+        }
+
+        then(true);
+    });
 }
 
 } // namespace
 
-bool DialogConvertDeckToCodFormat::promptIfRequired(QWidget *parent,
+void DialogConvertDeckToCodFormat::promptIfRequired(QWidget *parent,
                                                     const QString &filePath,
-                                                    const std::function<bool()> &convert)
+                                                    const std::function<bool()> &convert,
+                                                    std::function<void(bool convertible)> then)
 {
     if (DeckFileFormat::getFormatFromName(filePath) == DeckFileFormat::Cockatrice) {
-        return true;
+        then(true);
+        return;
     }
 
     // Retrieve saved preference if the prompt is disabled
     if (!SettingsCache::instance().visualDeckStorage().getVisualDeckStoragePromptForConversion()) {
         if (!SettingsCache::instance().visualDeckStorage().getVisualDeckStorageAlwaysConvert()) {
-            return false;
+            then(false);
+            return;
         }
 
-        if (!confirmOverwriteIfExists(parent, filePath)) {
-            return false;
-        }
-
-        return convert();
+        confirmOverwriteIfExists(parent, filePath,
+                                 [convert, then](bool overwrite) { then(overwrite && convert()); });
+        return;
     }
 
     // Show the dialog to the user
-    DialogConvertDeckToCodFormat conversionDialog(parent);
-    if (conversionDialog.exec() != QDialog::Accepted) {
-        SettingsCache::instance().visualDeckStorage().setVisualDeckStoragePromptForConversion(
-            !conversionDialog.dontAskAgain());
-        SettingsCache::instance().visualDeckStorage().setVisualDeckStorageAlwaysConvert(false);
+    auto *conversionDialog = new DialogConvertDeckToCodFormat(parent);
+    Dialogs::open(conversionDialog, [conversionDialog, parent, filePath, convert, then](int result) {
+        if (result != QDialog::Accepted) {
+            SettingsCache::instance().visualDeckStorage().setVisualDeckStoragePromptForConversion(
+                !conversionDialog->dontAskAgain());
+            SettingsCache::instance().visualDeckStorage().setVisualDeckStorageAlwaysConvert(false);
 
-        return false;
-    }
+            then(false);
+            return;
+        }
 
-    // Try to convert file
-    if (!confirmOverwriteIfExists(parent, filePath)) {
-        return false;
-    }
-
-    if (!convert()) {
-        return false;
-    }
-
-    if (conversionDialog.dontAskAgain()) {
-        SettingsCache::instance().visualDeckStorage().setVisualDeckStoragePromptForConversion(false);
-        SettingsCache::instance().visualDeckStorage().setVisualDeckStorageAlwaysConvert(true);
-    }
-
-    return true;
+        convertAccepted(parent, filePath, convert, conversionDialog->dontAskAgain(), then);
+    });
 }

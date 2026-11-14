@@ -40,10 +40,13 @@ public:
      * @param parent The widget to parent the prompt to.
      * @param filePath The path of the deck file to check.
      * @param convert Called to convert the deck once the user agrees.
-     * @return true if tags can be stored (no conversion needed, or the conversion
-     *         was performed), false if the user declined to convert.
+     * @param then Told true if tags can be stored (no conversion needed, or the
+     *        conversion was performed), false if the user declined to convert.
      */
-    static bool promptIfRequired(QWidget *parent, const QString &filePath, const std::function<bool()> &convert);
+    static void promptIfRequired(QWidget *parent,
+                                 const QString &filePath,
+                                 const std::function<bool()> &convert,
+                                 std::function<void(bool convertible)> then);
 
 private:
     QVBoxLayout *layout;

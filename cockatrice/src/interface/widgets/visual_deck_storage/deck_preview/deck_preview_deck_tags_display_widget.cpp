@@ -3,6 +3,7 @@
 #include "../../../../client/settings/cache_settings.h"
 #include "../../../deck_loader/deck_loader.h"
 #include "../../general/layout_containers/flow_widget.h"
+#include "../../utility/non_blocking_dialogs.h"
 #include "deck_preview_tag_addition_widget.h"
 #include "deck_preview_tag_dialog.h"
 #include "deck_preview_tag_display_widget.h"
@@ -12,12 +13,12 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QHBoxLayout>
-#include <QPointer>
 #include <QSizePolicy>
 #include <libcockatrice/deck_list/deck_file_format.h>
 #include <libcockatrice/deck_list/loaded_deck.h>
 #include <libcockatrice/settings/paths_settings.h>
 #include <libcockatrice/utility/qt_utils.h>
+#include <memory>
 #include <optional>
 #include <qnamespace.h>
 
@@ -64,7 +65,8 @@ void DeckPreviewDeckTagsDisplayWidget::setKnownTagsProvider(const std::function<
     knownTagsProvider = provider;
 }
 
-void DeckPreviewDeckTagsDisplayWidget::setConversionPromptHandler(const std::function<bool()> &handler)
+void DeckPreviewDeckTagsDisplayWidget::setConversionPromptHandler(
+    const std::function<void(std::function<void()> thenAllowed)> &handler)
 {
     conversionPromptHandler = handler;
 }
@@ -108,27 +110,26 @@ static QStringList findAllKnownTags()
 void DeckPreviewDeckTagsDisplayWidget::openTagEditDlg()
 {
     // The deck editor path has no conversion prompt; the VDS path registers one.
-    if (conversionPromptHandler && !conversionPromptHandler()) {
+    if (conversionPromptHandler) {
+        conversionPromptHandler(Dialogs::whileAlive(this, [this] { openTagDialog(); }));
         return;
     }
-
-    const QStringList knownTags = knownTagsProvider ? knownTagsProvider() : findAllKnownTags();
-    execTagDialog(knownTags);
+    openTagDialog();
 }
 
-void DeckPreviewDeckTagsDisplayWidget::execTagDialog(const QStringList &knownTags)
+void DeckPreviewDeckTagsDisplayWidget::openTagDialog()
 {
-    QPointer<DeckPreviewDeckTagsDisplayWidget> self(this);
-    DeckPreviewTagDialog dialog(knownTags, currentTags);
-    if (dialog.exec() == QDialog::Accepted) {
-        // Guard against the widget being destroyed during dialog.exec()'s nested event loop.
-        if (!self) {
-            return;
-        }
-        QStringList updatedTags = dialog.getActiveTags();
-        if (updatedTags != currentTags) {
-            setTags(updatedTags);
-            emit tagsChanged(updatedTags);
-        }
-    }
+    const QStringList knownTags = knownTagsProvider ? knownTagsProvider() : findAllKnownTags();
+    auto dialog = std::make_unique<DeckPreviewTagDialog>(knownTags, currentTags);
+    const DeckPreviewTagDialog *tagDialog = dialog.get();
+    Dialogs::open(dialog.release(), Dialogs::whileAlive(this, [this, tagDialog](int result) {
+                      if (result != QDialog::Accepted) {
+                          return;
+                      }
+                      QStringList updatedTags = tagDialog->getActiveTags();
+                      if (updatedTags != currentTags) {
+                          setTags(updatedTags);
+                          emit tagsChanged(updatedTags);
+                      }
+                  }));
 }
