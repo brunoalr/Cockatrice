@@ -13,6 +13,7 @@
 #include "main.h"
 
 #include <QColorDialog>
+#include <QComboBox>
 #include <QDialog>
 #include <QDir>
 #include <QFile>
@@ -28,6 +29,7 @@
 #include <gtest/gtest.h>
 #include <libcockatrice/card/database/card_database.h>
 #include <libcockatrice/card/database/card_database_manager.h>
+#include <libcockatrice/settings/cards_display_settings.h>
 #include <libcockatrice/settings/download_settings.h>
 #include <libcockatrice/settings/message_settings.h>
 #include <libcockatrice/settings/paths_settings.h>
@@ -284,6 +286,48 @@ TEST_F(PathChoosers, TheSpoilerFileGoesIntoTheChosenDirectory)
 
     EXPECT_EQ(SettingsCache::instance().getSpoilerCardDatabasePath(), chosen.filePath("spoiler.xml"));
 }
+class CardLanguagePrompt : public SettingsDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    int updateRequests = 0;
+
+    void SetUp() override
+    {
+        SettingsCache::instance().cardsDisplay().setCardLang("en");
+    }
+
+    void chooseAnotherLanguage()
+    {
+        auto *page = addPage<GeneralSettingsPage>();
+        QObject::connect(page, &GeneralSettingsPage::cardDatabaseUpdateRequested, page, [this] { ++updateRequests; });
+        for (QComboBox *box : page->findChildren<QComboBox *>()) {
+            if (box->itemData(0) == "en" && box->count() > 1) {
+                box->setCurrentIndex(1);
+            }
+        }
+        settle();
+        EXPECT_NE(SettingsCache::instance().cardsDisplay().getCardLang(), "en");
+    }
+};
+
+TEST_F(CardLanguagePrompt, YesRunsOracle)
+{
+    chooseAnotherLanguage();
+    EXPECT_EQ(updateRequests, 0);
+
+    answer("Run Oracle now?", QMessageBox::Yes);
+    EXPECT_EQ(updateRequests, 1);
+}
+
+TEST_F(CardLanguagePrompt, NoKeepsTheLanguageWithoutRunningOracle)
+{
+    chooseAnotherLanguage();
+    answer("Run Oracle now?", QMessageBox::No);
+
+    EXPECT_EQ(updateRequests, 0);
+    EXPECT_NE(SettingsCache::instance().cardsDisplay().getCardLang(), "en");
+}
+
 class ShortcutPrompts : public SettingsDialogs // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:
