@@ -97,8 +97,9 @@ void writeServerArray(QSettings &settings, const QList<ServersSettings::ServerEn
         settings.setValue("server", entry.host);
         settings.setValue("port", entry.port);
         settings.setValue("username", entry.username);
-        settings.setValue("password", ServersSettings::canStorePasswords() ? entry.password : QString());
-        settings.setValue("savePassword", ServersSettings::canStorePasswords() && entry.savePassword);
+        const bool savePassword = ServersSettings::canStorePasswords() && entry.savePassword;
+        settings.setValue("password", savePassword ? entry.password : QString());
+        settings.setValue("savePassword", savePassword);
         settings.setValue("site", entry.site);
     }
     settings.endArray();

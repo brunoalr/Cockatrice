@@ -214,6 +214,28 @@ TEST_F(ServersSettingsTest, LegacyProfileAddedAfterMigrationIsMerged)
     ASSERT_EQ(again.getServers().size(), 2);
 }
 
+TEST_F(ServersSettingsTest, AddingAServerWithoutTheSaveFlagStoresNoPassword)
+{
+    ServersSettings settings(settingsPath, nullptr);
+    settings.addNewServer("Alpha", "alpha.example", "4748", "alice", "secret", false);
+
+    QSettings raw(settingsFile(), QSettings::IniFormat);
+    EXPECT_EQ(raw.value("server/server_details/servers/1/password").toString(), QString());
+    EXPECT_EQ(raw.value("server/server_details/servers/1/username").toString(), QString("alice"));
+}
+
+TEST_F(ServersSettingsTest, UpdatingAServerWithoutTheSaveFlagStoresNoPasswordOrVerifier)
+{
+    ServersSettings settings(settingsPath, nullptr);
+    settings.addNewServer("Alpha", "alpha.example", "4748", "alice", QString(), false);
+
+    EXPECT_TRUE(settings.updateExistingServer("Alpha", "alpha.example", "4748", "alice", "secret", false));
+    settings.setServerPassword("Alpha", "$scrypt$made-up-verifier");
+
+    QSettings raw(settingsFile(), QSettings::IniFormat);
+    EXPECT_EQ(raw.value("server/server_details/servers/1/password").toString(), QString());
+}
+
 TEST_F(ServersSettingsTest, OutOfRangeIndexReturnsNullopt)
 {
     ServersSettings settings(settingsPath, nullptr);
