@@ -61,7 +61,7 @@ void confirmOverwriteIfExists(QWidget *parent, const QString &filePath, std::fun
                          QObject::tr("A .cod version of this deck already exists. Overwrite it?"), std::move(then));
         return;
     }
-    then(true); // Safe to proceed
+    then(true);
 }
 
 void convertAccepted(QWidget *parent,
@@ -70,7 +70,6 @@ void convertAccepted(QWidget *parent,
                      bool dontAskAgain,
                      const std::function<void(bool convertible)> &then)
 {
-    // Try to convert file
     confirmOverwriteIfExists(parent, filePath, [convert, dontAskAgain, then](bool overwrite) {
         if (!overwrite || !convert()) {
             then(false);

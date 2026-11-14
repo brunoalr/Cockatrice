@@ -36,9 +36,8 @@ public:
     void setKnownTagsProvider(const std::function<QStringList()> &provider);
 
     /**
-     * @brief Sets a handler run before opening the tag dialog. The handler calls
-     * thenAllowed to open the dialog; not calling it cancels the dialog. Defaults
-     * to no handler (the deck editor path).
+     * @brief Sets a handler run before opening the tag dialog: it calls thenAllowed to open
+     * the dialog, or cancels it by not calling it. Defaults to none (the deck editor path).
      */
     void setConversionPromptHandler(const std::function<void(std::function<void()> thenAllowed)> &handler);
 

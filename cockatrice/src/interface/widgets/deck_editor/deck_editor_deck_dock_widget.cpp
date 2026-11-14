@@ -976,9 +976,8 @@ void DeckEditorDeckDockWidget::addMoveToZoneMenu(QMenu *menu,
 
     moveMenu->addSeparator();
 
-    // Resolve the card's identity before creating the zone:
-    // creating it rebuilds the model tree, so sourceCardIndex's
-    // internal pointer is freed by the time it would be used.
+    // Read the card's identity now: creating the zone rebuilds the model tree,
+    // which frees what sourceCardIndex points to.
     const QString cardName =
         sourceCardIndex.siblingAtColumn(DeckListModelColumns::CARD_NAME).data(Qt::EditRole).toString();
     const QString providerId =

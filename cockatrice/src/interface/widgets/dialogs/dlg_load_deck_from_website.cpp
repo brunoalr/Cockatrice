@@ -142,7 +142,6 @@ void DlgLoadDeckFromWebsite::readReply(QNetworkReply *reply, DeckProvider provid
             return;
         }
 
-        // Parse the plain text deck here
         DeckList deckList;
         QTextStream stream(&deckText);
         deckList.loadFromStream_Plain(stream, false, CardNameNormalizer());
@@ -153,7 +152,6 @@ void DlgLoadDeckFromWebsite::readReply(QNetworkReply *reply, DeckProvider provid
         return;
     }
 
-    // Normal JSON parsing for other providers
     QJsonParseError parseError;
     QJsonDocument doc = QJsonDocument::fromJson(responseData, &parseError);
     if (parseError.error != QJsonParseError::NoError) {

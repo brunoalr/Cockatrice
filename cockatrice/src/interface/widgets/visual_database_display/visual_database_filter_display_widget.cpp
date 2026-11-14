@@ -75,12 +75,11 @@ void FilterDisplayWidget::deleteFilter()
             if (!confirmed) {
                 return;
             }
-            // If confirmed, delete the filter
             QString filePath = SettingsCache::instance().paths().getFiltersPath() + QDir::separator() + filterFilename;
             QFile file(filePath);
             if (file.remove()) {
-                emit filterDeleted(filterFilename); // Emit signal for deletion
-                delete this;                        // Delete this widget
+                emit filterDeleted(filterFilename);
+                delete this;
             } else {
                 Dialogs::warning(this, tr("Delete Failed"), tr("Failed to delete filter '%1'.").arg(filterFilename));
             }

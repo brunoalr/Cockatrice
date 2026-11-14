@@ -554,7 +554,6 @@ void AppearanceSettingsPage::overrideAllCardArtWithPersonalPreferenceToggled(QT_
 
     OverridePrintingWarning::confirm(this, enable, [this, enable](bool accepted) {
         if (!accepted) {
-            // If user cancels, revert the checkbox/state back
             overrideAllCardArtWithPersonalPreferenceCheckBox.blockSignals(true);
             overrideAllCardArtWithPersonalPreferenceCheckBox.setChecked(!enable);
             overrideAllCardArtWithPersonalPreferenceCheckBox.blockSignals(false);

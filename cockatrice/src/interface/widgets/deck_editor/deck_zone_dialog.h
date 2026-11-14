@@ -80,11 +80,8 @@ public:
                                  const std::function<QString(const QString &)> &nameValidator,
                                  std::function<void(const QString &boardName, const QString &zoneName)> thenAccepted);
 
-    /**
-     * @brief Prompts for a new custom zone and creates it in @p deck once the user accepts.
-     *
-     * @param thenCreated Called with the name of the created zone; not called when the user cancels
-     */
+    /// Prompts for a new custom zone and creates it in @p deck once the user accepts.
+    /// @p thenCreated gets the new zone's name; it is not called when the user cancels.
     static void promptToCreateZone(QWidget *parent,
                                    DeckStateManager *deck,
                                    const QString &initialBoardName,

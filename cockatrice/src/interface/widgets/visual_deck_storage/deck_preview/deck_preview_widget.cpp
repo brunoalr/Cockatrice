@@ -553,7 +553,6 @@ void DeckPreviewWidget::actRenameDeck()
             return;
         }
 
-        // write change
         model->renameDeck(current, newName);
 
         // The banner card text updates via the model's dataChanged signal.
@@ -576,7 +575,6 @@ void DeckPreviewWidget::actRenameFile()
             return;
         }
 
-        // write change
         if (!model->renameFile(current, newName)) {
             Dialogs::critical(this, tr("Error"), tr("Rename failed"));
         }
@@ -600,7 +598,6 @@ void DeckPreviewWidget::actDeleteFile()
                          return;
                      }
 
-                     // write change
                      if (!model->deleteFile(current)) {
                          Dialogs::critical(this, tr("Error"), tr("Delete failed"));
                      }
