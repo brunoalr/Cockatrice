@@ -17,7 +17,6 @@ class GamesProxyModel;
 class QLabel;
 class QMenu;
 class QPushButton;
-class QToolButton;
 class QAction;
 class AbstractClient;
 class TabSupervisor;
@@ -165,7 +164,7 @@ private:
 
     QPushButton *filterButton;                     /**< Button to open the filter dialog. */
     QPushButton *clearFilterButton;                /**< Button to clear active filters. */
-    QToolButton *hostGameSplitButton = nullptr;    /**< Split host button, on every style that can draw one. */
+    QWidget *hostGameSplitButton = nullptr;        /**< Split host button, on every style that can draw one. */
     QPushButton *hostGameButton = nullptr;         /**< Primary quick-host button, on the native macOS style only. */
     QPushButton *hostGameSettingsButton = nullptr; /**< Opens the host form; a sibling button on macOS. */
     QMenu *hostGameMenu = nullptr;                 /**< Menu behind the split arrow (non-macOS styles only). */

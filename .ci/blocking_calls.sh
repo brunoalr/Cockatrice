@@ -5,7 +5,7 @@ export LC_ALL=C
 
 baseline_file="$(dirname "$0")/blocking_calls.baseline"
 
-blocking_call='QMessageBox::(information|warning|critical|about|aboutQt|question)\(|QtUtils::confirm\(|QInputDialog::get[A-Za-z]+\(|QFileDialog::get(OpenFile|SaveFile|ExistingDirectory)(Names?|Urls?)?\(|Q(Color|Font)Dialog::get[A-Za-z]+\(|(^|[^A-Za-z0-9_])exec\('
+blocking_call='QMessageBox::(information|warning|critical|about|aboutQt|question)\(|QtUtils::confirm\(|QInputDialog::get[A-Za-z]+\(|QFileDialog::get(OpenFile|SaveFile|ExistingDirectory)(Names?|Urls?)?\(|Q(Color|Font)Dialog::get[A-Za-z]+\(|setPopupMode\((QToolButton::)?(InstantPopup|MenuButtonPopup)\)|(^|[^A-Za-z0-9_])exec\('
 
 count_blocking_calls() {
   local repo=$1
@@ -71,6 +71,9 @@ auto j = QFileDialog::getOpenFileUrl(this);
 auto k = QFileDialog::getSaveFileUrl(this);
 auto c = QColorDialog::getColor(Qt::red, this);
 auto t = QFontDialog::getFont(&ok, this);
+button->setPopupMode(QToolButton::InstantPopup);
+split->setPopupMode(QToolButton::MenuButtonPopup);
+delayed->setPopupMode(QToolButton::DelayedPopup);
 if (exec() == QDialog::Accepted) {
 return QDialog::exec();
     *ok = dialog->exec() == QDialog::Accepted;
@@ -89,8 +92,8 @@ EOF
 
   local count
   count=$(count_blocking_calls "$repo")
-  if [[ $count != 22 ]]; then
-    echo "self-test FAILED: counted $count blocking calls in the fixture, expected 22"
+  if [[ $count != 24 ]]; then
+    echo "self-test FAILED: counted $count blocking calls in the fixture, expected 24"
     return 1
   fi
   if check_against_baseline 7 6 >/dev/null; then

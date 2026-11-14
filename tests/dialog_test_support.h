@@ -50,6 +50,9 @@ public:
                 return;
             }
             ADD_FAILURE() << "a nested event loop is running";
+            if (QWidget *popup = QApplication::activePopupWidget()) {
+                popup->close();
+            }
             for (QWidget *widget : QApplication::topLevelWidgets()) {
                 if (auto *dialog = qobject_cast<QDialog *>(widget); dialog && dialog->isVisible()) {
                     dialog->reject();

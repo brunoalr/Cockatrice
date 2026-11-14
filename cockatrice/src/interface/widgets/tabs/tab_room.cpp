@@ -200,8 +200,7 @@ TabRoom::TabRoom(TabSupervisor *_tabSupervisor,
 
     auto *chatSettingsButton = new QToolButton;
     chatSettingsButton->setIcon(loadThemedIcon(QStringLiteral("icons/settings")));
-    chatSettingsButton->setMenu(chatSettingsMenu);
-    chatSettingsButton->setPopupMode(QToolButton::InstantPopup);
+    Dialogs::showMenuOnClick(chatSettingsButton, chatSettingsMenu);
 
     auto *sayHbox = new QHBoxLayout;
     sayHbox->addWidget(sayLabel);

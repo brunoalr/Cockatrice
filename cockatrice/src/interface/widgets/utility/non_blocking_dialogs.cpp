@@ -1,8 +1,10 @@
 #include "non_blocking_dialogs.h"
 
+#include <QAbstractButton>
 #include <QEvent>
 #include <QFileDialog>
 #include <QInputDialog>
+#include <QMenu>
 #include <QPointer>
 
 namespace Dialogs
@@ -227,6 +229,12 @@ void open(QMessageBox *box, std::function<void(QAbstractButton *clicked)> thenCl
             thenClicked(box->clickedButton());
         }
     });
+}
+
+void showMenuOnClick(QAbstractButton *button, QMenu *menu)
+{
+    QObject::connect(button, &QAbstractButton::clicked, menu,
+                     [button, menu] { menu->popup(button->mapToGlobal(QPoint(0, button->height()))); });
 }
 
 void detail::openThen(QDialog *dialog, std::function<void(int result)> thenFinished)

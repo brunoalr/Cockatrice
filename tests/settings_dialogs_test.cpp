@@ -21,14 +21,18 @@
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPointer>
 #include <QPushButton>
 #include <QTemporaryDir>
+#include <QTest>
+#include <QToolButton>
 #include <algorithm>
 #include <gtest/gtest.h>
 #include <libcockatrice/card/database/card_database.h>
 #include <libcockatrice/card/database/card_database_manager.h>
+#include <libcockatrice/rng/rng_abstract.h>
 #include <libcockatrice/settings/cards_display_settings.h>
 #include <libcockatrice/settings/download_settings.h>
 #include <libcockatrice/settings/message_settings.h>
@@ -37,6 +41,7 @@
 #include <memory>
 
 ThemeManager *themeManager = nullptr;                          // NOSONAR: the client declares it extern and assigns it
+RNG_Abstract *rng = nullptr;                                   // NOSONAR: the client declares it extern and assigns it
 QSystemTrayIcon *trayIcon = nullptr;                           // NOSONAR: the client declares it extern and assigns it
 const QString translationPrefix = QStringLiteral("cockatrice"); // NOSONAR: the client declares it extern
 QString translationPath;                                       // NOSONAR: the client declares it extern
@@ -632,6 +637,34 @@ TEST_F(ColourPicker, ACancelledPickKeepsTheColour)
     settle();
     EXPECT_EQ(button->getColor(), QColor(Qt::blue));
     EXPECT_TRUE(changes.isEmpty());
+}
+class ToolButtonMenu : public SettingsDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    QToolButton *button = new QToolButton(window.get());
+    QMenu *menu = new QMenu(window.get());
+
+    void SetUp() override
+    {
+        menu->addAction("Clear chat");
+        window->show();
+        Dialogs::showMenuOnClick(button, menu);
+    }
+
+    void TearDown() override
+    {
+        menu->close();
+        settle();
+    }
+};
+
+TEST_F(ToolButtonMenu, AClickShowsTheMenuBelowTheButton)
+{
+    QTest::mouseClick(button, Qt::LeftButton);
+    settle();
+
+    EXPECT_TRUE(menu->isVisible());
+    EXPECT_EQ(menu->pos(), button->mapToGlobal(QPoint(0, button->height())));
 }
 } // namespace
 

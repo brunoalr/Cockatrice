@@ -191,15 +191,22 @@ GameSelector::GameSelector(AbstractClient *_client,
         gameSettingsAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
         connect(gameSettingsAction, &QAction::triggered, this, &GameSelector::actCreate);
 
-        // A split QToolButton in its native style: the primary half quick-hosts, and the
-        // arrow opens the menu with the full form. This is the control on every style that
-        // can draw one; QMacStyle draws the menu half as a second square bezel instead.
-        hostGameSplitButton = new QToolButton(this);
+        // A split button of two tool buttons: the primary quick-hosts, and the arrow beside it
+        // opens the menu with the full form. This is the control on every style that can draw
+        // one; QMacStyle draws each tool button as its own square bezel instead.
+        hostGameSplitButton = new QWidget(this);
         hostGameSplitButton->setObjectName("hostGameSplitButton");
-        hostGameSplitButton->setDefaultAction(hostGameAction);
-        hostGameSplitButton->setPopupMode(QToolButton::MenuButtonPopup);
-        hostGameSplitButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
-        hostGameSplitButton->setMenu(hostGameMenu);
+        auto *quickHostButton = new QToolButton(hostGameSplitButton);
+        quickHostButton->setDefaultAction(hostGameAction);
+        quickHostButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+        auto *hostGameMenuButton = new QToolButton(hostGameSplitButton);
+        hostGameMenuButton->setArrowType(Qt::DownArrow);
+        Dialogs::showMenuOnClick(hostGameMenuButton, hostGameMenu);
+        auto *splitLayout = new QHBoxLayout(hostGameSplitButton);
+        splitLayout->setContentsMargins(0, 0, 0, 0);
+        splitLayout->setSpacing(0);
+        splitLayout->addWidget(quickHostButton);
+        splitLayout->addWidget(hostGameMenuButton);
 
         // The native macOS style has no split rendering, so there the primary stays a plain
         // QPushButton next to a plain settings button. A QPushButton does not take its text,
