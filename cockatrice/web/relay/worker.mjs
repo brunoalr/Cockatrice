@@ -30,10 +30,13 @@ const copiedHeaders = ['content-type', 'cache-control', 'etag', 'last-modified']
 async function readBody(stream) {
   const chunks = []
   let size = 0
-  for await (const chunk of stream ?? []) {
-    size += chunk.byteLength
+  const reader = stream?.getReader()
+  while (reader) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
     if (size > bodyLimit) return null
-    chunks.push(chunk)
+    chunks.push(value)
   }
   return new Blob(chunks)
 }
