@@ -913,7 +913,7 @@ void DeckEditorDeckDockWidget::decklistCustomMenu(QPoint point)
 
     // The menu stays up while the deck may change: show the card it was opened on before the selector.
     QAction *selectPrinting = menu->addAction(tr("Select Printing"));
-    connect(selectPrinting, &QAction::triggered, this, [this, card = getCurrentCard()] {
+    connect(selectPrinting, &QAction::triggered, this, [this, card = isCardRow ? getCurrentCard() : ExactCard()] {
         if (card) {
             emit selectedCardChanged(card);
         }
