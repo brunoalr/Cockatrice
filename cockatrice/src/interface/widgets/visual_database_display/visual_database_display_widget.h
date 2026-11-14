@@ -7,6 +7,7 @@
 #ifndef VISUAL_DATABASE_DISPLAY_WIDGET_H
 #define VISUAL_DATABASE_DISPLAY_WIDGET_H
 
+#include "../deck_editor/card_database_view.h"
 #include "libcockatrice/card/card_info.h"
 
 #include <QString>
@@ -18,7 +19,6 @@
 
 class CardDatabaseDisplayModel;
 class CardDatabaseModel;
-class CardDatabaseView;
 class CardDatabaseVisualDisplayModel;
 class CardDatabaseVisualView;
 class CardSizeWidget;
@@ -47,9 +47,9 @@ public:
 
     /**
      * @brief Sets the callback used to create a custom zone from the add-to-zone menu.
-     * The callback returns the name of the created zone, or an empty string if creation was cancelled.
+     * The callback reports the name of the created zone, and nothing if creation was cancelled.
      */
-    void setNewZoneCreator(const std::function<QString()> &creator);
+    void setNewZoneCreator(const CardDatabaseView::NewZoneHandler &creator);
 
     CardDatabaseDisplayModel *getDatabaseDisplayModel()
     {
@@ -115,7 +115,7 @@ private:
     CardDatabaseVisualDisplayModel *visualDisplayModel;
     CardDatabaseView *databaseView;
     CardDatabaseVisualView *cardView;
-    std::function<QString()> newZoneCreator;
+    CardDatabaseView::NewZoneHandler newZoneCreator;
     QVBoxLayout *mainLayout;
     CardSizeWidget *cardSizeWidget;
 

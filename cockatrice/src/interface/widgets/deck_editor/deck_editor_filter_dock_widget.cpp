@@ -29,6 +29,7 @@
 #include <QVariant>
 #include <QWidget>
 #include <libcockatrice/utility/qt_utils.h>
+#include <memory>
 #include <qnamespace.h>
 
 DeckEditorFilterDockWidget::DeckEditorFilterDockWidget(AbstractTabDeckEditor *parent)
@@ -107,33 +108,19 @@ void DeckEditorFilterDockWidget::createFiltersDock()
 
 void DeckEditorFilterDockWidget::filterViewCustomContextMenu(const QPoint &point)
 {
-    QMenu menu;
-    QAction *action;
-    QModelIndex idx;
-
-    idx = filterView->indexAt(point);
+    const QPersistentModelIndex idx = filterView->indexAt(point);
     if (!idx.isValid()) {
         return;
     }
 
-    action = menu.addAction(QString("delete"));
-    action->setData(point);
-    connect(&menu, &QMenu::triggered, this, &DeckEditorFilterDockWidget::filterRemove);
-    menu.exec(filterView->mapToGlobal(point));
-}
-
-void DeckEditorFilterDockWidget::filterRemove(const QAction *action)
-{
-    QPoint point;
-    QModelIndex idx;
-
-    point = action->data().toPoint();
-    idx = filterView->indexAt(point);
-    if (!idx.isValid()) {
-        return;
-    }
-
-    filterModel->removeRow(idx.row(), idx.parent());
+    auto menu = std::make_unique<QMenu>();
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    connect(menu->addAction(QString("delete")), &QAction::triggered, this, [this, idx] {
+        if (idx.isValid()) {
+            filterModel->removeRow(idx.row(), idx.parent());
+        }
+    });
+    menu.release()->popup(filterView->mapToGlobal(point));
 }
 
 void DeckEditorFilterDockWidget::actClearFilterAll()

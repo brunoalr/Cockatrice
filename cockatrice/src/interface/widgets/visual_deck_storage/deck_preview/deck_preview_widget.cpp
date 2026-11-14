@@ -5,6 +5,7 @@
 #include "../../../deck_loader/deck_loader.h"
 #include "../../cards/additional_info/color_identity_widget.h"
 #include "../../cards/deck_preview_card_picture_widget.h"
+#include "../../utility/non_blocking_dialogs.h"
 #include "../visual_deck_storage_model.h"
 #include "../visual_deck_storage_quick_settings_widget.h"
 #include "../visual_deck_storage_tag_filter_widget.h"
@@ -22,7 +23,6 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <QFrame>
-#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
@@ -73,7 +73,8 @@ DeckPreviewWidget::DeckPreviewWidget(QWidget *_parent,
     connect(deckTagsDisplayWidget, &DeckPreviewDeckTagsDisplayWidget::tagsChanged, this, &DeckPreviewWidget::setTags);
     deckTagsDisplayWidget->setKnownTagsProvider(
         [this] { return visualDeckStorageWidget->tagFilterWidget->getAllKnownTags(); });
-    deckTagsDisplayWidget->setConversionPromptHandler([this] { return promptFileConversionIfRequired(); });
+    deckTagsDisplayWidget->setConversionPromptHandler(
+        [this](std::function<void()> thenAllowed) { promptFileConversionIfRequired(std::move(thenAllowed)); });
 
     bannerCardLabel = new QLabel(this);
     bannerCardLabel->setObjectName("bannerCardLabel");
@@ -545,22 +546,22 @@ void DeckPreviewWidget::actRenameDeck()
     // read input
     const QString oldName = model->dataForRow(r).deckName;
 
-    bool ok;
-    QString newName = QInputDialog::getText(this, tr("Rename deck"), tr("New name:"), QLineEdit::Normal, oldName, &ok);
-    if (!ok || oldName == newName) {
-        return;
-    }
+    Dialogs::getText(this, tr("Rename deck"), tr("New name:"), oldName, [this, oldName](const QString &newName) {
+        // The rows may have moved while the prompt was open.
+        const int current = row();
+        if (current == -1 || oldName == newName) {
+            return;
+        }
 
-    // write change
-    model->renameDeck(r, newName);
+        model->renameDeck(current, newName);
 
-    // The banner card text updates via the model's dataChanged signal.
+        // The banner card text updates via the model's dataChanged signal.
+    });
 }
 
 void DeckPreviewWidget::actRenameFile()
 {
-    const int r = row();
-    if (r == -1) {
+    if (row() == -1) {
         return;
     }
 
@@ -568,51 +569,59 @@ void DeckPreviewWidget::actRenameFile()
     const auto info = QFileInfo(filePath);
     const QString oldName = info.baseName();
 
-    bool ok;
-    QString newName = QInputDialog::getText(this, tr("Rename file"), tr("New name:"), QLineEdit::Normal, oldName, &ok);
-    if (!ok || newName.isEmpty() || oldName == newName) {
-        return;
-    }
+    Dialogs::getText(this, tr("Rename file"), tr("New name:"), oldName, [this, oldName](const QString &newName) {
+        const int current = row();
+        if (current == -1 || newName.isEmpty() || oldName == newName) {
+            return;
+        }
 
-    // write change
-    if (!model->renameFile(r, newName)) {
-        QMessageBox::critical(this, tr("Error"), tr("Rename failed"));
-    }
+        if (!model->renameFile(current, newName)) {
+            Dialogs::critical(this, tr("Error"), tr("Rename failed"));
+        }
 
-    // The file path and banner card text update via the model's signals.
+        // The file path and banner card text update via the model's signals.
+    });
 }
 
 void DeckPreviewWidget::actDeleteFile()
 {
-    const int r = row();
-    if (r == -1) {
+    if (row() == -1) {
         return;
     }
 
     // read input
-    auto res = QMessageBox::warning(this, tr("Delete file"), tr("Are you sure you want to delete the selected file?"),
-                                    QMessageBox::Yes | QMessageBox::No);
-    if (res != QMessageBox::Yes) {
-        return;
-    }
+    Dialogs::ask(this, QMessageBox::Warning, tr("Delete file"),
+                 tr("Are you sure you want to delete the selected file?"), QMessageBox::Yes | QMessageBox::No,
+                 QMessageBox::NoButton, [this](QMessageBox::StandardButton answer) {
+                     const int current = row();
+                     if (current == -1 || answer != QMessageBox::Yes) {
+                         return;
+                     }
 
-    // write change
-    if (!model->deleteFile(r)) {
-        QMessageBox::critical(this, tr("Error"), tr("Delete failed"));
-    }
+                     if (!model->deleteFile(current)) {
+                         Dialogs::critical(this, tr("Error"), tr("Delete failed"));
+                     }
 
-    // The folder widget removes this preview once the row is gone.
+                     // The folder widget removes this preview once the row is gone.
+                 });
 }
 
 /**
  * Checks if the deck's file format supports tags.
  * If not, then prompt the user for file conversion.
- * @return whether the resulting file can support adding tags
+ * @param thenConvertible Called once the resulting file can support adding tags
  */
-bool DeckPreviewWidget::promptFileConversionIfRequired()
+void DeckPreviewWidget::promptFileConversionIfRequired(std::function<void()> thenConvertible)
 {
-    return DialogConvertDeckToCodFormat::promptIfRequired(this, filePath, [this] {
-        model->convertToCockatriceFormat(row());
-        return true;
-    });
+    DialogConvertDeckToCodFormat::promptIfRequired(
+        this, filePath,
+        [this] {
+            model->convertToCockatriceFormat(row());
+            return true;
+        },
+        [thenConvertible = std::move(thenConvertible)](bool convertible) {
+            if (convertible) {
+                thenConvertible();
+            }
+        });
 }

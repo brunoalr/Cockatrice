@@ -100,7 +100,10 @@ void TabDeckEditorVisual::createCentralFrame()
     connect(tabContainer, &TabDeckEditorVisualTabWidget::printingSelectorRequested, this,
             &TabDeckEditorVisual::showPrintingSelector);
     connect(tabContainer, &TabDeckEditorVisualTabWidget::cardInfoRequested, this, &TabDeckEditorVisual::updateCardInfo);
-    tabContainer->visualDatabaseDisplay->setNewZoneCreator([this] { return createNewZone(); });
+    tabContainer->visualDatabaseDisplay->setNewZoneCreator(
+        [this](std::function<void(const QString &zoneName)> thenCreated) {
+            DeckZoneDialog::promptToCreateZone(this, deckStateManager, {}, std::move(thenCreated));
+        });
 
     centralFrame->addWidget(tabContainer);
     setCentralWidget(centralWidget);
@@ -295,19 +298,6 @@ void TabDeckEditorVisual::actSaveDeckAs(std::function<void(bool saved)> then)
             then(saved);
         }
     });
-}
-
-/** @brief Prompts for and creates a new custom deck zone. Returns the name of the created zone. */
-QString TabDeckEditorVisual::createNewZone()
-{
-    QString boardName;
-    const QString zoneName = DeckZoneDialog::promptForNewZone(this, {}, &boardName, [this](const QString &candidate) {
-        return deckStateManager->validateNewZoneName(candidate);
-    });
-    if (!zoneName.isEmpty()) {
-        deckStateManager->createCustomZone(boardName, zoneName);
-    }
-    return zoneName;
 }
 
 /** @brief Refreshes keyboard shortcuts for this tab from settings. */
