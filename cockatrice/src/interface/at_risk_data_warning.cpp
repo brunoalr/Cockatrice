@@ -1,6 +1,7 @@
 #include "at_risk_data_warning.h"
 
 #include "../client/settings/cache_settings.h"
+#include "widgets/utility/non_blocking_dialogs.h"
 
 #include <QCheckBox>
 #include <QCoreApplication>
@@ -163,22 +164,28 @@ QString AtRiskDataWarning::buildInstalledAtRiskMessage(const QStringList &offend
     return message;
 }
 
-void AtRiskDataWarning::showAtRiskDataWarning(QWidget *parent, const QString &title, const QString &message)
+void AtRiskDataWarning::showAtRiskDataWarning(QWidget *parent,
+                                              const QString &title,
+                                              const QString &message,
+                                              const std::function<void()> &thenClosed)
 {
-    QMessageBox box(QMessageBox::Warning, title, message, QMessageBox::Ok, parent);
-    box.setTextFormat(Qt::PlainText);
+    auto *box = new QMessageBox(QMessageBox::Warning, title, message, QMessageBox::Ok, parent);
+    box->setTextFormat(Qt::PlainText);
     auto *dontShowAgain = new QCheckBox(tr("Don't show this again"));
-    box.setCheckBox(dontShowAgain);
-    box.exec();
-    if (dontShowAgain->isChecked()) {
-        SettingsCache::instance().paths().setAppDirWarningAcknowledged(true);
-    }
+    box->setCheckBox(dontShowAgain);
+    Dialogs::open(box, [dontShowAgain, thenClosed](QAbstractButton *) {
+        if (dontShowAgain->isChecked()) {
+            SettingsCache::instance().paths().setAppDirWarningAcknowledged(true);
+        }
+        thenClosed();
+    });
 }
 
-void AtRiskDataWarning::warnAboutDataPathsInProgramDir(QWidget *parent)
+void AtRiskDataWarning::warnAboutDataPathsInProgramDir(QWidget *parent, const std::function<void()> &thenDone)
 {
     auto &paths = SettingsCache::instance().paths();
     if (paths.getAppDirWarningAcknowledged()) {
+        thenDone();
         return;
     }
 
@@ -186,6 +193,7 @@ void AtRiskDataWarning::warnAboutDataPathsInProgramDir(QWidget *parent)
     // never shipped an uninstaller, and portable updates use the installer's payload
     // purge, which preserves data/ - so there is nothing destructive to warn about.
     if (SettingsCache::instance().getIsPortableBuild()) {
+        thenDone();
         return;
     }
 
@@ -197,6 +205,7 @@ void AtRiskDataWarning::warnAboutDataPathsInProgramDir(QWidget *parent)
     // is already on disk on affected machines.
     const QStringList offenders = collectInstalledAtRiskPaths(appDir);
     if (offenders.isEmpty()) {
+        thenDone();
         return;
     }
     // Only existing paths can be copied; a configured-but-never-created path has
@@ -211,5 +220,5 @@ void AtRiskDataWarning::warnAboutDataPathsInProgramDir(QWidget *parent)
     const AtRiskBackupOutcome outcome = backUpAtRiskPaths(sourcesToBackUp, appDir);
 
     const QString message = buildInstalledAtRiskMessage(offenders, sourcesToBackUp, outcome);
-    showAtRiskDataWarning(parent, tr("Data paths inside the program directory"), message);
+    showAtRiskDataWarning(parent, tr("Data paths inside the program directory"), message, thenDone);
 }

@@ -1,3 +1,4 @@
+#include "dialog_test_support.h"
 #include "interface/widgets/utility/non_blocking_dialogs.h"
 
 #include <QApplication>
@@ -5,8 +6,6 @@
 #include <QInputDialog>
 #include <QPointer>
 #include <QPushButton>
-#include <QThread>
-#include <QTimer>
 #include <QWidget>
 #include <gtest/gtest.h>
 #include <memory>
@@ -16,11 +15,7 @@
 
 namespace
 {
-void settle()
-{
-    QCoreApplication::processEvents();
-    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-}
+using DialogTest::settle;
 
 // Qt delivers a deferred delete posted inside an event handler on the next pass, ahead of calls queued
 // after it, as in the running client. One posted from the test body waits for settle().
@@ -35,24 +30,7 @@ class NonBlockingDialogs : public ::testing::Test // NOSONAR: TEST_F reads fixtu
 {
 protected:
     std::unique_ptr<QWidget> parent = std::make_unique<QWidget>();
-    QTimer nestedLoopWatchdog;
-
-    void SetUp() override
-    {
-        // A helper that blocks runs a nested event loop: fail and close its dialog instead of hanging.
-        QObject::connect(&nestedLoopWatchdog, &QTimer::timeout, [] {
-            if (QThread::currentThread()->loopLevel() == 0) {
-                return;
-            }
-            ADD_FAILURE() << "a nested event loop is running";
-            for (QWidget *widget : QApplication::topLevelWidgets()) {
-                if (auto *dialog = qobject_cast<QDialog *>(widget); dialog && dialog->isVisible()) {
-                    dialog->reject();
-                }
-            }
-        });
-        nestedLoopWatchdog.start(10);
-    }
+    DialogTest::NestedLoopWatchdog nestedLoopWatchdog;
 
     QMessageBox *onlyMessageBox() const
     {
@@ -79,7 +57,15 @@ TEST_F(NonBlockingDialogs, ConfirmReturnsBeforeTheCallbackRuns)
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
     EXPECT_TRUE(box->isVisible());
-    EXPECT_EQ(box->windowModality(), Qt::WindowModal);
+}
+
+TEST_F(NonBlockingDialogs, ADialogWithAParentBlocksTheWholeApplication)
+{
+    Dialogs::getText(parent.get(), "Title", "Label", "", {});
+
+    QInputDialog *dialog = onlyInputDialog();
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_EQ(dialog->windowModality(), Qt::ApplicationModal);
 }
 
 TEST_F(NonBlockingDialogs, ConfirmShowsAQuestionWithYesAndNo)
@@ -791,6 +777,19 @@ TEST_F(NonBlockingDialogs, WhileAliveForwardsOnlyWhileItsContextLives)
     context.reset();
     guarded(5);
     EXPECT_EQ(received, 3);
+}
+
+TEST_F(NonBlockingDialogs, WhileAliveFitsTheMessageBoxOverload)
+{
+    auto *box = new QMessageBox(parent.get());
+    QPushButton *keep = box->addButton("Keep", QMessageBox::YesRole);
+    QAbstractButton *clicked = nullptr;
+    Dialogs::open(box, Dialogs::whileAlive(parent.get(), [&clicked](QAbstractButton *button) { clicked = button; }));
+
+    keep->click();
+    settle();
+
+    EXPECT_EQ(clicked, keep);
 }
 } // namespace
 

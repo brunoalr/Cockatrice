@@ -14,6 +14,7 @@ cockatrice_add_test(
   ${CMAKE_SOURCE_DIR}/cockatrice/src/client/settings/card_counter_settings.cpp
   ${CMAKE_SOURCE_DIR}/cockatrice/src/client/settings/shortcuts_settings.cpp
   ${CMAKE_SOURCE_DIR}/cockatrice/src/client/network/update/client/release_channel.cpp
+  ${CMAKE_SOURCE_DIR}/cockatrice/src/interface/widgets/utility/non_blocking_dialogs.cpp
   ${VERSION_STRING_CPP}
   theme_migration_test.cpp
   theme_icon_render_test.cpp
