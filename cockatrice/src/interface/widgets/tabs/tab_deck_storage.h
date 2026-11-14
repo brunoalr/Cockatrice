@@ -68,7 +68,8 @@ private:
     void uploadDecks(QStringList filePaths, const QString &targetPath);
     void uploadDeck(const QString &filePath, const QString &targetPath, std::function<void()> thenNext);
     void sendDeck(const DeckList &deck, const QString &targetPath, const std::function<void()> &thenNext);
-    void deleteRemoteDeck(const RemoteDeckList_TreeModel::Node *node);
+    void deleteRemoteFolder(const QString &targetPath);
+    void deleteRemoteDeck(int deckId);
 
     void downloadNodeAtIndex(const QModelIndex &curLeft, const QModelIndex &curRight);
 

@@ -532,20 +532,23 @@ void TabDeckStorage::actNewLocalFolder()
 
 void TabDeckStorage::actDeleteLocalDeck()
 {
-    if (localDirView->selectionModel()->selectedRows().isEmpty()) {
+    QStringList filePaths;
+    for (const auto &curLeft : localDirView->selectionModel()->selectedRows()) {
+        filePaths.append(localDirModel->filePath(curLeft));
+    }
+    if (filePaths.isEmpty()) {
         return;
     }
 
-    // The files are read from the selection again once answered: the model may have changed meanwhile.
     Dialogs::ask(this, QMessageBox::Warning, tr("Delete local file"),
                  tr("Are you sure you want to delete the selected files?"), QMessageBox::Yes | QMessageBox::No,
-                 QMessageBox::NoButton, [this](QMessageBox::StandardButton answer) {
+                 QMessageBox::NoButton, [this, filePaths](QMessageBox::StandardButton answer) {
                      if (answer != QMessageBox::Yes) {
                          return;
                      }
-                     for (const auto &curLeft : localDirView->selectionModel()->selectedRows()) {
-                         if (curLeft.isValid()) {
-                             localDirModel->remove(curLeft);
+                     for (const QString &filePath : filePaths) {
+                         if (const QModelIndex file = localDirModel->index(filePath); file.isValid()) {
+                             localDirModel->remove(file);
                          }
                      }
                  });
@@ -698,51 +701,57 @@ void TabDeckStorage::newFolderFinished(const Response &response, const CommandCo
 
 void TabDeckStorage::actDeleteRemoteDeck()
 {
-    if (serverDirView->getCurrentSelection().isEmpty()) {
+    // The question names these: a server reply may clear or refresh the selection before it is answered.
+    QStringList folderPaths;
+    QList<int> deckIds;
+    for (const auto *curRight : serverDirView->getCurrentSelection()) {
+        if (const auto *dir = dynamic_cast<const RemoteDeckList_TreeModel::DirectoryNode *>(curRight)) {
+            folderPaths.append(dir->getPath());
+        } else if (const auto *deckNode = dynamic_cast<const RemoteDeckList_TreeModel::FileNode *>(curRight)) {
+            deckIds.append(deckNode->getId());
+        }
+    }
+    if (folderPaths.isEmpty() && deckIds.isEmpty()) {
         return;
     }
 
-    // The nodes are read from the selection again once answered: a refreshed tree frees the old ones.
     Dialogs::ask(this, QMessageBox::Warning, tr("Delete remote decks"),
                  tr("Are you sure you want to delete the selected decks?"), QMessageBox::Yes | QMessageBox::No,
-                 QMessageBox::NoButton, [this](QMessageBox::StandardButton answer) {
+                 QMessageBox::NoButton, [this, folderPaths, deckIds](QMessageBox::StandardButton answer) {
                      if (answer != QMessageBox::Yes) {
                          return;
                      }
-                     for (const auto &curRight : serverDirView->getCurrentSelection()) {
-                         deleteRemoteDeck(curRight);
+                     for (const QString &folderPath : folderPaths) {
+                         deleteRemoteFolder(folderPath);
+                     }
+                     for (int deckId : deckIds) {
+                         deleteRemoteDeck(deckId);
                      }
                  });
 }
 
-void TabDeckStorage::deleteRemoteDeck(const RemoteDeckList_TreeModel::Node *curRight)
+void TabDeckStorage::deleteRemoteFolder(const QString &targetPath)
 {
-    if (!curRight) {
+    if (targetPath.isEmpty()) {
         return;
     }
-
-    PendingCommand *pend;
-    if (const auto *dir = dynamic_cast<const RemoteDeckList_TreeModel::DirectoryNode *>(curRight)) {
-        QString targetPath = dir->getPath();
-        if (targetPath.isEmpty()) {
-            return;
-        }
-        if (targetPath.length() > MAX_NAME_LENGTH) {
-            qCritical() << "target path to delete is too long" << targetPath;
-            return;
-        }
-        Command_DeckDelDir cmd;
-        cmd.set_path(targetPath.toStdString());
-        pend = client->prepareSessionCommand(cmd);
-        connect(pend, &PendingCommand::finished, this, &TabDeckStorage::deleteFolderFinished);
-    } else {
-        const auto *deckNode = dynamic_cast<const RemoteDeckList_TreeModel::FileNode *>(curRight);
-        Command_DeckDel cmd;
-        cmd.set_deck_id(deckNode->getId());
-        pend = client->prepareSessionCommand(cmd);
-        connect(pend, &PendingCommand::finished, this, &TabDeckStorage::deleteDeckFinished);
+    if (targetPath.length() > MAX_NAME_LENGTH) {
+        qCritical() << "target path to delete is too long" << targetPath;
+        return;
     }
+    Command_DeckDelDir cmd;
+    cmd.set_path(targetPath.toStdString());
+    PendingCommand *pend = client->prepareSessionCommand(cmd);
+    connect(pend, &PendingCommand::finished, this, &TabDeckStorage::deleteFolderFinished);
+    client->sendCommand(pend);
+}
 
+void TabDeckStorage::deleteRemoteDeck(int deckId)
+{
+    Command_DeckDel cmd;
+    cmd.set_deck_id(deckId);
+    PendingCommand *pend = client->prepareSessionCommand(cmd);
+    connect(pend, &PendingCommand::finished, this, &TabDeckStorage::deleteDeckFinished);
     client->sendCommand(pend);
 }
 
