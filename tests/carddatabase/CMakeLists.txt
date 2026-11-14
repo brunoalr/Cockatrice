@@ -80,6 +80,19 @@ if(WITH_ORACLE OR WITH_CLIENT)
     libcockatrice_card
     libcockatrice_models
   )
+
+  # ------------------------
+  # Card Database Settings Test
+  # ------------------------
+  cockatrice_add_test(
+    NAME
+    card_database_settings_test
+    SOURCES
+    ${VERSION_STRING_CPP}
+    card_database_settings_test.cpp
+    LIBS
+    libcockatrice_settings
+  )
 endif()
 
 # ------------------------
