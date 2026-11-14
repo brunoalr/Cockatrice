@@ -156,6 +156,7 @@ private:
     QFuture<LoadResult> future;
     QPointer<QNetworkReply> activeReply;
     bool loadActive = false;
+    bool backgroundLoadFailed = false;
     QString loadedSource;
     bool loadedParents = false;
 
