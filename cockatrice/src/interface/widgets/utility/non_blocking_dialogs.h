@@ -13,6 +13,8 @@
 #include <type_traits>
 #include <utility>
 
+class QMenu;
+
 namespace Dialogs
 {
 void information(QWidget *parent, const QString &title, const QString &text, std::function<void()> thenClosed = {});
@@ -74,6 +76,9 @@ template <typename Dialog> void open(Dialog *dialog, std::function<void(int resu
 
 // Reports what QMessageBox::clickedButton() holds after exec(): the escape button for a window close.
 void open(QMessageBox *box, std::function<void(QAbstractButton *clicked)> thenClicked);
+
+// Instead of a QToolButton's own menu, which some Qt versions show with QMenu::exec(): a nested event loop.
+void showMenuOnClick(QAbstractButton *button, QMenu *menu);
 
 template <typename Fn> auto whileAlive(QObject *context, Fn fn)
 {

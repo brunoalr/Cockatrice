@@ -5,15 +5,18 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFileDialog>
 #include <QLabel>
 #include <QLoggingCategory>
 #include <QSpinBox>
 #include <QString>
 #include <QStringList>
+#include <functional>
 #include <qtmetamacros.h>
 
 class QGroupBox;
 class QLineEdit;
+class PathsSettings;
 class QPushButton;
 
 inline Q_LOGGING_CATEGORY(GeneralSettingsPageLog, "general_settings_page");
@@ -104,6 +107,10 @@ private:
     QLineEdit *tokenDatabasePathEdit;
     QPushButton *resetAllPathsButton;
     QLabel *allPathsResetLabel;
+
+    void choosePath(QLineEdit *pathEdit,
+                    QFileDialog::FileMode mode,
+                    const std::function<void(PathsSettings &, const QString &)> &apply);
 };
 
 #endif // COCKATRICE_GENERAL_SETTINGS_PAGE_H

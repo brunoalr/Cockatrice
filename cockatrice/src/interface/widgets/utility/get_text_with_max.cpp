@@ -21,24 +21,3 @@ QInputDialog *newTextDialogWithMax(QWidget *parent,
     dialog->findChild<QLineEdit *>()->setMaxLength(max);
     return dialog;
 }
-
-QString getTextWithMax(QWidget *parent,
-                       const QString &title,
-                       const QString &label,
-                       QLineEdit::EchoMode mode,
-                       const QString &text,
-                       bool *ok,
-                       int max)
-{
-    auto *dialog = newTextDialogWithMax(parent, title, label, mode, text, max);
-
-    const int ret = dialog->exec();
-    if (ok != nullptr) {
-        *ok = !!ret;
-    }
-    if (ret) {
-        return dialog->textValue();
-    } else {
-        return QString();
-    }
-}

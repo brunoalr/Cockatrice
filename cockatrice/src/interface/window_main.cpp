@@ -292,10 +292,10 @@ void MainWindow::actFullScreen(bool checked)
 
 void MainWindow::actSettings()
 {
-    DlgSettings dlg(this);
-    auto *generalPage = qobject_cast<GeneralSettingsPage *>(dlg.page(DlgSettings::GeneralPage));
+    auto *dlg = new DlgSettings(this);
+    auto *generalPage = qobject_cast<GeneralSettingsPage *>(dlg->page(DlgSettings::GeneralPage));
     connect(generalPage, &GeneralSettingsPage::cardDatabaseUpdateRequested, this, &MainWindow::actCheckCardUpdates);
-    dlg.exec();
+    Dialogs::open(dlg, {});
 }
 
 void MainWindow::actExit()
@@ -305,7 +305,7 @@ void MainWindow::actExit()
 
 void MainWindow::actAbout()
 {
-    QMessageBox mb(
+    auto *mb = new QMessageBox(
         QMessageBox::NoIcon, tr("About Cockatrice"),
         QString("<font size=\"8\"><b>Cockatrice</b></font> (" + QString::fromStdString(BUILD_ARCHITECTURE) + ")<br>" +
                 tr("Version") + QString(" %1").arg(VERSION_STRING) + "<br><br><b><a href='" + GITHUB_PAGES_URL + "'>" +
@@ -321,11 +321,11 @@ void MainWindow::actAbout()
                 GITHUB_TROUBLESHOOTING_URL + "'>" + tr("Troubleshooting") + "</a><br>" + "<a href='" + GITHUB_FAQ_URL +
                 "'>" + tr("F.A.Q.") + "</a><br>"),
         QMessageBox::Ok, this);
-    mb.setIconPixmap(
+    mb->setIconPixmap(
         themePixmap(QStringLiteral("cockatrice")).scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    mb.setTextInteractionFlags(Qt::TextBrowserInteraction);
-    mb.setObjectName("aboutDialog");
-    mb.exec();
+    mb->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    mb->setObjectName("aboutDialog");
+    Dialogs::open(mb, {});
 }
 
 void MainWindow::actTips()
@@ -343,8 +343,8 @@ void MainWindow::actTips()
 void MainWindow::actUpdate()
 {
 #ifndef Q_OS_WASM
-    DlgUpdate dlg(this);
-    dlg.exec();
+    auto *dlg = new DlgUpdate(this);
+    Dialogs::open(dlg, {});
 #endif
 }
 
@@ -368,7 +368,8 @@ void MainWindow::actOpenSettingsFolder()
 #ifdef WITH_GUI_TEST
 void MainWindow::actRecord()
 {
-    QString filename = QFileDialog::getSaveFileName(this, tr("Test File Name"), QString(), tr("XML Files (*.xml)"));
+    const QString filename = QFileDialog::getSaveFileName( // blocking-ok: GUI test recording, WITH_GUI_TEST builds only
+        this, tr("Test File Name"), QString(), tr("XML Files (*.xml)"));
     if (!filename.isEmpty()) {
         testUtility->recordTests(filename);
     }
@@ -376,7 +377,8 @@ void MainWindow::actRecord()
 
 void MainWindow::actPlayRecording()
 {
-    QString filename = QFileDialog::getOpenFileName(this, tr("Test File Name"), QString(), tr("XML Files (*.xml)"));
+    const QString filename = QFileDialog::getOpenFileName( // blocking-ok: GUI test playback, WITH_GUI_TEST builds only
+        this, tr("Test File Name"), QString(), tr("XML Files (*.xml)"));
     if (!filename.isEmpty()) {
         testUtility->playTests(filename);
     }
@@ -1691,8 +1693,8 @@ void MainWindow::checkClientUpdatesFinished(bool needToUpdate, bool /* isCompati
     Q_UNUSED(needToUpdate);
 #else
     if (needToUpdate) {
-        DlgUpdate dlg(this);
-        dlg.exec();
+        auto *dlg = new DlgUpdate(this);
+        Dialogs::open(dlg, {});
     }
 #endif
 }
@@ -1748,13 +1750,13 @@ void MainWindow::actAddCustomSet()
     QString fullFilePath = dialog.selectedFiles().at(0);
 
     if (!QFile::exists(fullFilePath)) {
-        QMessageBox::warning(this, tr("Load sets/cards"), tr("Selected file cannot be found."));
+        Dialogs::warning(this, tr("Load sets/cards"), tr("Selected file cannot be found."));
         return;
     }
 
     if (QFileInfo(fullFilePath).suffix() != "xml") // fileName = *.xml
     {
-        QMessageBox::warning(this, tr("Load sets/cards"), tr("You can only import XML databases at this time."));
+        Dialogs::warning(this, tr("Load sets/cards"), tr("You can only import XML databases at this time."));
         return;
     }
 
@@ -1781,13 +1783,15 @@ void MainWindow::actAddCustomSet()
     }
 
     if (res) {
-        QMessageBox::information(
+        Dialogs::information(
             this, tr("Load sets/cards"),
-            tr("The new sets/cards have been added successfully.\nCockatrice will now reload the card database."));
-        // Imported files can introduce sets the config has never seen.
-        reloadCardDatabaseAndCheckSets();
+            tr("The new sets/cards have been added successfully.\nCockatrice will now reload the card database."),
+            [this] {
+                // Imported files can introduce sets the config has never seen.
+                reloadCardDatabaseAndCheckSets();
+            });
     } else {
-        QMessageBox::warning(this, tr("Load sets/cards"), tr("Sets/cards failed to import."));
+        Dialogs::warning(this, tr("Load sets/cards"), tr("Sets/cards failed to import."));
     }
 }
 
@@ -1823,7 +1827,5 @@ void MainWindow::actManageSets()
 
 void MainWindow::actEditTokens()
 {
-    DlgEditTokens dlg(this);
-    dlg.exec();
-    CardDatabaseManager::getInstance()->saveCustomTokensToFile();
+    Dialogs::open(new DlgEditTokens(this), {});
 }

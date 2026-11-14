@@ -61,6 +61,7 @@ set(cockatrice_SOURCES
     src/interface/widgets/dialogs/dlg_view_log.cpp
     src/interface/widgets/dialogs/override_printing_warning.cpp
     src/interface/widgets/dialogs/path_safety_warning.cpp
+    src/interface/widgets/dialogs/settings_close_check.cpp
     src/interface/widgets/dialogs/settings_view.cpp
     src/interface/widgets/dialogs/tip_of_the_day.cpp
     src/interface/widgets/deck_share/deck_share_utils.cpp

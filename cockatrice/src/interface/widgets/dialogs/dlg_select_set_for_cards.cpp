@@ -476,6 +476,10 @@ SetEntryWidget::SetEntryWidget(DlgSelectSetForCards *_parent, const QString &_se
 
 void SetEntryWidget::mousePressEvent(QMouseEvent *event)
 {
+#ifdef Q_OS_WASM
+    // The browser build cannot run the drag's nested event loop, so a set entry stays put there.
+    Q_UNUSED(event);
+#else
     if (event->button() == Qt::LeftButton) {
         // Create a drag object and set up mime data
         QDrag *drag = new QDrag(this);
@@ -506,8 +510,9 @@ void SetEntryWidget::mousePressEvent(QMouseEvent *event)
         // Optionally adjust the pixmap position offset to align with the cursor
         drag->setHotSpot(event->pos());
 
-        drag->exec(Qt::MoveAction);
+        drag->exec(Qt::MoveAction); // blocking-ok: a drag runs its own loop until the drop
     }
+#endif
 }
 
 void SetEntryWidget::enterEvent(QEnterEvent *event)

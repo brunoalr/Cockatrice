@@ -9,13 +9,13 @@
 #include "../interface/theme_manager.h"
 #include "../interface/widgets/general/background_sources.h"
 #include "../playmat/playmat_collection_dialog.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "libcockatrice/interfaces/interface_interface_settings_provider.h"
 #include "libcockatrice/utility/macros.h"
 
 #include <QAbstractButton>
 #include <QApplication>
 #include <QColor>
-#include <QColorDialog>
 #include <QDebug>
 #include <QDir>
 #include <QGridLayout>
@@ -87,25 +87,7 @@ AppearanceSettingsPage::AppearanceSettingsPage()
 
     connect(&styleCombo, &QComboBox::currentIndexChanged, this, &AppearanceSettingsPage::styleComboChanged);
 
-    connect(themeManager, &ThemeManager::themeChanged, this, [this, dirPath] {
-        const QString newDir = themeManager->getAvailableThemes().value(SettingsCache::instance().getThemeName());
-        const ThemeConfig cfg = ThemeConfig::fromThemeDir(newDir);
-        const QString current = cfg.colorScheme;
-
-        schemeCombo.blockSignals(true);
-        const int idx = schemeCombo.findData(current);
-        schemeCombo.setCurrentIndex(idx >= 0 ? idx : 0);
-        schemeCombo.blockSignals(false);
-
-        styleCombo.blockSignals(true);
-        const QString currentStyle = cfg.styleName;
-        const int styleIdx = currentStyle.isEmpty() ? 0 : styleCombo.findData(currentStyle);
-        styleCombo.setCurrentIndex(styleIdx >= 0 ? styleIdx : 0);
-        styleCombo.blockSignals(false);
-        previousStyle = styleCombo.currentData().toString();
-
-        updateStyleWarning();
-    });
+    connect(themeManager, &ThemeManager::themeChanged, this, &AppearanceSettingsPage::showThemeConfig);
 
     connect(&editPaletteButton, &QPushButton::clicked, this, &AppearanceSettingsPage::editPalette);
 
@@ -338,14 +320,14 @@ AppearanceSettingsPage::AppearanceSettingsPage()
                 });
 
         connect(pushButton, &QPushButton::clicked, this, [index, this]() {
-            auto &cardCounterSettings = SettingsCache::instance().cardCounters();
+            Dialogs::getColor(SettingsCache::instance().cardCounters().color(index), this, {},
+                              [index](const QColor &newColor) {
+                                  if (!newColor.isValid()) {
+                                      return;
+                                  }
 
-            auto newColor = QColorDialog::getColor(cardCounterSettings.color(index), this);
-            if (!newColor.isValid()) {
-                return;
-            }
-
-            cardCounterSettings.setColor(index, newColor);
+                                  SettingsCache::instance().cardCounters().setColor(index, newColor);
+                              });
         });
 
         auto *colorName = new QLabel;
@@ -438,14 +420,15 @@ void AppearanceSettingsPage::openThemeLocation()
     if (dirDir.exists() && dirDir.mkpath(dir)) {
         QtUtils::openPathInFileManager(dir);
     } else {
-        QMessageBox::critical(this, tr("Error"), tr("Could not create themes directory at '%1'.").arg(dir));
+        Dialogs::critical(this, tr("Error"), tr("Could not create themes directory at '%1'.").arg(dir));
     }
 }
 
 void AppearanceSettingsPage::editPalette()
 {
-    PaletteEditorDialog dlg(themeManager->getCurrentThemePath(), SettingsCache::instance().getThemeName(), this);
-    dlg.exec();
+    auto *dlg =
+        new PaletteEditorDialog(themeManager->getCurrentThemePath(), SettingsCache::instance().getThemeName(), this);
+    Dialogs::open(dlg, {});
 }
 
 void AppearanceSettingsPage::updateHomeTabSettingsVisibility()
@@ -478,6 +461,27 @@ static int findFusionIndex(const QComboBox &combo)
     return -1;
 }
 
+void AppearanceSettingsPage::showThemeConfig()
+{
+    const QString newDir = themeManager->getAvailableThemes().value(SettingsCache::instance().getThemeName());
+    const ThemeConfig cfg = ThemeConfig::fromThemeDir(newDir);
+    const QString current = cfg.colorScheme;
+
+    schemeCombo.blockSignals(true);
+    const int idx = schemeCombo.findData(current);
+    schemeCombo.setCurrentIndex(idx >= 0 ? idx : 0);
+    schemeCombo.blockSignals(false);
+
+    styleCombo.blockSignals(true);
+    const QString currentStyle = cfg.styleName;
+    const int styleIdx = currentStyle.isEmpty() ? 0 : styleCombo.findData(currentStyle);
+    styleCombo.setCurrentIndex(styleIdx >= 0 ? styleIdx : 0);
+    styleCombo.blockSignals(false);
+    previousStyle = styleCombo.currentData().toString();
+
+    updateStyleWarning();
+}
+
 void AppearanceSettingsPage::updateStyleWarning()
 {
     styleWarningLabel.setVisible(isBrokenStyle(styleCombo.currentData().toString()));
@@ -497,49 +501,48 @@ void AppearanceSettingsPage::styleComboChanged(int index)
         return;
     }
 
-    QMessageBox msgBox(this);
-    msgBox.setWindowTitle(tr("Broken style"));
-    msgBox.setIcon(QMessageBox::Warning);
-    msgBox.setText(tr("The \"%1\" style is broken and can break the game view: dragging cards across zones can "
-                      "shrink the board to a tiny grey window that can only be fixed by rejoining the game.")
-                       .arg(newStyle));
-    msgBox.setInformativeText(
+    auto *msgBox = new QMessageBox(this);
+    msgBox->setWindowTitle(tr("Broken style"));
+    msgBox->setIcon(QMessageBox::Warning);
+    msgBox->setText(tr("The \"%1\" style is broken and can break the game view: dragging cards across zones can "
+                       "shrink the board to a tiny grey window that can only be fixed by rejoining the game.")
+                        .arg(newStyle));
+    msgBox->setInformativeText(
         tr("It can also render controls such as combo boxes unreadable, especially in dark mode.\n\n"
            "Fusion is the recommended style on every platform. Switch to Fusion instead?"));
 
     int fusionIdx = findFusionIndex(styleCombo);
     QPushButton *fusionButton = nullptr;
     if (fusionIdx >= 0) {
-        fusionButton = msgBox.addButton(tr("Use Fusion instead"), QMessageBox::AcceptRole);
+        fusionButton = msgBox->addButton(tr("Use Fusion instead"), QMessageBox::AcceptRole);
     }
-    QPushButton *keepButton = msgBox.addButton(tr("Use %1 anyway").arg(newStyle), QMessageBox::DestructiveRole);
-    msgBox.addButton(QMessageBox::Cancel);
+    QPushButton *keepButton = msgBox->addButton(tr("Use %1 anyway").arg(newStyle), QMessageBox::DestructiveRole);
+    msgBox->addButton(QMessageBox::Cancel);
     if (fusionButton != nullptr) {
-        msgBox.setDefaultButton(fusionButton);
+        msgBox->setDefaultButton(fusionButton);
     } else {
-        msgBox.setDefaultButton(keepButton);
+        msgBox->setDefaultButton(keepButton);
     }
 
-    msgBox.exec();
+    Dialogs::open(msgBox, [this, fusionButton, keepButton, fusionIdx, newStyle](const QAbstractButton *clicked) {
+        if (fusionButton != nullptr && clicked == fusionButton) {
+            styleCombo.setCurrentIndex(fusionIdx);
+            return;
+        }
+        if (clicked == keepButton) {
+            themeManager->setStyleName(newStyle);
+            previousStyle = newStyle;
+            updateStyleWarning();
+            return;
+        }
 
-    const QAbstractButton *clicked = msgBox.clickedButton();
-    if (fusionButton != nullptr && clicked == fusionButton) {
-        styleCombo.setCurrentIndex(fusionIdx);
-        return;
-    }
-    if (clicked == keepButton) {
-        themeManager->setStyleName(newStyle);
-        previousStyle = newStyle;
+        // Cancel: revert to the previously applied style without re-prompting
+        styleCombo.blockSignals(true);
+        const int previousIdx = styleCombo.findData(previousStyle);
+        styleCombo.setCurrentIndex(previousIdx >= 0 ? previousIdx : 0);
+        styleCombo.blockSignals(false);
         updateStyleWarning();
-        return;
-    }
-
-    // Cancel: revert to the previously applied style without re-prompting
-    styleCombo.blockSignals(true);
-    const int previousIdx = styleCombo.findData(previousStyle);
-    styleCombo.setCurrentIndex(previousIdx >= 0 ? previousIdx : 0);
-    styleCombo.blockSignals(false);
-    updateStyleWarning();
+    });
 }
 
 void AppearanceSettingsPage::showShortcutsChanged(QT_STATE_CHANGED_T value)
@@ -589,8 +592,8 @@ void AppearanceSettingsPage::cardViewExpandedRowsMaxChanged(int value)
 
 void AppearanceSettingsPage::openPlaymatCollectionDialog()
 {
-    PlaymatCollectionDialog dialog(this);
-    dialog.exec();
+    auto *dialog = new PlaymatCollectionDialog(this);
+    Dialogs::open(dialog, {});
 }
 
 void AppearanceSettingsPage::retranslateUi()

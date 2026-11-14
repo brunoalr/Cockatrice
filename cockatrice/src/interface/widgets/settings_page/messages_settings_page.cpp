@@ -3,6 +3,7 @@
 #include "../../../client/settings/cache_settings.h"
 #include "../../theme_icon.h"
 #include "../interface/widgets/utility/get_text_with_max.h"
+#include "../interface/widgets/utility/non_blocking_dialogs.h"
 #include "libcockatrice/utility/macros.h"
 
 #include <QAction>
@@ -11,9 +12,11 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QListWidgetItem>
+#include <QPersistentModelIndex>
 #include <QSizePolicy>
 #include <QStringLiteral>
 #include <QToolBar>
@@ -297,26 +300,28 @@ void MessagesSettingsPage::storeSettings()
 
 void MessagesSettingsPage::actAdd()
 {
-    bool ok;
-    QString msg =
-        getTextWithMax(this, tr("Add message"), tr("Message:"), QLineEdit::Normal, QString(), &ok, MAX_TEXT_LENGTH);
-    if (ok) {
-        messageList->addItem(msg);
-        storeSettings();
-    }
+    auto *prompt =
+        newTextDialogWithMax(this, tr("Add message"), tr("Message:"), QLineEdit::Normal, QString(), MAX_TEXT_LENGTH);
+    Dialogs::open(prompt, [this, prompt](int result) {
+        if (result == QDialog::Accepted) {
+            messageList->addItem(prompt->textValue());
+            storeSettings();
+        }
+    });
 }
 
 void MessagesSettingsPage::actEdit()
 {
-    if (messageList->currentItem()) {
-        QString oldText = messageList->currentItem()->text();
-        bool ok;
-        QString msg =
-            getTextWithMax(this, tr("Edit message"), tr("Message:"), QLineEdit::Normal, oldText, &ok, MAX_TEXT_LENGTH);
-        if (ok) {
-            messageList->currentItem()->setText(msg);
-            storeSettings();
-        }
+    if (const QListWidgetItem *item = messageList->currentItem()) {
+        auto *prompt = newTextDialogWithMax(this, tr("Edit message"), tr("Message:"), QLineEdit::Normal, item->text(),
+                                            MAX_TEXT_LENGTH);
+        const QPersistentModelIndex edited(messageList->model()->index(messageList->row(item), 0));
+        Dialogs::open(prompt, [this, prompt, edited](int result) {
+            if (result == QDialog::Accepted && edited.isValid()) {
+                messageList->item(edited.row())->setText(prompt->textValue());
+                storeSettings();
+            }
+        });
     }
 }
 

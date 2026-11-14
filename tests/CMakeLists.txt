@@ -836,6 +836,46 @@ if(WITH_CLIENT)
   )
   cockatrice_add_test(
     NAME
+    settings_dialogs_test
+    SOURCES
+    ${CLIENT_SRC}/client/network/update/card_spoiler/spoiler_background_updater.cpp
+    ${CLIENT_SRC}/client/network/update/card_spoiler/spoiler_file.cpp
+    ${CLIENT_SRC}/client/settings/shortcut_treeview.cpp
+    ${CLIENT_SRC}/interface/palette_editor/color_button.cpp
+    ${CLIENT_SRC}/interface/pixel_map_generator.cpp
+    ${CLIENT_SRC}/interface/shutdown_chain.cpp
+    ${CLIENT_SRC}/interface/theme_config.cpp
+    ${CLIENT_SRC}/interface/theme_icon.cpp
+    ${CLIENT_SRC}/interface/theme_icon_badge.cpp
+    ${CLIENT_SRC}/interface/theme_icon_fill.cpp
+    ${CLIENT_SRC}/interface/theme_icon_ink.cpp
+    ${CLIENT_SRC}/interface/theme_icon_sticker.cpp
+    ${CLIENT_SRC}/interface/theme_manager.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/path_safety_warning.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/settings_close_check.cpp
+    ${CLIENT_SRC}/interface/widgets/settings_page/abstract_settings_page.cpp
+    ${CLIENT_SRC}/interface/widgets/settings_page/deck_editor_settings_page.cpp
+    ${CLIENT_SRC}/interface/widgets/settings_page/general_settings_page.cpp
+    ${CLIENT_SRC}/interface/widgets/settings_page/messages_settings_page.cpp
+    ${CLIENT_SRC}/interface/widgets/server/user/user_info_connection.cpp
+    ${CLIENT_SRC}/interface/widgets/settings_page/settings_search_model.cpp
+    ${CLIENT_SRC}/interface/widgets/settings_page/shortcut_settings_page.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/custom_line_edit.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/get_text_with_max.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/sequence_edit.cpp
+    ${SETTINGS_SOURCES}
+    settings_dialogs_test.cpp
+    LIBS
+    libcockatrice_card
+    libcockatrice_utility
+    ${SETTINGS_LIBS}
+    INCLUDE_DIRS
+    ${SETTINGS_INCLUDE_DIRS}
+    DEFINITIONS
+    "CARDDB_DATADIR=\"${CMAKE_CURRENT_SOURCE_DIR}/carddatabase/data/\""
+  )
+  cockatrice_add_test(
+    NAME
     lobby_dialogs_test
     SOURCES
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_avatar.cpp

@@ -4,6 +4,7 @@
 #include "../../card_picture_loader/card_picture_loader_cache_method.h"
 #include "../../card_picture_loader/card_picture_loader_local_schemes.h"
 #include "../interface/card_picture_loader/card_picture_loader.h"
+#include "../utility/non_blocking_dialogs.h"
 
 #include <QComboBox>
 #include <QDir>
@@ -11,7 +12,6 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QList>
-#include <QMessageBox>
 #include <QString>
 #include <QVBoxLayout>
 #include <QVariant>
@@ -194,7 +194,7 @@ void StorageSettingsPage::clearDownloadedPicsButtonClicked()
     // signal before confirming; the in-memory pixmap cache is cleared synchronously right away.
     connect(
         &CardPictureLoader::getInstance(), &CardPictureLoader::networkCacheCleared, this,
-        [this] { QMessageBox::information(this, tr("Success"), tr("Cached card pictures have been reset.")); },
+        [this] { Dialogs::information(this, tr("Success"), tr("Cached card pictures have been reset.")); },
         Qt::SingleShotConnection);
     CardPictureLoader::clearPixmapCache();
     CardPictureLoader::clearNetworkCache();
@@ -210,16 +210,16 @@ void StorageSettingsPage::clearImageBackupsButtonClicked()
     CardPictureLoader::clearPixmapCache();
 
     if (success) {
-        QMessageBox::information(this, tr("Success"), tr("Downloaded card pictures have been reset."));
+        Dialogs::information(this, tr("Success"), tr("Downloaded card pictures have been reset."));
     } else {
-        QMessageBox::critical(this, tr("Error"), tr("One or more downloaded card pictures could not be cleared."));
+        Dialogs::critical(this, tr("Error"), tr("One or more downloaded card pictures could not be cleared."));
     }
 }
 
 void StorageSettingsPage::clearPixmapCacheButtonClicked()
 {
     CardPictureLoader::clearPixmapCache();
-    QMessageBox::information(this, tr("Success"), tr("In-memory (currently loaded) card pictures have been reset."));
+    Dialogs::information(this, tr("Success"), tr("In-memory (currently loaded) card pictures have been reset."));
 }
 
 void StorageSettingsPage::retranslateUi()

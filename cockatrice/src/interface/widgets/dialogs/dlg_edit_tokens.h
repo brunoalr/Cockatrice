@@ -49,6 +49,7 @@ private:
 
 public:
     explicit DlgEditTokens(QWidget *parent = nullptr);
+    ~DlgEditTokens() override;
 };
 
 #endif

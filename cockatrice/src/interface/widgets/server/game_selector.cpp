@@ -70,7 +70,7 @@ namespace
 /**
  * @brief Returns whether the application paints with the native macOS style.
  *
- * QMacStyle ignores autoRaise and flat, and draws a QToolButton menu as a second square
+ * QMacStyle ignores autoRaise and flat, and draws each tool button as its own square
  * bezel, so the split host control cannot be composed there. A global style sheet wraps the
  * real application style in a QStyleSheetStyle that takes it as a child, so that layer is
  * unwrapped before the style is identified.
@@ -191,15 +191,21 @@ GameSelector::GameSelector(AbstractClient *_client,
         gameSettingsAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
         connect(gameSettingsAction, &QAction::triggered, this, &GameSelector::actCreate);
 
-        // A split QToolButton in its native style: the primary half quick-hosts, and the
-        // arrow opens the menu with the full form. This is the control on every style that
-        // can draw one; QMacStyle draws the menu half as a second square bezel instead.
-        hostGameSplitButton = new QToolButton(this);
+        // A split button made of two tool buttons: the primary quick-hosts, and the arrow beside
+        // it opens the menu with the full form.
+        hostGameSplitButton = new QWidget(this);
         hostGameSplitButton->setObjectName("hostGameSplitButton");
-        hostGameSplitButton->setDefaultAction(hostGameAction);
-        hostGameSplitButton->setPopupMode(QToolButton::MenuButtonPopup);
-        hostGameSplitButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
-        hostGameSplitButton->setMenu(hostGameMenu);
+        auto *quickHostButton = new QToolButton(hostGameSplitButton);
+        quickHostButton->setDefaultAction(hostGameAction);
+        quickHostButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+        hostGameMenuButton = new QToolButton(hostGameSplitButton);
+        hostGameMenuButton->setArrowType(Qt::DownArrow);
+        Dialogs::showMenuOnClick(hostGameMenuButton, hostGameMenu);
+        auto *splitLayout = new QHBoxLayout(hostGameSplitButton);
+        splitLayout->setContentsMargins(0, 0, 0, 0);
+        splitLayout->setSpacing(0);
+        splitLayout->addWidget(quickHostButton);
+        splitLayout->addWidget(hostGameMenuButton);
 
         // The native macOS style has no split rendering, so there the primary stays a plain
         // QPushButton next to a plain settings button. A QPushButton does not take its text,
@@ -216,8 +222,7 @@ GameSelector::GameSelector(AbstractClient *_client,
         applyHostGameStyle();
 
         // The shortcuts belong to the whole room tab, not just the game list, so they also
-        // fire while the chat or the user list has focus. A QToolButton menu is mouse-only,
-        // so the settings action needs its own shortcut for keyboard parity.
+        // fire while the chat or the user list has focus.
         if (auto *roomTab = qobject_cast<TabRoom *>(parentWidget())) {
             roomTab->addAction(hostGameAction);
             roomTab->addAction(gameSettingsAction);
@@ -437,7 +442,7 @@ void GameSelector::applyHostGameStyle()
     }
 
     // Every style that can draw a split button gets one. The native macOS style cannot
-    // (QMacStyle draws the menu half as a second square bezel), so it gets the plain
+    // (QMacStyle draws each tool button as its own square bezel), so it gets the plain
     // primary button and a sibling settings button instead.
     const bool macStyle = usesMacStyle();
     hostGameSplitButton->setVisible(!macStyle);
@@ -745,6 +750,10 @@ void GameSelector::retranslateUi()
             // A QPushButton does not draw text from an action; on macOS this button is the
             // secondary action, so it carries the same label.
             hostGameSettingsButton->setText(tr("Game settings…"));
+        }
+        if (hostGameMenuButton) {
+            hostGameMenuButton->setAccessibleName(tr("Game settings…"));
+            hostGameMenuButton->setToolTip(tr("Open the game settings before hosting"));
         }
     }
     joinButton->setText(tr("&Join"));
