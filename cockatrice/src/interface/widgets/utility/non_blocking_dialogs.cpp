@@ -1,5 +1,6 @@
 #include "non_blocking_dialogs.h"
 
+#include <QEvent>
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QPointer>
@@ -8,15 +9,46 @@ namespace Dialogs
 {
 namespace
 {
+// A dialog whose closeEvent() skips QDialog's is hidden without finished(): finish it, or it is never reported.
+class FinishWhenHidden : public QObject
+{
+public:
+    explicit FinishWhenHidden(QDialog *_dialog) : QObject(_dialog), dialog(_dialog)
+    {
+        dialog->installEventFilter(this);
+    }
+
+protected:
+    bool eventFilter(QObject *, QEvent *event) override
+    {
+        if (event->type() == QEvent::Hide && !event->spontaneous()) {
+            QMetaObject::invokeMethod(
+                this,
+                [this] {
+                    if (!dialog->isVisible()) {
+                        dialog->done(dialog->result());
+                    }
+                },
+                Qt::QueuedConnection);
+        }
+        return false;
+    }
+
+private:
+    QDialog *dialog;
+};
+
 // finished() is emitted from inside the dialog's own close handling: a callback that destroys the parent
 // there frees the dialog under Qt, and a QMessageBox has not recorded its escape button yet.
 void show(QDialog *dialog, std::function<void(int result)> thenFinished)
 {
     // Qt would delete the dialog before the queued callback; exec() holds this attribute back the same way.
     dialog->setAttribute(Qt::WA_DeleteOnClose, false);
+    auto *hidden = new FinishWhenHidden(dialog);
     QObject::connect(
         dialog, &QDialog::finished, dialog,
-        [dialog, thenFinished = std::move(thenFinished)](int result) {
+        [dialog, hidden, thenFinished = std::move(thenFinished)](int result) {
+            delete hidden; // NOSONAR: a child of the dialog, done with its one job
             // Queued to the dialog, the call is dropped when the dialog dies first, with its parent or alone.
             QMetaObject::invokeMethod(
                 dialog,

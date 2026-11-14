@@ -2,6 +2,7 @@
 #include "interface/widgets/utility/non_blocking_dialogs.h"
 
 #include <QApplication>
+#include <QCloseEvent>
 #include <QColorDialog>
 #include <QFileDialog>
 #include <QInputDialog>
@@ -26,6 +27,19 @@ void fromTheEventLoop(std::function<void()> action)
     QCoreApplication::processEvents();
     settle();
 }
+
+// As the settings dialog does: closing it never reaches QDialog::closeEvent(), so finished() is not emitted.
+class DialogThatOnlyHides : public QDialog
+{
+public:
+    using QDialog::QDialog;
+
+protected:
+    void closeEvent(QCloseEvent *event) override
+    {
+        event->accept();
+    }
+};
 
 class NonBlockingDialogs : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
 {
@@ -342,6 +356,32 @@ TEST_F(NonBlockingDialogs, GetColorDeliversTheChosenColorOnAcceptOnly)
     settle();
 
     EXPECT_EQ(color, QColor(Qt::blue));
+}
+
+TEST_F(NonBlockingDialogs, ADialogHiddenWithoutFinishingIsReportedAsRejectedAndDeleted)
+{
+    std::optional<int> result;
+    auto *dialog = new DialogThatOnlyHides(parent.get());
+    const QPointer<QDialog> guard = dialog;
+    Dialogs::open(dialog, [&result](int finished) { result = finished; });
+
+    fromTheEventLoop([dialog] { dialog->close(); });
+    settle();
+    settle();
+
+    EXPECT_EQ(result, int(QDialog::Rejected));
+    EXPECT_TRUE(guard.isNull());
+}
+
+TEST_F(NonBlockingDialogs, ADialogThatFinishesIsReportedOnce)
+{
+    int reports = 0;
+    auto *dialog = new DialogThatOnlyHides(parent.get());
+    Dialogs::open(dialog, [&reports](int) { ++reports; });
+
+    fromTheEventLoop([dialog] { dialog->accept(); });
+
+    EXPECT_EQ(reports, 1);
 }
 
 TEST_F(NonBlockingDialogs, OpenReportsTheResultWhileTheDialogIsStillReadable)
