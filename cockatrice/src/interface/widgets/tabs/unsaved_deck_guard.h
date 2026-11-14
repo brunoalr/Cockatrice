@@ -14,12 +14,13 @@ class UnsavedDeckGuard
     Q_DECLARE_TR_FUNCTIONS(AbstractTabDeckEditor)
 
 public:
-    enum DeckOpenLocation
+    enum class DeckOpenLocation
     {
         CANCELLED,
         SAME_TAB,
         NEW_TAB
     };
+    using enum DeckOpenLocation;
 
     using Save = std::function<void(std::function<void(bool saved)> then)>;
 

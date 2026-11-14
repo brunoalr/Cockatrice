@@ -52,10 +52,8 @@ bool InstallerCloseServer::listen()
 
     connect(server, &QLocalServer::newConnection, this, [this]() {
         while (QLocalSocket *socket = server->nextPendingConnection()) {
-            // No disconnected -> deleteLater() slot: the probe disconnects right after it
-            // writes, and a receiver that blocked would then have the socket freed from inside
-            // its own readyRead emission. The reaper covers a client that never sends the
-            // line; the handler below deletes after the emit.
+            // No disconnected -> deleteLater() slot: it could free the socket inside its own readyRead emission.
+            // The reaper covers a client that never sends the line; the handler below deletes after the emit.
             auto *reaper = new QTimer(socket);
             reaper->setSingleShot(true);
             connect(reaper, &QTimer::timeout, socket, &QObject::deleteLater);

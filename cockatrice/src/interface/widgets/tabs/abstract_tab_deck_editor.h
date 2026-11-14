@@ -304,9 +304,9 @@ protected:
 
     QMap<QDockWidget *, DockActions> dockToActions;
 
-private:
     std::unique_ptr<UnsavedDeckGuard> unsavedDeckGuard;
 
+private:
     void saveDeckToFile(const DeckList &deckList, const QString &fileName, const std::function<void(bool saved)> &then);
     void openDeckList(const DeckList &deckList, DeckOpenLocation deckOpenLocation);
 };
