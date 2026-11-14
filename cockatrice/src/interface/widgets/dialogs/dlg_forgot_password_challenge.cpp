@@ -15,7 +15,7 @@
 
 class QWidget;
 
-DlgForgotPasswordChallenge::DlgForgotPasswordChallenge(QWidget *parent) : QDialog(parent), emailEdit(new QLineEdit())
+DlgForgotPasswordChallenge::DlgForgotPasswordChallenge(QWidget *parent) : QDialog(parent)
 {
     const auto [lastfphost, lastfpport, lastfpplayername] = lastForgotPasswordServer();
     rejectWithoutPasswordRequest(this, tr("Reset Password Challenge Warning"),
