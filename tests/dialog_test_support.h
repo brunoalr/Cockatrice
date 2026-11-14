@@ -158,11 +158,14 @@ template <typename RunTests> int run(int argc, char **argv, const QString &appli
         qCritical() << "portable.dat is beside the test binary: refusing to run on portable data";
         return 1;
     }
+#ifndef Q_OS_WIN
+    // Not on Windows: its known folders follow no environment variable, so they cannot be moved for a test.
     if (const QString data = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
         !data.startsWith(home.path() + QLatin1Char('/'))) {
         qCritical() << "the settings would be written to" << data << "outside the temporary home: refusing to run";
         return 1;
     }
+#endif
     return runTests();
 }
 
