@@ -19,6 +19,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <functional>
 #include <libcockatrice/card/relation/card_relation_type.h>
 #include <libcockatrice/filters/filter_string.h>
 #include <qtmetamacros.h>
@@ -141,7 +142,10 @@ signals:
     void requestDrawBottomCardsDialog(int defaultNumberBottomCards, int maxCards);
     void requestRollDieDialog();
     void requestCreateTokenDialog(const QStringList &predefinedTokens);
-    void requestCreateRelatedFromRelationDialog(const CardState *sourceCard, const CardRelation &cardRelation);
+    /// thenFinished runs when the request ends, created or not; never if the card died meanwhile.
+    void requestCreateRelatedFromRelationDialog(const CardState *sourceCard,
+                                                const CardRelation &cardRelation,
+                                                const std::function<void()> &thenFinished);
     void requestMoveCardXCardsFromTopDialog(int defaultNumberTopCardsToPlaceBelow, int deckSize);
     void requestSetPTDialog(const QString &oldPT);
     void requestSetAnnotationDialog(const QString &oldAnnotation);
@@ -170,13 +174,11 @@ public slots:
     void actRequestCreateTokenDialog(const QStringList &predefinedTokens);
     void actCreateToken(TokenInfo tokenToCreate);
     void actCreateAnotherToken();
-    void actRequestCreateRelatedFromRelationDialog(const CardState *sourceCard, const CardRelation &cardRelation);
+    void actRequestCreateRelatedFromRelationDialog(const CardState *sourceCard,
+                                                   const CardRelation &cardRelation,
+                                                   const std::function<void()> &thenFinished = {});
     bool createRelatedFromRelation(const CardState *sourceCard, const CardRelation &cardRelation, int variableCount);
     void onRelatedCardCreated(const CardState *sourceCard, const CardRelation &cardRelation);
-    void setLastRelatedCreationSucceeded(bool succeeded)
-    {
-        lastRelatedCreationSucceeded = succeeded;
-    }
     void actShuffle();
     void actRequestShuffleTopDialog();
     void actShuffleTop(int number);
@@ -308,8 +310,6 @@ private:
     int movingCardsUntilCounter = 0;
     MoveTopCardsUntilOptions movingCardsUntilOptions;
 
-    bool lastRelatedCreationSucceeded = false;
-
     [[nodiscard]] bool getPlayToStack() const;
     [[nodiscard]] int getStartingHandSize() const;
     [[nodiscard]] bool getAnnotateTokens() const;
@@ -320,6 +320,7 @@ private:
                     CardRelationType attach = CardRelationType::DoesNotAttach,
                     bool persistent = false,
                     bool faceDown = false);
+    void setLastTokenFromRelation(const CardRelation &cardRelation);
 
     void playSelectedCards(QList<CardState *> selectedCards, bool faceDown = false);
 
