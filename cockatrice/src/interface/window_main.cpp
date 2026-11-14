@@ -1641,7 +1641,10 @@ void MainWindow::reloadCardDatabaseAndCheckSets()
     auto *watcher = new QFutureWatcher<void>(this);
     connect(watcher, &QFutureWatcher<void>::finished, this, [watcher] {
         watcher->deleteLater();
+#ifndef Q_OS_WASM
+        // The web build adopted the new sets at the swap; this check would re-enable sets the player disabled.
         CardDatabaseManager::getInstance()->checkUnknownSets();
+#endif
     });
     watcher->setFuture(QtConcurrent::run([] { CardDatabaseManager::getInstance()->loadCardDatabases(); }));
 }
