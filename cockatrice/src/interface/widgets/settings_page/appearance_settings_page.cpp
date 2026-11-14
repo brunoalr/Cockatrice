@@ -438,14 +438,14 @@ void AppearanceSettingsPage::openThemeLocation()
     if (dirDir.exists() && dirDir.mkpath(dir)) {
         QtUtils::openPathInFileManager(dir);
     } else {
-        QMessageBox::critical(this, tr("Error"), tr("Could not create themes directory at '%1'.").arg(dir));
+        Dialogs::critical(this, tr("Error"), tr("Could not create themes directory at '%1'.").arg(dir));
     }
 }
 
 void AppearanceSettingsPage::editPalette()
 {
-    PaletteEditorDialog dlg(themeManager->getCurrentThemePath(), SettingsCache::instance().getThemeName(), this);
-    dlg.exec();
+    auto *dlg = new PaletteEditorDialog(themeManager->getCurrentThemePath(), SettingsCache::instance().getThemeName(), this);
+    Dialogs::open(dlg, {});
 }
 
 void AppearanceSettingsPage::updateHomeTabSettingsVisibility()
@@ -497,49 +497,48 @@ void AppearanceSettingsPage::styleComboChanged(int index)
         return;
     }
 
-    QMessageBox msgBox(this);
-    msgBox.setWindowTitle(tr("Broken style"));
-    msgBox.setIcon(QMessageBox::Warning);
-    msgBox.setText(tr("The \"%1\" style is broken and can break the game view: dragging cards across zones can "
-                      "shrink the board to a tiny grey window that can only be fixed by rejoining the game.")
-                       .arg(newStyle));
-    msgBox.setInformativeText(
+    auto *msgBox = new QMessageBox(this);
+    msgBox->setWindowTitle(tr("Broken style"));
+    msgBox->setIcon(QMessageBox::Warning);
+    msgBox->setText(tr("The \"%1\" style is broken and can break the game view: dragging cards across zones can "
+                       "shrink the board to a tiny grey window that can only be fixed by rejoining the game.")
+                        .arg(newStyle));
+    msgBox->setInformativeText(
         tr("It can also render controls such as combo boxes unreadable, especially in dark mode.\n\n"
            "Fusion is the recommended style on every platform. Switch to Fusion instead?"));
 
     int fusionIdx = findFusionIndex(styleCombo);
     QPushButton *fusionButton = nullptr;
     if (fusionIdx >= 0) {
-        fusionButton = msgBox.addButton(tr("Use Fusion instead"), QMessageBox::AcceptRole);
+        fusionButton = msgBox->addButton(tr("Use Fusion instead"), QMessageBox::AcceptRole);
     }
-    QPushButton *keepButton = msgBox.addButton(tr("Use %1 anyway").arg(newStyle), QMessageBox::DestructiveRole);
-    msgBox.addButton(QMessageBox::Cancel);
+    QPushButton *keepButton = msgBox->addButton(tr("Use %1 anyway").arg(newStyle), QMessageBox::DestructiveRole);
+    msgBox->addButton(QMessageBox::Cancel);
     if (fusionButton != nullptr) {
-        msgBox.setDefaultButton(fusionButton);
+        msgBox->setDefaultButton(fusionButton);
     } else {
-        msgBox.setDefaultButton(keepButton);
+        msgBox->setDefaultButton(keepButton);
     }
 
-    msgBox.exec();
+    Dialogs::open(msgBox, [this, fusionButton, keepButton, fusionIdx, newStyle](const QAbstractButton *clicked) {
+        if (fusionButton != nullptr && clicked == fusionButton) {
+            styleCombo.setCurrentIndex(fusionIdx);
+            return;
+        }
+        if (clicked == keepButton) {
+            themeManager->setStyleName(newStyle);
+            previousStyle = newStyle;
+            updateStyleWarning();
+            return;
+        }
 
-    const QAbstractButton *clicked = msgBox.clickedButton();
-    if (fusionButton != nullptr && clicked == fusionButton) {
-        styleCombo.setCurrentIndex(fusionIdx);
-        return;
-    }
-    if (clicked == keepButton) {
-        themeManager->setStyleName(newStyle);
-        previousStyle = newStyle;
+        // Cancel: revert to the previously applied style without re-prompting
+        styleCombo.blockSignals(true);
+        const int previousIdx = styleCombo.findData(previousStyle);
+        styleCombo.setCurrentIndex(previousIdx >= 0 ? previousIdx : 0);
+        styleCombo.blockSignals(false);
         updateStyleWarning();
-        return;
-    }
-
-    // Cancel: revert to the previously applied style without re-prompting
-    styleCombo.blockSignals(true);
-    const int previousIdx = styleCombo.findData(previousStyle);
-    styleCombo.setCurrentIndex(previousIdx >= 0 ? previousIdx : 0);
-    styleCombo.blockSignals(false);
-    updateStyleWarning();
+    });
 }
 
 void AppearanceSettingsPage::showShortcutsChanged(QT_STATE_CHANGED_T value)
@@ -589,8 +588,8 @@ void AppearanceSettingsPage::cardViewExpandedRowsMaxChanged(int value)
 
 void AppearanceSettingsPage::openPlaymatCollectionDialog()
 {
-    PlaymatCollectionDialog dialog(this);
-    dialog.exec();
+    auto *dialog = new PlaymatCollectionDialog(this);
+    Dialogs::open(dialog, {});
 }
 
 void AppearanceSettingsPage::retranslateUi()
