@@ -295,7 +295,7 @@ public:
      * Unlike the selection-based overload, this does not depend on the game
      * being visible in the filtered game list.
      */
-    bool joinGameById(int gameId, bool asSpectator = false);
+    bool joinGameById(int gameId, bool asSpectator = false, bool asJudge = false);
 };
 
 #endif

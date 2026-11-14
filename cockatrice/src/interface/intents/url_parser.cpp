@@ -68,7 +68,7 @@ void IntentUrlParser::parseFirstLink()
     }
 
     PendingIntentChain chain;
-    Intent *firstIntent = nullptr;
+    const Intent *firstIntent = nullptr;
     if (action == "opendeck") {
         firstIntent = createOpenDeckIntent(query, chain);
     } else {
@@ -145,7 +145,7 @@ void IntentUrlParser::askToJoinGame(const QUrlQuery &query)
 
     const auto answered = Dialogs::whileAlive(this, [this, ctx](bool confirmed) {
         PendingIntentChain chain;
-        Intent *firstIntent = confirmed ? createJoinGameIntent(ctx, chain) : nullptr;
+        const Intent *firstIntent = confirmed ? createJoinGameIntent(ctx, chain) : nullptr;
         queueChain(chain, firstIntent);
     });
     Dialogs::confirm(mainWindow, tr("Join game"), message, answered, QMessageBox::Yes);

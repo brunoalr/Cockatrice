@@ -573,7 +573,12 @@ void GameSelector::customContextMenu(const QPoint &point)
     // The list changes while the menu is up: the menu keeps the game it was opened on.
     const ServerInfo_Game gameInfo = gameListModel->getGame(index.data(Qt::UserRole).toInt());
     const auto join = [this, gameInfo](bool asSpectator, bool asJudge) {
-        return [this, gameInfo, asSpectator, asJudge] { joinGame(gameInfo, asSpectator, asJudge); };
+        return [this, gameInfo, asSpectator, asJudge] {
+            // Its seats may have changed meanwhile: join the game as listed now, while it still is.
+            if (!joinGameById(gameInfo.game_id(), asSpectator, asJudge)) {
+                joinGame(gameInfo, asSpectator, asJudge);
+            }
+        };
     };
     connect(menu->addAction(tr("Join Game")), &QAction::triggered, this, join(false, false));
 
@@ -676,7 +681,7 @@ void GameSelector::sendJoinGame(int roomId, Command_JoinGame cmd, const QString 
     disableButtons();
 }
 
-bool GameSelector::joinGameById(const int gameId, const bool asSpectator)
+bool GameSelector::joinGameById(const int gameId, const bool asSpectator, const bool asJudge)
 {
     for (int row = 0; row < gameListModel->rowCount(); ++row) {
         const ServerInfo_Game &game = gameListModel->getGame(row);
@@ -684,7 +689,7 @@ bool GameSelector::joinGameById(const int gameId, const bool asSpectator)
             continue;
         }
 
-        joinGame(game, asSpectator);
+        joinGame(game, asSpectator, asJudge);
         return true;
     }
 
