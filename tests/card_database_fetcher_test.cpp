@@ -28,7 +28,7 @@ void writeFile(const QString &path, const QByteArray &data)
     ASSERT_EQ(file.write(data), data.size());
 }
 
-class CardDatabaseFetcherTest : public ::testing::Test
+class CardDatabaseFetcherTest : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:
     QTemporaryDir site;
@@ -104,6 +104,54 @@ TEST_F(CardDatabaseFetcherTest, MissingCardsGiveFailedAndLeaveNoTokensBehind)
     EXPECT_TRUE(failed.first().first().toString().contains(QStringLiteral("cards.xml")));
     EXPECT_FALSE(fetched.wait(200));
     EXPECT_TRUE(targetIsEmpty());
+}
+
+TEST_F(CardDatabaseFetcherTest, ABodyThatIsNotACardDatabaseGivesFailedAndLeavesNothingBehind)
+{
+    publishCards();
+    writeFile(site.filePath(QStringLiteral("tokens.xml")), "<!doctype html><html><body>Not found</body></html>\n");
+    CardDatabaseFetcher fetcher(page(), target.path());
+    QSignalSpy fetched(&fetcher, &CardDatabaseFetcher::fetched);
+    QSignalSpy failed(&fetcher, &CardDatabaseFetcher::failed);
+
+    fetcher.fetch();
+
+    ASSERT_TRUE(failed.wait(5000));
+    EXPECT_TRUE(failed.first().first().toString().contains(QStringLiteral("tokens.xml")));
+    EXPECT_FALSE(fetched.wait(200));
+    EXPECT_TRUE(targetIsEmpty());
+}
+
+TEST_F(CardDatabaseFetcherTest, ATokensFileThatCannotBeSavedLeavesNoCardsBehind)
+{
+    publishCards();
+    publishTokens();
+    ASSERT_TRUE(QDir(target.path()).mkdir(QStringLiteral("tokens.xml")));
+    CardDatabaseFetcher fetcher(page(), target.path());
+    QSignalSpy fetched(&fetcher, &CardDatabaseFetcher::fetched);
+    QSignalSpy failed(&fetcher, &CardDatabaseFetcher::failed);
+
+    fetcher.fetch();
+
+    ASSERT_TRUE(failed.wait(5000));
+    EXPECT_FALSE(fetched.wait(200));
+    EXPECT_FALSE(QFile::exists(target.filePath(QStringLiteral("cards.xml"))));
+}
+
+TEST_F(CardDatabaseFetcherTest, AQueryAndAFragmentInThePageAddressAreLeftOut)
+{
+    publishCards();
+    publishTokens();
+    QUrl address = QUrl::fromLocalFile(site.path() + QLatin1Char('/'));
+    address.setQuery(QStringLiteral("connect=secret"));
+    address.setFragment(QStringLiteral("part"));
+    CardDatabaseFetcher fetcher(address, target.path());
+    QSignalSpy fetched(&fetcher, &CardDatabaseFetcher::fetched);
+
+    fetcher.fetch();
+
+    ASSERT_TRUE(fetched.wait(5000));
+    EXPECT_EQ(readFile(target.filePath(QStringLiteral("cards.xml"))), cards);
 }
 
 TEST_F(CardDatabaseFetcherTest, SecondFetchWhileOneRunsStartsNothing)
