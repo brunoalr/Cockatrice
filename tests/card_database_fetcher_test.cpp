@@ -122,6 +122,22 @@ TEST_F(CardDatabaseFetcherTest, ABodyThatIsNotACardDatabaseGivesFailedAndLeavesN
     EXPECT_TRUE(targetIsEmpty());
 }
 
+TEST_F(CardDatabaseFetcherTest, ADatabaseCutShortGivesFailedAndLeavesNothingBehind)
+{
+    writeFile(site.filePath(QStringLiteral("cards.xml")), cards.left(cards.size() / 2));
+    publishTokens();
+    CardDatabaseFetcher fetcher(page(), target.path());
+    QSignalSpy fetched(&fetcher, &CardDatabaseFetcher::fetched);
+    QSignalSpy failed(&fetcher, &CardDatabaseFetcher::failed);
+
+    fetcher.fetch();
+
+    ASSERT_TRUE(failed.wait(5000));
+    EXPECT_TRUE(failed.first().first().toString().contains(QStringLiteral("cards.xml")));
+    EXPECT_FALSE(fetched.wait(200));
+    EXPECT_TRUE(targetIsEmpty());
+}
+
 TEST_F(CardDatabaseFetcherTest, ATokensFileThatCannotBeSavedLeavesNoCardsBehind)
 {
     publishCards();

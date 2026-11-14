@@ -5,7 +5,6 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QSaveFile>
-#include <chrono>
 #include <libcockatrice/network/network_manager.h>
 #include <utility>
 
@@ -13,6 +12,7 @@ namespace
 {
 const QString cardsFile = QStringLiteral("cards.xml");
 const QString tokensFile = QStringLiteral("tokens.xml");
+const int wholeDownloadLimitMs = 5 * 60 * 1000;
 } // namespace
 
 CardDatabaseFetcher::CardDatabaseFetcher(const QUrl &_base, const QString &_targetDir, QObject *parent)
@@ -29,7 +29,7 @@ void CardDatabaseFetcher::fetch()
     for (const QString &name : {cardsFile, tokensFile}) {
         QNetworkRequest request(base.resolved(QUrl(name)));
         // A browser applies this limit to the whole download, not to a stall.
-        request.setTransferTimeout(std::chrono::minutes(5));
+        request.setTransferTimeout(wholeDownloadLimitMs);
         qCInfo(CardDatabaseFetcherLog) << "Downloading" << request.url().toDisplayString();
         QNetworkReply *reply = network->get(request);
         running.append(reply);
@@ -48,8 +48,9 @@ void CardDatabaseFetcher::replyFinished(QNetworkReply *reply, const QString &nam
         return;
     }
     const QByteArray body = reply->readAll();
-    // Some hosts answer a missing file with status 200 and a page of their own.
-    if (!body.left(1024).contains("<cockatrice_carddatabase")) {
+    // Some hosts answer a missing file with status 200 and a page of their own; a cut transfer lacks the end.
+    if (!body.left(1024).contains("<cockatrice_carddatabase") ||
+        !body.right(256).contains("</cockatrice_carddatabase>")) {
         fail(tr("%1: not a card database").arg(name));
         return;
     }
