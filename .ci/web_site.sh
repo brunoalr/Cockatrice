@@ -80,7 +80,7 @@ keep_previous() {
 }
 
 assemble() {
-  local app=$1 database=$2 site=$3 previous_url=${4:-}
+  local app=$1 database=$2 site=${3%/} previous_url=${4:-}
   local web worker hash previous=
   web="$(dirname "$0")/../cockatrice/web"
   worker="$web/coi-serviceworker.js"
@@ -96,24 +96,33 @@ assemble() {
     exit 1
   fi
 
+  mkdir -p "$(dirname "$site")"
+  staging=$(mktemp -d "$site.XXXXXX")
+  trap 'rm -rf "$staging"' EXIT
+  # mktemp -d makes the directory private, and the site is published as it is
+  chmod 755 "$staging"
   hash=$(app_hash "$app")
-  mkdir -p "$site/app/$hash"
-  cp "${app_files[@]/#/$app/}" "$site/app/$hash/"
-  cp "$database/cards.xml" "$database/tokens.xml" "$worker" "$site/"
-  sed "s|app/@HASH@/|app/$hash/|g" "$web/index.html" >"$site/index.html"
-  if ! grep -q "app/$hash/" "$site/index.html" || grep -q '@HASH@' "$site/index.html"; then
+  mkdir -p "$staging/app/$hash"
+  cp "${app_files[@]/#/$app/}" "$staging/app/$hash/"
+  cp "$database/cards.xml" "$database/tokens.xml" "$worker" "$staging/"
+  sed "s|app/@HASH@/|app/$hash/|g" "$web/index.html" >"$staging/index.html"
+  if ! grep -q "app/$hash/" "$staging/index.html" || grep -q '@HASH@' "$staging/index.html"; then
     echo "::error::$web/index.html does not name app/@HASH@/"
     exit 1
   fi
   if [[ -n $previous_url ]]; then
-    keep_previous "$previous_url" "$site"
+    keep_previous "$previous_url" "$staging"
   fi
   if [[ -n $previous ]]; then
     previous="\"$previous\""
   else
     previous=null
   fi
-  printf '{"current": "%s", "previous": %s}\n' "$hash" "$previous" >"$site/versions.json"
+  printf '{"current": "%s", "previous": %s}\n' "$hash" "$previous" >"$staging/versions.json"
+  if [[ -d $site ]]; then
+    rmdir "$site"
+  fi
+  mv "$staging" "$site"
   echo "assembled version $hash in $site"
 }
 
@@ -261,6 +270,17 @@ self_test() {
   cp -R "$work/a" "$served/incomplete"
   rm "$served/incomplete/app/$a/qtlogo.svg"
   refuses "a site over a live site that lacks a file of its version" "$work/app-b" "$work/database" "$work/x1" "$url/incomplete"
+  if [[ -e $work/x1 ]] || ls -d "$work"/x1.* >/dev/null 2>&1; then
+    echo "self-test FAILED: a failed assembly left $(ls -d "$work"/x1*) behind"
+    return 1
+  fi
+  mkdir "$work/x10"
+  refuses "a site over a live site that lacks a file of its version" "$work/app-b" "$work/database" "$work/x10" "$url/incomplete"
+  if [[ ! -d $work/x10 ]] || [[ -n $(ls -A "$work/x10") ]] || ls -d "$work"/x10.* >/dev/null 2>&1; then
+    echo "self-test FAILED: a failed assembly into an empty directory left $(ls -d "$work"/x10*) changed"
+    return 1
+  fi
+  assembles "$work/app" "$work/database" "$work/x10"
   cp -R "$work/a" "$served/altered"
   printf '\0' >>"$served/altered/app/$a/qtloader.js"
   refuses "a site over a live site whose files do not match its version" "$work/app-b" "$work/database" "$work/x2" "$url/altered"
