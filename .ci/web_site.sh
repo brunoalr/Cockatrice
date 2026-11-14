@@ -82,12 +82,19 @@ keep_previous() {
 
 assemble() {
   local app=$1 database=$2 site=${3%/} previous_url=${4:-}
-  local web worker hash previous=
-  web="$(dirname "$0")/../cockatrice/web"
+  local repo web worker hash source=${WEB_SITE_SOURCE_URL:-} previous=
+  repo="$(dirname "$0")/.."
+  web="$repo/cockatrice/web"
   worker="$web/coi-serviceworker.js"
   require_files "$app" "${app_files[@]}"
   require_files "$database" cards.xml tokens.xml
   require_files "$web" index.html coi-serviceworker.js coi-serviceworker.LICENSE
+  require_files "$repo" LICENSE
+  # The address goes into the page as it is
+  if [[ -n $source && ! $source =~ ^https://[A-Za-z0-9./_-]+$ ]]; then
+    echo "::error::WEB_SITE_SOURCE_URL is not a plain https address: $source"
+    exit 1
+  fi
   if [[ $(head -n 1 "$worker" | grep -oE '[0-9a-f]{64}') != "$(tail -n +2 "$worker" | sha256 | cut -c1-64)" ]]; then
     echo "::error::$worker differs from the upstream file its first line names"
     exit 1
@@ -105,8 +112,13 @@ assemble() {
   hash=$(app_hash "$app")
   mkdir -p "$staging/app/$hash"
   cp "${app_files[@]/#/$app/}" "$staging/app/$hash/"
-  cp "$database/cards.xml" "$database/tokens.xml" "$worker" "$web/coi-serviceworker.LICENSE" "$staging/"
-  sed "s|app/@HASH@/|app/$hash/|g" "$web/index.html" >"$staging/index.html"
+  cp "$database/cards.xml" "$database/tokens.xml" "$worker" "$web/coi-serviceworker.LICENSE" "$repo/LICENSE" "$staging/"
+  if [[ -n $source ]]; then
+    echo "$source" >"$staging/SOURCE"
+    sed "s|app/@HASH@/|app/$hash/|g; s|@SOURCE@|$source|" "$web/index.html" >"$staging/index.html"
+  else
+    sed "s|app/@HASH@/|app/$hash/|g; /@SOURCE@/d" "$web/index.html" >"$staging/index.html"
+  fi
   if ! grep -q "app/$hash/" "$staging/index.html" || grep -q '@HASH@' "$staging/index.html"; then
     echo "::error::$web/index.html does not name app/@HASH@/"
     exit 1
@@ -137,6 +149,7 @@ self_test() {
   mkdir -p "$work/repo/.ci" "$web" "$work/app" "$work/database" "$served"
   cp "$0" "$script"
   cp "$(dirname "$0")"/../cockatrice/web/{index.html,coi-serviceworker.js,coi-serviceworker.LICENSE} "$web/"
+  cp "$(dirname "$0")/../LICENSE" "$work/repo/"
   local file
   for file in "${app_files[@]}"; do
     echo "fixture $file" >"$work/app/$file"
@@ -183,7 +196,8 @@ self_test() {
   local a
   a=$(cd "$work/app" && cat "${app_files[@]}" | sha256 | cut -c1-16)
   assembles "$work/app" "$work/database" "$work/a"
-  for file in index.html coi-serviceworker.js coi-serviceworker.LICENSE versions.json cards.xml tokens.xml "${app_files[@]/#/app/$a/}"; do
+  for file in index.html coi-serviceworker.js coi-serviceworker.LICENSE LICENSE versions.json cards.xml tokens.xml \
+    "${app_files[@]/#/app/$a/}"; do
     if [[ ! -s $work/a/$file ]]; then
       echo "self-test FAILED: the site has no $file"
       return 1
@@ -297,6 +311,19 @@ self_test() {
     return 1
   fi
 
+  if grep -q '@SOURCE@' "$work/a/index.html" || [[ -e $work/a/SOURCE ]]; then
+    echo "self-test FAILED: a site without a source address still names one"
+    return 1
+  fi
+  local source=https://example.org/source/tree/0123abc
+  WEB_SITE_SOURCE_URL=$source assembles "$work/app" "$work/database" "$work/sourced"
+  if ! grep -q "href=\"$source\"" "$work/sourced/index.html" || [[ $(<"$work/sourced/SOURCE") != "$source" ]]; then
+    echo "self-test FAILED: the site does not link its source address $source"
+    return 1
+  fi
+  WEB_SITE_SOURCE_URL='https://example.org/"><script>' refuses "a site with a source address that is not a plain https address" \
+    "$work/app" "$work/database" "$work/x12"
+
   cp -R "$work/app" "$work/app-incomplete"
   rm "$work/app-incomplete/qtloader.js"
   refuses "a site without qtloader.js" "$work/app-incomplete" "$work/database" "$work/x5"
@@ -314,6 +341,13 @@ self_test() {
     echo "self-test FAILED: the missing licence was not named: $(<"$out")"
     return 1
   fi
+  rm "$work/repo/LICENSE"
+  refuses "a site without the licence" "$work/app" "$work/database" "$work/x13"
+  if ! grep -q 'LICENSE' "$out"; then
+    echo "self-test FAILED: the missing licence was not named: $(<"$out")"
+    return 1
+  fi
+  cp "$(dirname "$0")/../LICENSE" "$work/repo/"
   rm "$web/coi-serviceworker.js"
   refuses "a site without the isolation worker" "$work/app" "$work/database" "$work/x7"
   if ! grep -q 'coi-serviceworker.js' "$out"; then
