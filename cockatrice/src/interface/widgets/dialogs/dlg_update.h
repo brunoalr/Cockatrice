@@ -63,7 +63,7 @@ private:
     void showRelease(Release *release, bool needToUpdate, bool isCompatible);
     void setStatus(const QString &text);
     void setDownloading(bool downloading);
-    void warnInstallerIsWaiting();
+    static void warnInstallerIsWaiting(QWidget *parent);
     void markNotesShown();
     [[nodiscard]] static QString localizedChannelName();
 
