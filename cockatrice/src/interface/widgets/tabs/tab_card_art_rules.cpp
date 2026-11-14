@@ -1,6 +1,7 @@
 #include "tab_card_art_rules.h"
 
 #include "../utility/completer_utils.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "card_database_display_model.h"
 #include "card_database_model.h"
 #include "libcockatrice/card/card_info.h"
@@ -32,7 +33,6 @@
 #include <libcockatrice/protocol/pb/response_card_art_rule_entry.pb.h>
 #include <libcockatrice/protocol/pb/response_clear_blacklisted_banners.pb.h>
 #include <libcockatrice/protocol/pending_command.h>
-#include <libcockatrice/utility/qt_utils.h>
 #include <string>
 
 class QObject;
@@ -314,17 +314,20 @@ void TabCardArtRules::removeSelected()
 
 void TabCardArtRules::clearBlacklistedBanners()
 {
-    if (!QtUtils::confirm(this, tr("Clear blacklisted banners"),
-                          tr("Remove the banner card from every user whose current banner matches a DENY rule?\n\n"
-                             "Users who are online keep showing their banner until they log in again."),
-                          QMessageBox::No)) {
-        return;
-    }
-
-    Command_ClearBlacklistedBanners cmd;
-    PendingCommand *pend = client->prepareModeratorCommand(cmd);
-    connect(pend, &PendingCommand::finished, this, &TabCardArtRules::clearBlacklistedBannersResponse);
-    client->sendCommand(pend);
+    Dialogs::confirm(
+        this, tr("Clear blacklisted banners"),
+        tr("Remove the banner card from every user whose current banner matches a DENY rule?\n\n"
+           "Users who are online keep showing their banner until they log in again."),
+        [this](bool confirmed) {
+            if (!confirmed) {
+                return;
+            }
+            Command_ClearBlacklistedBanners cmd;
+            PendingCommand *pend = client->prepareModeratorCommand(cmd);
+            connect(pend, &PendingCommand::finished, this, &TabCardArtRules::clearBlacklistedBannersResponse);
+            client->sendCommand(pend);
+        },
+        QMessageBox::No);
 }
 
 void TabCardArtRules::clearBlacklistedBannersResponse(const Response &r)
@@ -333,24 +336,24 @@ void TabCardArtRules::clearBlacklistedBannersResponse(const Response &r)
         case Response::RespOk:
             break;
         case Response::RespFunctionNotAllowed:
-            QMessageBox::warning(this, tr("Not supported"),
-                                 tr("This server does not support clearing blacklisted banners. It may be running an "
-                                    "older version."));
+            Dialogs::warning(this, tr("Not supported"),
+                             tr("This server does not support clearing blacklisted banners. It may be running an "
+                                "older version."));
             return;
         case Response::RespInternalError:
-            QMessageBox::critical(this, tr("Error"),
-                                  tr("The server could not clear blacklisted banners because of a database error."));
+            Dialogs::critical(this, tr("Error"),
+                              tr("The server could not clear blacklisted banners because of a database error."));
             return;
         default:
-            QMessageBox::critical(this, tr("Error"),
-                                  tr("The server rejected the request: %1")
-                                      .arg(QString::fromStdString(Response_ResponseCode_Name(r.response_code()))));
+            Dialogs::critical(this, tr("Error"),
+                              tr("The server rejected the request: %1")
+                                  .arg(QString::fromStdString(Response_ResponseCode_Name(r.response_code()))));
             return;
     }
 
     const auto &resp = r.GetExtension(Response_ClearBlacklistedBanners::ext);
-    QMessageBox::information(this, tr("Banners cleared"),
-                             tr("%n banner card(s) cleared.\n\n"
-                                "Users who are online keep showing their banner until they log in again.",
-                                "number of banners cleared", resp.cleared_count()));
+    Dialogs::information(this, tr("Banners cleared"),
+                         tr("%n banner card(s) cleared.\n\n"
+                            "Users who are online keep showing their banner until they log in again.",
+                            "number of banners cleared", resp.cleared_count()));
 }

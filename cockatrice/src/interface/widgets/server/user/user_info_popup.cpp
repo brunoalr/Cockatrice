@@ -688,32 +688,29 @@ void UserInfoPopup::onGamesContextMenu(const QPoint &pos)
     }
     const ServerInfo_Game game = var.value<ServerInfo_Game>();
 
-    QMenu menu(this);
-    menu.setStyleSheet(
+    auto *menu = new QMenu(this);
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    menu->setStyleSheet(
         QStringLiteral("QMenu{background:%1;color:%2;border:1px solid %3;border-radius:4px;}"
                        "QMenu::item:selected{background:%4;}")
             .arg(colorStr(theme.bg), colorStr(theme.text), colorStr(theme.border), colorStr(theme.buttonHover)));
 
+    const auto requestJoin = [this, idx, gameId = game.game_id(), roomId = game.room_id()](bool asSpectator) {
+        if (idx.isValid()) {
+            emit joinGameRequested(gameId, roomId, asSpectator);
+        }
+    };
+
     // Never grey the join action out: GameSelector::joinGame() asks whether to
     // fall back to spectating when the game is full or already running, so a
     // disabled entry would just read as a dead button.
-    QAction *join = menu.addAction(tr("Join game"));
+    connect(menu->addAction(tr("Join game")), &QAction::triggered, this, [requestJoin] { requestJoin(false); });
 
-    QAction *spec = nullptr;
     if (game.spectators_allowed()) {
-        spec = menu.addAction(tr("Spectate"));
+        connect(menu->addAction(tr("Spectate")), &QAction::triggered, this, [requestJoin] { requestJoin(true); });
     }
 
-    const QAction *chosen = menu.exec(gamesView->viewport()->mapToGlobal(pos));
-    if (!chosen || !idx.isValid()) {
-        return;
-    }
-
-    if (chosen == join) {
-        emit joinGameRequested(game.game_id(), game.room_id(), false);
-    } else if (spec && chosen == spec) {
-        emit joinGameRequested(game.game_id(), game.room_id(), true);
-    }
+    menu->popup(gamesView->viewport()->mapToGlobal(pos));
 }
 
 // ── showForUser ───────────────────────────────────────────────────────────────

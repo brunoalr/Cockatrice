@@ -2,7 +2,9 @@
 #define DIALOG_TEST_SUPPORT_H
 
 #include <QApplication>
+#include <QDebug>
 #include <QDialog>
+#include <QFile>
 #include <QList>
 #include <QStandardPaths>
 #include <QString>
@@ -87,6 +89,11 @@ template <typename RunTests> int run(int argc, char **argv, const QString &appli
     // CMake lists the cases at build time, where LeakSanitizer is on: the settings singleton leaks at exit.
     if (::testing::GTEST_FLAG(list_tests)) {
         return RUN_ALL_TESTS();
+    }
+    // In portable mode the settings live beside the binary: a run would write there and then delete them.
+    if (QFile::exists(QCoreApplication::applicationDirPath() + QStringLiteral("/portable.dat"))) {
+        qCritical() << "portable.dat is beside the test binary: refusing to run on portable data";
+        return 1;
     }
     return runTests();
 }
