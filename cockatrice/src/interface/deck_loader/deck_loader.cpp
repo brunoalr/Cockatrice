@@ -1,5 +1,6 @@
 #include "deck_loader.h"
 
+#include "../../client/flush_player_data.h"
 #include "../theme_manager.h"
 #include "libcockatrice/card/card_info.h"
 #include "libcockatrice/card/database/card_database_querier.h"
@@ -188,6 +189,7 @@ DeckLoader::saveToFile(const DeckList &deck, const QString &fileName, DeckFileFo
     }
 
     qCInfo(DeckLoaderLog) << "Saved deck to " << fileName << "with format" << fmt;
+    flushPlayerData();
 
     LoadedDeck::LoadInfo lastLoadInfo = {fileName, fmt};
     return lastLoadInfo;
