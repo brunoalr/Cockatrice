@@ -10,7 +10,12 @@
 class QObject;
 
 // In MB (Increments of 64)
+#ifdef Q_OS_WASM
+// The page's whole heap, pictures included, has to fit in the 32-bit WebAssembly address space.
+#define PIXMAPCACHE_SIZE_DEFAULT 256
+#else
 #define PIXMAPCACHE_SIZE_DEFAULT 2048
+#endif
 #define PIXMAPCACHE_SIZE_MIN 64
 #define PIXMAPCACHE_SIZE_MAX 4096
 

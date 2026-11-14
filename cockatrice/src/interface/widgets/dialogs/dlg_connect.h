@@ -27,6 +27,7 @@ class QRadioButton;
 class QVBoxLayout;
 class HandlePublicServers;
 class QWidget;
+class ServersSettings;
 class UserConnection_Information;
 
 class DlgConnect : public QDialog
@@ -39,6 +40,7 @@ signals:
 public:
     explicit DlgConnect(QWidget *parent = nullptr);
     ~DlgConnect() override;
+    static void ensureWebServer(ServersSettings &servers);
     [[nodiscard]] QString getHost() const;
     [[nodiscard]] int getPort() const
     {

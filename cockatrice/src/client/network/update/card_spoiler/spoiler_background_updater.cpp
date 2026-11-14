@@ -146,7 +146,10 @@ void SpoilerBackgroundUpdater::cancel()
 void SpoilerBackgroundUpdater::downloadFromURL(const QUrl &url, bool saveResults)
 {
     QNetworkRequest request(url);
+#ifndef Q_OS_WASM
+    // A browser sends a preflight for a User-Agent it lets a page set.
     request.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
+#endif
     request.setTransferTimeout(60000);
     activeReply = manager->get(request);
     if (saveResults) {
