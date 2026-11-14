@@ -28,6 +28,11 @@ const noStorage = 'does not let the page store data'
 const loadFailed = 'could not be loaded'
 const mayDelete = text => text.includes('may delete') && text.includes('Deck Editor > Save deck to clipboard')
 const deck = 'decks/persist-smoke.cod'
+const playerData = ['settings/', 'decks/', 'replays/', 'filters/', 'themes/', 'customsets/']
+const notPlayerData = path =>
+  ['settings/logs/', 'settings/sentry/'].some(dir => path.startsWith(dir)) ||
+  /\.(png|jpe?g|gif|webp|bmp|svg|avif|tiff?)$/i.test(path) || /(^|\/)(cards|tokens|spoiler)\.xml$/i.test(path) ||
+  /(^|\/)(pics|cache)\/|\.cache$/i.test(path)
 const screen = "document.querySelector('#qt-shadow-container').shadowRoot"
 const statusLine = "[...document.querySelectorAll('[role=status]')].map(e => e.textContent).join(' ')"
 
@@ -312,6 +317,25 @@ const checks = {
     const failedLine = await state.page.evaluate(statusLine)
     if (!failedLine.includes(loadFailed)) {
       throw new Error(`when the stored data cannot be loaded the line says: ${failedLine}`)
+    }
+  },
+
+  // every page of the origin can read what the client stores
+  async g(state) {
+    await closeTab(state.page)
+    state.page = await newTab(state.url)
+    await state.page.started(0)
+    await sleep(30000)
+    await state.page.evaluate('cockatricePersist.flush()')
+    const files = await state.page.evaluate('cockatricePersist.files()')
+    const size = Object.values(await readStore(state.page)).reduce((sum, file) => sum + file.size, 0)
+    console.log(`files after a session of 30 s: ${files.join(' ')} (${size} bytes)`)
+    const kept = files.filter(path => !playerData.some(dir => path.startsWith(dir)) || notPlayerData(path))
+    if (kept.length) {
+      throw new Error(`stored beside the player's data: ${kept.join(' ')}`)
+    }
+    if (size >= 2 * 1024 * 1024) {
+      throw new Error(`the stored files take ${size} bytes`)
     }
   },
 }

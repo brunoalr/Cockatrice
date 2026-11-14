@@ -280,7 +280,7 @@ int main(int argc, char *argv[])
     // Declared before crash-reporter init: the startup attach below needs the log tail while the
     // file still holds the crashed session's lines.
     const QString persistentLogPath =
-        SettingsCache::instance().getSettingsPath() + QStringLiteral("logs/cockatrice.log");
+        SettingsCache::instance().getSessionDataPath() + QStringLiteral("/settings/logs/cockatrice.log");
     Logger::getInstance().setPersistentLogPath(persistentLogPath);
 
     // Crash reporting: init the SDK early so a crash anywhere below is captured into the
@@ -289,7 +289,8 @@ int main(int argc, char *argv[])
     // unconsented and the dialog below drives give/revoke. An empty DSN skips the SDK entirely and
     // the mock fallback further below behaves exactly as before.
     CrashReporter crashReporter;
-    const QString crashDatabasePath = SettingsCache::instance().getSettingsPath() + QStringLiteral("sentry");
+    const QString crashDatabasePath =
+        SettingsCache::instance().getSessionDataPath() + QStringLiteral("/settings/sentry");
     // Envelopes that received the redacted log at startup (AlwaysSend path); 0 means the log was
     // NOT folded into a pending crash event and a standalone log event is still needed below.
     int crashLogAttachedEnvelopes = 0;
