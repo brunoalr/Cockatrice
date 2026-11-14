@@ -559,6 +559,18 @@ echo "::group::Build project"
 cpuinfo
 echo "Running CMake with the following build flags: ${buildflags[*]}"
 cmake --build . "${buildflags[@]}"
+if [[ ${MAKE_WASM:-} == "1" ]]; then
+  # The binary links Qt statically, and whoever publishes it must name that Qt's licence and source
+  qt_version=$(sed -nE 's/^set\(PACKAGE_VERSION "([0-9]+\.[0-9]+\.[0-9]+)"\)$/\1/p' "$QT_WASM_DIR/lib/cmake/Qt6/Qt6ConfigVersionImpl.cmake")
+  if [[ -z $qt_version ]]; then
+    echo "::error file=$0::cannot read the Qt version from $QT_WASM_DIR"
+    exit 1
+  fi
+  printf '%s\n' \
+    "Qt $qt_version for WebAssembly, under the GNU General Public License version 3 (LICENSE.GPL3.txt)" \
+    "Qt source: https://download.qt.io/archive/qt/${qt_version%.*}/$qt_version/single/qt-everywhere-src-$qt_version.tar.xz" \
+    "Built with Emscripten $(emcc -dumpversion)" >cockatrice/QT.txt
+fi
 echo "::endgroup::"
 
 if [[ $BUILD_PROFILE && $RUNNER_OS == Windows && -f msbuild-perf.log ]]; then

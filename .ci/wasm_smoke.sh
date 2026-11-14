@@ -15,6 +15,15 @@ settle_seconds=${SETTLE_SECONDS:-15}
 started='ui\.show\(\) finished'
 fatal='Aborted\(|Uncaught|is not supported on Qt for WebAssembly'
 not_isolated='is not supported for now'
+case ${WASM_SMOKE_CARDS:-} in
+  '') expected= ;;
+  missing) expected='Card database download failed' ;;
+  *[!0-9]*)
+    echo "WASM_SMOKE_CARDS is the number of cards the page must load from cards.xml, or missing; not '$WASM_SMOKE_CARDS'" >&2
+    exit 3
+    ;;
+  *) expected="cards\\.xml.* Cards = $WASM_SMOKE_CARDS Sets" ;;
+esac
 serve_flag=
 if [[ ${WASM_SMOKE_ISOLATION_HEADERS:-1} == 0 ]]; then
   serve_flag=--no-isolation-headers
@@ -55,8 +64,12 @@ for ((second = 0; second <= start_seconds + settle_seconds; second++)); do
   fi
   if [[ -z $started_at ]] && grep -aqE "$started" "$log"; then
     started_at=$second
+    if [[ -n $expected ]]; then
+      result="started, but no line matched '$expected'"
+    fi
   fi
-  if [[ -n $started_at ]] && ((second - started_at >= settle_seconds)); then
+  if [[ -n $started_at ]] && ((second - started_at >= settle_seconds)) &&
+    { [[ -z $expected ]] || grep -aqE "$expected" "$log"; }; then
     result=started
     break
   fi
