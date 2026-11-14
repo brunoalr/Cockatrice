@@ -171,6 +171,19 @@ jobs:
           name: card-database
           path: ${{ runner.temp }}/database
 
+      - name: "Restore the fonts"
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/fonts
+          key: web-fonts-${{ hashFiles('.ci/web_fonts.sh') }}
+
+      # The steps below read the two variables: web_site.sh copies the fonts, the start-up check waits for the last one
+      - name: "Download the fonts"
+        run: |
+          .ci/web_fonts.sh "$RUNNER_TEMP/fonts"
+          echo "WEB_SITE_FONTS=$RUNNER_TEMP/fonts" >>"$GITHUB_ENV"
+          echo "WASM_SMOKE_FONT=NotoSansCJK-Regular.ttc" >>"$GITHUB_ENV"
+
       # Without the live site's address its version cannot be kept: fine for a trial build, not for a publish
       - name: "Assemble the site"
         env:
