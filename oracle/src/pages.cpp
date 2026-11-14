@@ -922,10 +922,16 @@ bool TagsPage::validatePage()
         return true;
     }
 
+    // Advancing validates this page again; a background run goes on without tags after one failure.
+    if (backgroundLoadFailed) {
+        return true;
+    }
+
     const auto rejectValidation = [this](const QString &message) {
         if (wizard()->backgroundMode) {
             qWarning() << message;
             wizard()->tagDatabase.reset();
+            backgroundLoadFailed = true;
             emit readyToContinue();
         } else {
             QMessageBox::critical(this, tr("Error"), message);
@@ -1186,6 +1192,7 @@ void TagsPage::failLoad(const QString &message)
 
     if (wizard()->backgroundMode) {
         statusLabel->setText(message);
+        backgroundLoadFailed = true;
         emit readyToContinue();
         return;
     }
