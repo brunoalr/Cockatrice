@@ -49,6 +49,7 @@
 #include <QWidget>
 #include <QtGlobal>
 #include <algorithm>
+#include <functional>
 #include <libcockatrice/card/database/card_database_manager.h>
 #include <libcockatrice/deck_list/deck_file_format.h>
 #include <libcockatrice/deck_list/deck_list.h>
@@ -372,6 +373,9 @@ void TabDeckStorage::actRenameLocal()
     for (const auto &curLeft : localDirView->selectionModel()->selectedRows()) {
         files.append(localDirModel->fileInfo(curLeft));
     }
+    // A folder goes after what it holds: renamed first, it would move the files still waiting for their turn.
+    std::ranges::stable_sort(files, std::ranges::greater{},
+                             [](const QFileInfo &file) { return file.absoluteFilePath().count(QLatin1Char('/')); });
     renameLocalFiles(files);
 }
 
@@ -749,7 +753,7 @@ void TabDeckStorage::deleteRemoteFolder(const QString &targetPath)
     }
     Command_DeckDelDir cmd;
     cmd.set_path(targetPath.toStdString());
-    PendingCommand *pend = client->prepareSessionCommand(cmd);
+    PendingCommand *pend = AbstractClient::prepareSessionCommand(cmd);
     connect(pend, &PendingCommand::finished, this, &TabDeckStorage::deleteFolderFinished);
     client->sendCommand(pend);
 }
@@ -758,7 +762,7 @@ void TabDeckStorage::deleteRemoteDeck(int deckId)
 {
     Command_DeckDel cmd;
     cmd.set_deck_id(deckId);
-    PendingCommand *pend = client->prepareSessionCommand(cmd);
+    PendingCommand *pend = AbstractClient::prepareSessionCommand(cmd);
     connect(pend, &PendingCommand::finished, this, &TabDeckStorage::deleteDeckFinished);
     client->sendCommand(pend);
 }
