@@ -149,6 +149,11 @@ self_test() {
   echo "self-test passed"
 }
 
+if ! command -v python3 >/dev/null; then
+  echo "::error::python3 is needed to check the card database" >&2
+  exit 3
+fi
+
 case "${1:-}" in
   --self-test)
     self_test
