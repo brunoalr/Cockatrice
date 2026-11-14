@@ -2,7 +2,9 @@
 #include "interface/widgets/utility/non_blocking_dialogs.h"
 
 #include <QApplication>
+#include <QCloseEvent>
 #include <QColorDialog>
+#include <QFileDialog>
 #include <QInputDialog>
 #include <QPointer>
 #include <QPushButton>
@@ -25,6 +27,19 @@ void fromTheEventLoop(std::function<void()> action)
     QCoreApplication::processEvents();
     settle();
 }
+
+// As the settings dialog does: closing it never reaches QDialog::closeEvent(), so finished() is not emitted.
+class DialogThatOnlyHides : public QDialog
+{
+public:
+    using QDialog::QDialog;
+
+protected:
+    void closeEvent(QCloseEvent *event) override
+    {
+        event->accept();
+    }
+};
 
 class NonBlockingDialogs : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
 {
@@ -66,6 +81,37 @@ TEST_F(NonBlockingDialogs, ADialogWithAParentBlocksTheWholeApplication)
     QInputDialog *dialog = onlyInputDialog();
     ASSERT_NE(dialog, nullptr);
     EXPECT_EQ(dialog->windowModality(), Qt::ApplicationModal);
+}
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+// The platform runs a native box its own way: KDE's never finishes when it is closed from its title bar.
+TEST_F(NonBlockingDialogs, MessageBoxesAreNeverThePlatformsOwn)
+{
+    Dialogs::information(parent.get(), "Title", "Text");
+    const QMessageBox *notice = onlyMessageBox();
+    ASSERT_NE(notice, nullptr);
+    EXPECT_TRUE(notice->testOption(QMessageBox::Option::DontUseNativeDialog));
+
+    auto *custom = new QMessageBox(nullptr);
+    Dialogs::open(custom, std::function<void(QAbstractButton *)>{});
+    EXPECT_TRUE(custom->testOption(QMessageBox::Option::DontUseNativeDialog));
+    custom->reject();
+    settle();
+}
+#endif
+
+// macOS opens its native file panel from show() only as a sheet of the dialog's window.
+TEST_F(NonBlockingDialogs, AFileDialogBlocksOnlyItsWindow)
+{
+    auto *dialog = new QFileDialog(parent.get());
+    Dialogs::open(dialog, [](int) {
+        // Only the modality matters here.
+    });
+
+    EXPECT_EQ(dialog->windowModality(), Qt::WindowModal);
+
+    dialog->reject();
+    settle();
 }
 
 TEST_F(NonBlockingDialogs, ConfirmShowsAQuestionWithYesAndNo)
@@ -327,6 +373,32 @@ TEST_F(NonBlockingDialogs, GetColorDeliversTheChosenColorOnAcceptOnly)
     settle();
 
     EXPECT_EQ(color, QColor(Qt::blue));
+}
+
+TEST_F(NonBlockingDialogs, ADialogHiddenWithoutFinishingIsReportedAsRejectedAndDeleted)
+{
+    std::optional<int> result;
+    auto *dialog = new DialogThatOnlyHides(parent.get());
+    const QPointer<QDialog> guard = dialog;
+    Dialogs::open(dialog, [&result](int finished) { result = finished; });
+
+    fromTheEventLoop([dialog] { dialog->close(); });
+    settle();
+    settle();
+
+    EXPECT_EQ(result, int(QDialog::Rejected));
+    EXPECT_TRUE(guard.isNull());
+}
+
+TEST_F(NonBlockingDialogs, ADialogThatFinishesIsReportedOnce)
+{
+    int reports = 0;
+    auto *dialog = new DialogThatOnlyHides(parent.get());
+    Dialogs::open(dialog, [&reports](int) { ++reports; });
+
+    fromTheEventLoop([dialog] { dialog->accept(); });
+
+    EXPECT_EQ(reports, 1);
 }
 
 TEST_F(NonBlockingDialogs, OpenReportsTheResultWhileTheDialogIsStillReadable)

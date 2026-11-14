@@ -202,6 +202,7 @@ private:
     void syncPendingClientUpdateChannel();
 
     void startLocalGame(const LocalGameOptions &options);
+    void watchReplayFile(const QString &fileName);
 
     QList<QMenu *> tabMenus;
     QMenu *cockatriceMenu, *dbMenu, *tabsMenu, *helpMenu, *trayIconMenu;

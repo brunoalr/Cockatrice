@@ -18,7 +18,9 @@
 #include <qtmetamacros.h>
 
 class AbstractClient;
+class Command_AccountEdit;
 class Response;
+struct CardArtParams;
 
 class UserInfoBox : public QWidget
 {
@@ -63,6 +65,9 @@ private:
     void resizeEvent(QResizeEvent *event) override;
     void requestPasswordChange(const QString &oldPassword, const QString &newPassword);
     void changePassword(const QString &oldPassword, const QString &newPassword);
+    void askPasswordToEdit(const Command_AccountEdit &edit, const QString &newEmail);
+    void sendAccountEdit(const Command_AccountEdit &cmd);
+    void sendCardArtParams(const CardArtParams &p);
 };
 
 #endif
