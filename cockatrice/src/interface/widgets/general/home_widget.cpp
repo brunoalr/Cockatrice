@@ -348,6 +348,10 @@ QGroupBox *HomeWidget::createButtons()
     archidektButton->setObjectName("homeBrowseArchidektButton");
     connect(archidektButton, &QPushButton::clicked, tabSupervisor, &TabSupervisor::addArchidektTab);
     boxLayout->addWidget(archidektButton);
+#ifdef Q_OS_WASM
+    // Archidekt admits only http://localhost:3000, so a page cannot read it.
+    archidektButton->hide();
+#endif
     replayButton = new HomeStyledButton(QString(), gradientColors);
     replayButton->setObjectName("homeViewReplaysButton");
     connect(replayButton, &QPushButton::clicked, tabSupervisor, [this] { tabSupervisor->actTabReplays(true); });

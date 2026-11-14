@@ -285,6 +285,10 @@ void CommanderBracketWidget::onEstimateBracketError(quint64 id, QObject *request
 
 void CommanderBracketWidget::maybeAutoEstimateBracket()
 {
+#ifdef Q_OS_WASM
+    // Commander Spellbook admits no request from a page on another origin: the widget stays hidden, unprompted.
+    return;
+#endif
     if (prompting) {
         return;
     }

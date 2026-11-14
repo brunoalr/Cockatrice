@@ -101,8 +101,11 @@ GeneralSettingsPage::GeneralSettingsPage()
     languageGrid->addWidget(&languageLabel, 0, 0);
     languageGrid->addWidget(&languageBox, 0, 1);
     languageGrid->addWidget(&advertiseTranslationPageLabel, 1, 1, Qt::AlignRight);
+#ifndef Q_OS_WASM
+    // The site ships English card data only, and a tab cannot run Oracle to import another language.
     languageGrid->addWidget(&cardLanguageLabel, 2, 0);
     languageGrid->addWidget(&cardLanguageBox, 2, 1);
+#endif
     languageGrid->addWidget(&cardLanguageNoteLabel, 3, 1);
     languageGrid->addWidget(&cardSearchLanguageLabel, 4, 0);
     languageGrid->addWidget(&cardSearchLanguageBox, 4, 1);
