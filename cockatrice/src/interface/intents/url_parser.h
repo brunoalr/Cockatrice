@@ -59,7 +59,7 @@ signals:
 
 private:
     void parseFirstLink();
-    void queueChain(const PendingIntentChain &chain, Intent *firstIntent);
+    void queueChain(const PendingIntentChain &chain, const Intent *firstIntent);
     void finishLink();
     void askToJoinGame(const QUrlQuery &query);
     Intent *createJoinGameIntent(const ContextJoinGame &context, PendingIntentChain &chain);

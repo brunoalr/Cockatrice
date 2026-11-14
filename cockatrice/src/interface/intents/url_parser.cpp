@@ -77,7 +77,7 @@ void IntentUrlParser::parseFirstLink()
     queueChain(chain, firstIntent);
 }
 
-void IntentUrlParser::queueChain(const PendingIntentChain &chain, Intent *firstIntent)
+void IntentUrlParser::queueChain(const PendingIntentChain &chain, const Intent *firstIntent)
 {
     // Without an intent the link was invalid or the user declined the confirm: nothing runs.
     if (firstIntent != nullptr) {

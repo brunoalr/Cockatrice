@@ -73,6 +73,38 @@ namespace
 {
 // File name filters for the local replay files Cockatrice can load.
 const QStringList REPLAY_FILE_NAME_FILTERS = {"*.cor"};
+
+void renameLocalInTurn(TabReplays *tab, QList<QFileInfo> files)
+{
+    if (files.isEmpty()) {
+        return;
+    }
+    const QFileInfo info = files.takeFirst();
+
+    const QString oldName = info.baseName();
+    const QString title = info.isDir() ? TabReplays::tr("Rename local folder") : TabReplays::tr("Rename local file");
+
+    // terminate all remaining selections if user cancels
+    Dialogs::getText(tab, title, TabReplays::tr("New name:"), oldName, [tab, info, files](const QString &newName) {
+        if (newName.isEmpty() || info.baseName() == newName) {
+            renameLocalInTurn(tab, files);
+            return;
+        }
+
+        QString newFileName = newName;
+        if (!info.suffix().isEmpty()) {
+            newFileName += "." + info.suffix();
+        }
+
+        if (const QString newFilePath = QFileInfo(info.dir(), newFileName).filePath();
+            !QFile::rename(info.filePath(), newFilePath)) {
+            Dialogs::critical(tab, TabReplays::tr("Error"), TabReplays::tr("Rename failed"),
+                              [tab, files] { renameLocalInTurn(tab, files); });
+            return;
+        }
+        renameLocalInTurn(tab, files);
+    });
+}
 } // namespace
 
 TabReplays::TabReplays(TabSupervisor *_tabSupervisor, AbstractClient *_client, const ServerInfo_User *currentUserInfo)
@@ -334,38 +366,7 @@ void TabReplays::actRenameLocal()
     for (const auto &curLeft : localDirView->selectionModel()->selectedRows()) {
         files.append(localDirModel->fileInfo(curLeft));
     }
-    renameLocalInTurn(files);
-}
-
-void TabReplays::renameLocalInTurn(QList<QFileInfo> files)
-{
-    if (files.isEmpty()) {
-        return;
-    }
-    const QFileInfo info = files.takeFirst();
-
-    const QString oldName = info.baseName();
-    const QString title = info.isDir() ? tr("Rename local folder") : tr("Rename local file");
-
-    // terminate all remaining selections if user cancels
-    Dialogs::getText(this, title, tr("New name:"), oldName, [this, info, files](const QString &newName) {
-        if (newName.isEmpty() || info.baseName() == newName) {
-            renameLocalInTurn(files);
-            return;
-        }
-
-        QString newFileName = newName;
-        if (!info.suffix().isEmpty()) {
-            newFileName += "." + info.suffix();
-        }
-        const QString newFilePath = QFileInfo(info.dir(), newFileName).filePath();
-
-        if (!QFile::rename(info.filePath(), newFilePath)) {
-            Dialogs::critical(this, tr("Error"), tr("Rename failed"), [this, files] { renameLocalInTurn(files); });
-            return;
-        }
-        renameLocalInTurn(files);
-    });
+    renameLocalInTurn(this, files);
 }
 
 void TabReplays::actNewLocalFolder()
@@ -579,7 +580,7 @@ void TabReplays::actDeleteRemoteReplay()
                          Command_ReplayDeleteMatch cmd;
                          cmd.set_game_id(gameId);
 
-                         PendingCommand *pend = client->prepareSessionCommand(cmd);
+                         PendingCommand *pend = AbstractClient::prepareSessionCommand(cmd);
                          connect(pend, &PendingCommand::finished, this, &TabReplays::deleteRemoteReplayFinished);
                          client->sendCommand(pend);
                      }
