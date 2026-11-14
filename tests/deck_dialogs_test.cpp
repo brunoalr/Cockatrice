@@ -46,6 +46,16 @@
 ThemeManager *themeManager = nullptr; // NOSONAR: the client declares it extern and assigns it
 RNG_Abstract *rng = nullptr;          // NOSONAR: the client declares it extern and assigns it
 
+void CardPictureLoader::clearPixmapCache()
+{
+    // The test binary has no picture cache: only the printing warning calls this.
+}
+
+void CardPictureLoader::clearNetworkCache()
+{
+    // The test binary has no picture cache: only the printing warning calls this.
+}
+
 namespace
 {
 using DialogTest::settle;
@@ -660,6 +670,41 @@ TEST_F(CodConversion, NoToOverwritingKeepsTheExistingCodFile)
     EXPECT_EQ(canStoreTags, false);
 }
 
+class PrintingOverride : public DeckDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    std::optional<bool> accepted;
+
+    void SetUp() override
+    {
+        SettingsCache::instance().cardsDisplay().setOverrideAllCardArtWithPersonalPreference(false);
+    }
+
+    void ask(bool enable)
+    {
+        OverridePrintingWarning::confirm(window.get(), enable, [this](bool answer) { accepted = answer; });
+        settle();
+    }
+};
+
+TEST_F(PrintingOverride, YesChangesTheSetting)
+{
+    ask(true);
+    EXPECT_FALSE(accepted.has_value());
+    clickInOnlyBox(QMessageBox::Yes);
+
+    EXPECT_EQ(accepted, true);
+    EXPECT_TRUE(SettingsCache::instance().cardsDisplay().getOverrideAllCardArtWithPersonalPreference());
+}
+
+TEST_F(PrintingOverride, NoKeepsTheSetting)
+{
+    ask(true);
+    clickInOnlyBox(QMessageBox::No);
+
+    EXPECT_EQ(accepted, false);
+    EXPECT_FALSE(SettingsCache::instance().cardsDisplay().getOverrideAllCardArtWithPersonalPreference());
+}
 } // namespace
 
 int main(int argc, char **argv)

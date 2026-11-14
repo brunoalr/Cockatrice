@@ -810,6 +810,7 @@ if(WITH_CLIENT)
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_default_tags_editor.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_tokens.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_load_deck_from_website.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/override_printing_warning.cpp
     ${CLIENT_SRC}/interface/widgets/utility/get_text_with_max.cpp
     ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_dialog.cpp
     ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_item_widget.cpp
