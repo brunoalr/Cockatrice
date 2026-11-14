@@ -6,10 +6,10 @@
 #include "../../deck_share/deck_share_utils.h"
 #include "../../deck_share/share_bar_widget.h"
 #include "../../interface/widgets/visual_deck_storage/visual_deck_storage_widget.h"
+#include "../../utility/non_blocking_dialogs.h"
 #include "../tab.h"
 #include "../tab_supervisor.h"
 
-#include <QMessageBox>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -86,7 +86,7 @@ void TabDeckStorageVisual::actOpenLocalDeck(const QString &filePath)
     std::optional<LoadedDeck> deckOpt =
         DeckLoader::loadFromFile(filePath, DeckFileFormat::getFormatFromName(filePath), true);
     if (!deckOpt) {
-        QMessageBox::critical(this, tr("Error"), tr("Could not open deck at %1").arg(filePath));
+        Dialogs::critical(this, tr("Error"), tr("Could not open deck at %1").arg(filePath));
         return;
     }
 
@@ -121,7 +121,7 @@ void TabDeckStorageVisual::exitShareMode()
 void TabDeckStorageVisual::actShareDeck(const QString &filePath)
 {
     if (!shareDeckAvailable) {
-        QMessageBox::information(this, tr("Share deck"), tr("You must be connected to the server to share a deck."));
+        Dialogs::information(this, tr("Share deck"), tr("You must be connected to the server to share a deck."));
         return;
     }
     enterShareMode({filePath});
@@ -152,7 +152,7 @@ void TabDeckStorageVisual::actShareSelected()
 {
     const QStringList filePaths = visualDeckStorageWidget->selectedFilePaths();
     if (filePaths.isEmpty()) {
-        QMessageBox::warning(this, tr("Share decks"), tr("Select at least one deck to share."));
+        Dialogs::warning(this, tr("Share decks"), tr("Select at least one deck to share."));
         return;
     }
 
@@ -166,7 +166,7 @@ void TabDeckStorageVisual::actShareSelected()
         std::optional<LoadedDeck> deckOpt =
             DeckLoader::loadFromFile(filePath, DeckFileFormat::getFormatFromName(filePath), true);
         if (!deckOpt) {
-            QMessageBox::warning(this, tr("Share decks"), tr("Unable to load deck file %1").arg(filePath));
+            Dialogs::warning(this, tr("Share decks"), tr("Unable to load deck file %1").arg(filePath));
             return;
         }
         DeckShareItem *item = cmd.add_items();
@@ -219,9 +219,11 @@ void TabDeckStorageVisual::handleConnectionChanged(ClientStatus status)
 
 void TabDeckStorageVisual::showShareNotice(const QString &message, bool warning)
 {
-    QMessageBox box(warning ? QMessageBox::Warning : QMessageBox::Information, tr("Share link"), message,
-                    QMessageBox::Ok, this);
-    box.exec();
+    if (warning) {
+        Dialogs::warning(this, tr("Share link"), message);
+    } else {
+        Dialogs::information(this, tr("Share link"), message);
+    }
 }
 
 void TabDeckStorageVisual::onShareTimeout()

@@ -22,7 +22,7 @@ class DeckPreviewDeckTagsDisplayWidget : public QWidget
     QStringList currentTags;
     FlowWidget *flowWidget;
     std::function<QStringList()> knownTagsProvider;
-    std::function<bool()> conversionPromptHandler;
+    std::function<void(std::function<void()> thenAllowed)> conversionPromptHandler;
 
 public:
     explicit DeckPreviewDeckTagsDisplayWidget(QWidget *_parent, const QStringList &_tags = {});
@@ -36,10 +36,10 @@ public:
     void setKnownTagsProvider(const std::function<QStringList()> &provider);
 
     /**
-     * @brief Sets a handler run before opening the tag dialog. Returning false
-     * cancels the dialog. Defaults to no handler (the deck editor path).
+     * @brief Sets a handler run before opening the tag dialog: it calls thenAllowed to open
+     * the dialog, or cancels it by not calling it. Defaults to none (the deck editor path).
      */
-    void setConversionPromptHandler(const std::function<bool()> &handler);
+    void setConversionPromptHandler(const std::function<void(std::function<void()> thenAllowed)> &handler);
 
 public slots:
     void openTagEditDlg();
@@ -52,6 +52,6 @@ signals:
     void tagsChanged(const QStringList &tags);
 
 private:
-    void execTagDialog(const QStringList &knownTags);
+    void openTagDialog();
 };
 #endif // DECK_PREVIEW_DECK_TAGS_DISPLAY_WIDGET_H

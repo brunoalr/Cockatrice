@@ -1,6 +1,8 @@
 #ifndef COCKATRICE_OVERRIDE_PRINTING_WARN_H
 #define COCKATRICE_OVERRIDE_PRINTING_WARN_H
 
+#include <functional>
+
 class QWidget;
 
 namespace OverridePrintingWarning
@@ -12,9 +14,9 @@ namespace OverridePrintingWarning
  *
  * @param parent The parent widget
  * @param enable Whether the user is trying to enable or disable the setting
- * @return Whether the user clicked accept. All other ways of closing the window returns false.
+ * @param then Told whether the user clicked accept. All other ways of closing the window report false.
  */
-bool execMessageBox(QWidget *parent, bool enable);
+void confirm(QWidget *parent, bool enable, std::function<void(bool accepted)> then = {});
 
 } // namespace OverridePrintingWarning
 

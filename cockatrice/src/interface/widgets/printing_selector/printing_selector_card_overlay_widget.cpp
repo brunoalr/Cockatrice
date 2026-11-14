@@ -5,6 +5,7 @@
 #include "../../theme_icon.h"
 #include "../../theme_manager.h"
 #include "../cards/card_info_picture_widget.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "all_zones_card_amount_widget.h"
 #include "libcockatrice/card/card_info.h"
 #include "libcockatrice/card/printing/printing_info.h"
@@ -20,7 +21,6 @@
 #include <QLabel>
 #include <QList>
 #include <QMenu>
-#include <QMessageBox>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPalette>
@@ -43,6 +43,7 @@
 #include <libcockatrice/settings/card_override_settings.h>
 #include <libcockatrice/utility/card_ref.h>
 #include <libcockatrice/utility/qt_utils.h>
+#include <memory>
 #include <qnamespace.h>
 
 namespace
@@ -310,14 +311,15 @@ void PrintingSelectorCardOverlayWidget::leaveEvent(QEvent *event)
  */
 void PrintingSelectorCardOverlayWidget::customMenu(QPoint point)
 {
-    QMenu menu;
+    auto menu = std::make_unique<QMenu>();
+    menu->setAttribute(Qt::WA_DeleteOnClose);
 
     hidePreview(); // Clear any preview state left over from a previous menu run.
 
-    // Submenus are owned by the stack-allocated top-level menu (addMenu() does not
-    // transfer ownership).
-    auto *preferenceMenu = new QMenu(tr("Preference"), &menu);
-    menu.addMenu(preferenceMenu);
+    // Submenus are owned by the top-level menu (addMenu() does not transfer
+    // ownership).
+    auto *preferenceMenu = new QMenu(tr("Preference"), menu.get());
+    menu->addMenu(preferenceMenu);
 
     const auto &preferredProviderId =
         SettingsCache::instance().cardOverrides().getCardPreferenceOverride(rootCard.getName());
@@ -338,9 +340,9 @@ void PrintingSelectorCardOverlayWidget::customMenu(QPoint point)
         });
     }
 
-    menu.addSeparator();
+    menu->addSeparator();
 
-    auto *overrideMenu = new QMenu(tr("Image Overrides"), &menu);
+    auto *overrideMenu = new QMenu(tr("Image Overrides"), menu.get());
 
     auto *loadCustomAction = overrideMenu->addAction(tr("Load Custom Image..."));
     auto *clearOverrideAction = overrideMenu->addAction(tr("Clear Custom Image"));
@@ -392,14 +394,14 @@ void PrintingSelectorCardOverlayWidget::customMenu(QPoint point)
     connect(overrideMenu, &QMenu::aboutToHide, this, &PrintingSelectorCardOverlayWidget::hidePreview);
     connect(overrideMenu, &QMenu::triggered, this, &PrintingSelectorCardOverlayWidget::hidePreview);
 
-    menu.addMenu(overrideMenu);
+    menu->addMenu(overrideMenu);
 
-    menu.addSeparator();
+    menu->addSeparator();
 
     // Related cards open in the deck editor, which a selection-only host does not have.
     if (!host->isSelectionOnly()) {
-        auto *relatedMenu = new QMenu(tr("Show Related cards"), &menu);
-        menu.addMenu(relatedMenu);
+        auto *relatedMenu = new QMenu(tr("Show Related cards"), menu.get());
+        menu->addMenu(relatedMenu);
         auto relatedCards = rootCard.getInfo().getAllRelatedCards();
         if (relatedCards.isEmpty()) {
             relatedMenu->setDisabled(true);
@@ -412,11 +414,10 @@ void PrintingSelectorCardOverlayWidget::customMenu(QPoint point)
             }
         }
     }
-    // The preview anchors itself to this popup's global geometry while it is open, so the
-    // pointer must stay valid for the whole exec() and be dropped before the stack unwinds.
+    // The preview anchors itself to this popup's global geometry while it is open; the
+    // pointer clears itself when the closed menu deletes the submenu.
     previewSourceMenu = overrideMenu;
-    menu.exec(this->mapToGlobal(point));
-    previewSourceMenu = nullptr;
+    menu.release()->popup(this->mapToGlobal(point));
 }
 
 /**
@@ -525,7 +526,7 @@ void PrintingSelectorCardOverlayWidget::loadCustomImage()
     QPixmap pixmap(filePath);
     if (pixmap.isNull()) {
         // No silent paths: a file that cannot be read answers visibly instead of a no-op.
-        QMessageBox::warning(this, tr("Load Custom Image"), tr("The selected file could not be read as an image."));
+        Dialogs::warning(this, tr("Load Custom Image"), tr("The selected file could not be read as an image."));
         return;
     }
 

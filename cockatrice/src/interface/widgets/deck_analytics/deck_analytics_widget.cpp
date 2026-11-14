@@ -1,6 +1,7 @@
 #include "deck_analytics_widget.h"
 
 #include "../general/layout_containers/flow_widget.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "abstract_analytics_panel_widget.h"
 #include "add_analytics_panel_dialog.h"
 #include "analytics_panel_widget_factory.h"
@@ -94,28 +95,37 @@ void DeckAnalyticsWidget::updateDisplays()
 
 void DeckAnalyticsWidget::onAddPanel()
 {
-    AddAnalyticsPanelDialog dlg(this);
-    if (dlg.exec() != QDialog::Accepted) {
-        return;
-    }
+    auto *dlg = new AddAnalyticsPanelDialog(this);
+    Dialogs::open(dlg, [this, dlg](int result) {
+        if (result != QDialog::Accepted) {
+            return;
+        }
 
-    QString selection = dlg.selectedType();
-    if (selection.isEmpty()) {
-        return;
-    }
+        QString selection = dlg->selectedType();
+        if (selection.isEmpty()) {
+            return;
+        }
 
+        configureNewPanel(selection);
+    });
+}
+
+void DeckAnalyticsWidget::configureNewPanel(const QString &typeId)
+{
     AbstractAnalyticsPanelWidget *analyticsWidget =
-        AnalyticsPanelWidgetFactory::instance().create(selection, this, statsAnalyzer);
+        AnalyticsPanelWidgetFactory::instance().create(typeId, this, statsAnalyzer);
     if (!analyticsWidget) {
         return;
     }
 
-    if (!analyticsWidget->applyConfigFromDialog()) {
-        analyticsWidget->deleteLater();
-        return;
-    }
+    analyticsWidget->applyConfigFromDialog([this, typeId, analyticsWidget](bool accepted) {
+        if (!accepted) {
+            analyticsWidget->deleteLater();
+            return;
+        }
 
-    addPanelInstance(selection, analyticsWidget, analyticsWidget->saveConfig());
+        addPanelInstance(typeId, analyticsWidget, analyticsWidget->saveConfig());
+    });
 }
 
 void DeckAnalyticsWidget::addPanelInstance(const QString &typeId,

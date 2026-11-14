@@ -36,6 +36,8 @@ private slots:
     void actRemoveToken();
 
 private:
+    void addToken(const QString &name) const;
+
     CardInfoPtr currentCard;
     CardDatabaseModel *databaseModel;
     TokenEditModel *cardDatabaseDisplayModel;
