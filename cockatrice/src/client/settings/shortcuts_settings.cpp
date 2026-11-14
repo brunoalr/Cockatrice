@@ -1,5 +1,7 @@
 #include "shortcuts_settings.h"
 
+#include "../../interface/widgets/utility/non_blocking_dialogs.h"
+
 #include <QDebug>
 #include <QFile>
 #include <QMap>
@@ -9,6 +11,7 @@
 #include <QSharedPointer>
 #include <QStringList>
 #include <QVariant>
+#include <memory>
 
 ShortcutKey::ShortcutKey(const QString &_name, QList<QKeySequence> _sequence, ShortcutGroup::Groups _group)
     : QList<QKeySequence>(_sequence), name(_name), group(_group)
@@ -53,17 +56,17 @@ ShortcutsSettings::ShortcutsSettings(const QString &settingsPath, QObject *paren
 
         if (!invalidItems.isEmpty()) {
             // warning message in case of invalid items
-            QMessageBox msgBox;
-            msgBox.setIcon(QMessageBox::Warning);
-            msgBox.setText(tr("Your configuration file contained invalid shortcuts.\n"
-                              "Please check your shortcut settings!"));
+            auto msgBox = std::make_unique<QMessageBox>();
+            msgBox->setIcon(QMessageBox::Warning);
+            msgBox->setText(tr("Your configuration file contained invalid shortcuts.\n"
+                               "Please check your shortcut settings!"));
             QString detailedMessage = tr("The following shortcuts have been set to default:\n");
             for (QMap<QString, QString>::const_iterator item = invalidItems.constBegin();
                  item != invalidItems.constEnd(); ++item) {
                 detailedMessage += item.key() + " - \"" + item.value() + "\"\n";
             }
-            msgBox.setDetailedText(detailedMessage);
-            msgBox.exec();
+            msgBox->setDetailedText(detailedMessage);
+            Dialogs::open(msgBox.release(), {});
         }
     }
 }

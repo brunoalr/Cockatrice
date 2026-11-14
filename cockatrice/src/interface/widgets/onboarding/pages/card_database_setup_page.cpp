@@ -1,6 +1,7 @@
 #include "card_database_setup_page.h"
 
 #include "../../client/settings/cache_settings.h"
+#include "../../utility/non_blocking_dialogs.h"
 #include "../first_run_wizard_page.h"
 #include "libcockatrice/card/database/card_database.h"
 
@@ -10,7 +11,6 @@
 #include <QLabel>
 #include <QLatin1String>
 #include <QLineEdit>
-#include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QSettings>
@@ -260,9 +260,9 @@ void CardDatabaseSetupPage::onApplyCustomUrl()
     if (!text.isEmpty()) {
         const QUrl url = QUrl::fromUserInput(text);
         if (!url.isValid()) {
-            QMessageBox::warning(this, tr("Invalid URL"),
-                                 tr("That doesn't look like a valid URL. Double-check it and try again, "
-                                    "or clear the field to use the default source."));
+            Dialogs::warning(this, tr("Invalid URL"),
+                             tr("That doesn't look like a valid URL. Double-check it and try again, "
+                                "or clear the field to use the default source."));
             return;
         }
     }

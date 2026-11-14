@@ -4,6 +4,7 @@
 #include "../../theme_icon.h"
 #include "../server/handle_public_servers.h"
 #include "../server/user/user_info_connection.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "libcockatrice/utility/macros.h"
 
 #include <QCheckBox>
@@ -16,7 +17,6 @@
 #include <QIntValidator>
 #include <QLabel>
 #include <QList>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QSharedPointer>
@@ -384,7 +384,7 @@ void DlgConnect::actOk()
 
     if (newHostButton->isChecked()) {
         if (saveEdit->text().isEmpty()) {
-            QMessageBox::critical(this, tr("Connection Warning"), tr("You need to name your new connection profile."));
+            Dialogs::critical(this, tr("Connection Warning"), tr("You need to name your new connection profile."));
             return;
         }
 
@@ -399,7 +399,7 @@ void DlgConnect::actOk()
     servers.setPrevioushostName(saveEdit->text());
 
     if (playernameEdit->text().isEmpty()) {
-        QMessageBox::critical(this, tr("Connect Warning"), tr("The player name can't be empty."));
+        Dialogs::critical(this, tr("Connect Warning"), tr("The player name can't be empty."));
         return;
     }
 

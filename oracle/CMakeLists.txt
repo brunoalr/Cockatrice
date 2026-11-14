@@ -38,6 +38,7 @@ set(oracle_SOURCES
     ../cockatrice/src/interface/theme_icon_ink.cpp
     ../cockatrice/src/interface/theme_icon_sticker.cpp
     ../cockatrice/src/interface/theme_manager.cpp
+    ../cockatrice/src/interface/widgets/utility/non_blocking_dialogs.cpp
     ${VERSION_STRING_CPP}
 )
 
