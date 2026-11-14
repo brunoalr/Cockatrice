@@ -9,6 +9,7 @@
 #include "libcockatrice/card/printing/printing_info.h"
 #include "libcockatrice/card/set/card_set.h"
 #include "libcockatrice/card/set/card_set_list.h"
+#include "libcockatrice/interfaces/interface_card_set_priority_controller.h"
 
 #include <QDebug>
 #include <QList>
@@ -17,6 +18,8 @@
 #include <QMetaType>
 #include <QMutexLocker>
 #include <QSharedPointer>
+#include <QVector>
+#include <algorithm>
 #include <utility>
 
 class ICardDatabasePathProvider;
@@ -271,6 +274,38 @@ void CardDatabase::markAllSetsAsKnown()
 {
     auto _sets = getSetList();
     _sets.markAllAsKnownBatched(setPriorityController);
+}
+
+void CardDatabase::adoptLoadedSets()
+{
+    CardSetList loaded = getSetList();
+    const bool firstVisit = std::none_of(loaded.cbegin(), loaded.cend(), [](const CardSetPtr &set) {
+        return set->getIsKnown() && !set->getIsKnownIgnored();
+    });
+    if (firstVisit) {
+        loaded.defaultSort();
+    }
+
+    QVector<ICardSetPriorityController::SetSaveData> saveData;
+    for (int i = 0; i < loaded.size(); ++i) {
+        const CardSetPtr &set = loaded.at(i);
+        const bool unknown = !set->getIsKnown() && !set->getIsKnownIgnored();
+        if (!firstVisit && !unknown) {
+            continue;
+        }
+        if (firstVisit) {
+            set->setSortKeyInMemory(static_cast<unsigned int>(i));
+        }
+        if (unknown) {
+            set->setIsKnownInMemory(true);
+        }
+        saveData.append(
+            {set->getShortName(), static_cast<unsigned int>(set->getSortKey()), set->getEnabled(), set->getIsKnown()});
+    }
+
+    if (!saveData.isEmpty()) {
+        setPriorityController->saveSets(saveData);
+    }
 }
 
 void CardDatabase::notifyEnabledSetsChanged(bool recomputeCachedSets)

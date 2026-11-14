@@ -154,6 +154,10 @@ public:
     /** @brief Marks all sets as known. */
     void markAllSetsAsKnown();
 
+    /** @brief For a snapshot parsed with every unsaved set enabled: marks its sets known and keeps their enablement,
+     *         so nothing needs a reparse. With no set known yet, every set gets its default-order sort key. */
+    void adoptLoadedSets();
+
     /**
      * @brief Notifies listeners that enabled sets changed.
      * @param recomputeCachedSets When true, every card's cached set-name / alt-name

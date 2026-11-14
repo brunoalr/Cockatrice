@@ -179,8 +179,8 @@ private:
     void confirmShutdown(std::function<void(bool closed)> then);
     void bringConfirmationForward();
     /**
-     * @brief Reloads the card database on a worker thread and runs checkUnknownSets() once the finished
-     *        snapshot has been swapped in.
+     * @brief Reloads the card database on a worker thread and, outside the web build, runs checkUnknownSets()
+     *        once the finished snapshot has been swapped in.
      *
      * The loader never runs checkUnknownSets() itself (see main.cpp); post-update loads that can introduce
      * new sets must own the check, and it has to run after the queued snapshot swap, not on the worker.
