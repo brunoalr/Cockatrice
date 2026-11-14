@@ -48,7 +48,7 @@ bool SettingsCloseCheck::mayClose()
 
     bool showLoadError = true;
     QString loadErrorMessage = tr("Unknown Error loading card database");
-    LoadStatus loadStatus = CardDatabaseManager::getInstance()->getLoadStatus();
+    const LoadStatus loadStatus = CardDatabaseManager::getInstance()->getLoadStatus();
     qCInfo(DlgSettingsLog) << "Card Database load status: " << loadStatus;
     switch (loadStatus) {
         case Ok:
