@@ -2,6 +2,7 @@
 #include "interface/card_picture_loader/card_picture_loader_local.h"
 #include "libcockatrice/card/card_info.h"
 #include "libcockatrice/card/printing/printing_info.h"
+#include "support/test_home.h"
 
 #include "gtest/gtest.h"
 #include <QByteArray>
@@ -15,7 +16,6 @@
 #include <QLoggingCategory>
 #include <QScopeGuard>
 #include <QSharedPointer>
-#include <QStandardPaths>
 #include <QString>
 #include <QTemporaryDir>
 #include <QtGlobal>
@@ -215,25 +215,21 @@ TEST_F(LocalMatcherTest, CustomSubfolderIgnoresSuffixedFiles)
 int main(int argc, char **argv)
 {
     // Redirect SettingsCache reads/writes (app-data location) away from the real user profile.
-    QStandardPaths::setTestModeEnabled(true);
-
+    //
     // Some CI containers run as a uid without a passwd entry (e.g. GitHub's docker
     // runner), so HOME resolves to "/" and the test-mode qttest data dir cannot be
     // created. SettingsCache's QSettings then silently drops every write, reads come
     // back empty, and the paths the loader searches are "". Give the test a writable
     // HOME for the duration of the run so settings behave like on a normal machine.
-    QTemporaryDir home;
-    if (home.isValid()) {
-        qputenv("HOME", home.path().toLocal8Bit());
-    }
+    const test_support::TestHome home;
 
     QCoreApplication app(argc, argv);
 
     // Every TEST() runs as its own process and CI runs them in parallel (ctest -j4),
     // while the picture paths round-trip through the process-global SettingsCache
     // file. Parallel cases must therefore never share one settings directory: on
-    // platforms where QStandardPaths ignores the $HOME override above (macOS
-    // resolves the home directory via system APIs), every case would otherwise read
+    // platforms where QStandardPaths ignores the $HOME override above (Windows
+    // resolves its known folders via system APIs), every case would otherwise read
     // and write the same paths.ini, and a sibling's setPicsPath can land between our
     // own set and the loader's get — so the loader searches a foreign (or empty)
     // directory and flakily returns a null image. Scope the settings to this process
@@ -241,6 +237,9 @@ int main(int argc, char **argv)
     QCoreApplication::setOrganizationName(QStringLiteral("CockatriceTest"));
     QCoreApplication::setApplicationName(
         QStringLiteral("loader-local-matching-test-%1").arg(QCoreApplication::applicationPid()));
+    if (!home.writesStayInside()) {
+        return 1;
+    }
 
     QLoggingCategory::setFilterRules("card_picture_loader.*=false\nsettings_cache.*=false");
 
@@ -257,8 +256,8 @@ int main(int argc, char **argv)
     }
 
     // Best-effort cleanup of this process's settings sandbox. QStandardPaths test
-    // mode is never auto-cleaned, and on macOS the $HOME override above is ignored,
-    // so without this every run litters ~/.qttest with one pid-unique directory.
+    // mode is never auto-cleaned, and on Windows the $HOME override above is ignored,
+    // so without this every run litters the real profile with one pid-unique directory.
     // Safe under parallel runs: the pid-unique application name above guarantees
     // this directory belongs to this process alone.
     const auto cleanupSandbox = qScopeGuard([] {
