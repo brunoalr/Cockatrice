@@ -68,6 +68,7 @@ private:
     void uploadDecks(QStringList filePaths, const QString &targetPath);
     void uploadDeck(const QString &filePath, const QString &targetPath, std::function<void()> thenNext);
     void sendDeck(const DeckList &deck, const QString &targetPath, const std::function<void()> &thenNext);
+    void createRemoteFolder(const QString &targetPath, const QString &folderName);
     void deleteRemoteFolder(const QString &targetPath);
     void deleteRemoteDeck(int deckId);
 

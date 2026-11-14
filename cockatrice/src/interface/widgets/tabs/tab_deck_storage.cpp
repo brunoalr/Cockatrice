@@ -669,11 +669,17 @@ void TabDeckStorage::actNewFolder()
         return;
     }
 
-    QString folderName = getTextWithMax(this, tr("New folder"), tr("Name of new folder:"), max_length);
-    if (folderName.isEmpty()) {
-        return;
-    }
+    auto *prompt =
+        newTextDialogWithMax(this, tr("New folder"), tr("Name of new folder:"), QLineEdit::Normal, {}, max_length);
+    Dialogs::open(prompt, [this, prompt, targetPath](int result) {
+        if (result == QDialog::Accepted && !prompt->textValue().isEmpty()) {
+            createRemoteFolder(targetPath, prompt->textValue());
+        }
+    });
+}
 
+void TabDeckStorage::createRemoteFolder(const QString &targetPath, const QString &folderName)
+{
     // '/' isn't a valid filename character on *nix so we're choosing to replace it with a different arbitrary
     // character.
     std::string folder = folderName.toStdString();
