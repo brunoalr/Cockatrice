@@ -9,6 +9,7 @@ set(cockatrice_SOURCES
     # sort by alphabetical order, so that there is no debate about where to add new sources to the list
     src/client/network/card_database_fetcher.cpp
     src/client/network/connection_controller/remote_connection_controller.cpp
+    src/client/network/fallback_font_fetcher.cpp
     src/client/network/update/client/update_downloader.cpp
     src/client/network/interfaces/deck_stats_interface.cpp
     src/client/network/interfaces/tapped_out_interface.cpp
