@@ -42,6 +42,9 @@ public:
 
     explicit ServersSettings(const QString &settingPath, QObject *parent = nullptr);
 
+    static bool canStorePasswords();
+    static void setPasswordStorageForTesting(bool allowed);
+
     QList<ServerEntry> getServers() const;
     std::optional<ServerEntry> getServer(int index) const;
 
@@ -69,7 +72,7 @@ public:
     void setFPHostName(QString hostname);
     void setFPPort(QString port);
     void setFPPlayerName(QString playerName);
-    //! \brief Store a password (or a "$scrypt$..." verifier) for the given saved server.
+    //! \brief Store a password (or a "$scrypt$..." verifier) for the given saved server, where canStorePasswords().
     void setServerPassword(const QString &saveName, const QString &password);
     void addNewServer(const QString &saveName,
                       const QString &serv,

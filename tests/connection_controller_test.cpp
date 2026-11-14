@@ -98,6 +98,32 @@ TEST_F(ConnectionControllerDialogs, ConnectReturnsWithTheDialogOpen)
     EXPECT_EQ(dialog->windowModality(), Qt::ApplicationModal);
 }
 
+TEST_F(ConnectionControllerDialogs, ConnectOpensWithTheFocusOnThePlayerName)
+{
+    controller->connectToServer();
+    settle();
+
+    DlgConnect *dialog = onlyOpen<DlgConnect>();
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_EQ(dialog->focusWidget(), dialog->findChild<QLineEdit *>("connectPlayernameEdit"));
+}
+
+TEST_F(ConnectionControllerDialogs, TheLoginPromptOpensWithTheFocusOnTheUsername)
+{
+    ContextConnectToServer context{"focused.example", "4747", {}, {}};
+    std::make_unique<IntentGetLoginCredentials>(&context, true).release()->execute();
+    settle();
+
+    DlgLoginPrompt *prompt = openLoginPrompt();
+    ASSERT_NE(prompt, nullptr);
+    auto *username = qobject_cast<QLineEdit *>(prompt->focusWidget());
+    ASSERT_NE(username, nullptr);
+    EXPECT_EQ(username->echoMode(), QLineEdit::Normal);
+    EXPECT_EQ(username, prompt->findChildren<QLineEdit *>().value(0));
+    prompt->reject();
+    settle();
+}
+
 TEST_F(ConnectionControllerDialogs, AcceptingConnectConnectsWithTheTypedLogin)
 {
     std::optional<QStringList> request;
@@ -408,6 +434,82 @@ TEST_F(ConnectionControllerDialogs, CancellingTheLoginPromptCancelsTheLink)
     EXPECT_TRUE(cancelled);
     EXPECT_TRUE(context.username.isEmpty());
 }
+
+class PasswordStorageDialogs : public ConnectionControllerDialogs, public ::testing::WithParamInterface<bool>
+{
+protected:
+    bool previous = ServersSettings::canStorePasswords();
+
+    void SetUp() override
+    {
+        ServersSettings::setPasswordStorageForTesting(GetParam());
+        ConnectionControllerDialogs::SetUp();
+    }
+
+    void TearDown() override
+    {
+        ServersSettings::setPasswordStorageForTesting(previous);
+    }
+
+    static QCheckBox *checkBox(const QWidget *dialog, const QString &text)
+    {
+        for (QCheckBox *box : dialog->findChildren<QCheckBox *>()) {
+            if (box->text() == text) {
+                return box;
+            }
+        }
+        ADD_FAILURE() << "no check box " << text.toStdString();
+        return nullptr;
+    }
+};
+
+TEST_P(PasswordStorageDialogs, ConnectOffersToSaveThePasswordAndAutoConnectOnlyWhereAllowed)
+{
+    controller->connectToServer();
+    DlgConnect *dialog = onlyOpen<DlgConnect>();
+    ASSERT_NE(dialog, nullptr);
+    QCheckBox *save = checkBox(dialog, "&Save password");
+    QCheckBox *autoConnect = checkBox(dialog, "A&uto connect");
+    ASSERT_NE(save, nullptr);
+    ASSERT_NE(autoConnect, nullptr);
+
+    EXPECT_EQ(save->isVisibleTo(dialog), GetParam());
+    EXPECT_EQ(autoConnect->isVisibleTo(dialog), GetParam());
+    EXPECT_FALSE(save->isChecked());
+    EXPECT_FALSE(autoConnect->isChecked());
+    EXPECT_FALSE(dialog->getSavePassword());
+}
+
+TEST_P(PasswordStorageDialogs, TheLoginPromptSavesThePasswordOnlyWhereAllowed)
+{
+    const QString host = GetParam() ? "allowed.example" : "not-allowed.example";
+    ContextConnectToServer context{host, "4747", {}, {}};
+    auto *intent = std::make_unique<IntentGetLoginCredentials>(&context, true).release();
+    intent->execute();
+    DlgLoginPrompt *prompt = openLoginPrompt();
+    ASSERT_NE(prompt, nullptr);
+    auto *save = prompt->findChild<QCheckBox *>();
+    ASSERT_NE(save, nullptr);
+
+    EXPECT_EQ(save->isVisibleTo(prompt), GetParam());
+
+    const auto edits = prompt->findChildren<QLineEdit *>();
+    for (int i = 0; i < edits.size(); ++i) {
+        edits[i]->setText(QString("field %1").arg(i));
+    }
+    save->setChecked(true);
+    prompt->accept();
+    settle();
+
+    EXPECT_EQ(SettingsCache::instance().servers().hasLoginData(host, "4747"), GetParam());
+}
+
+INSTANTIATE_TEST_SUITE_P(PasswordStorage,
+                         PasswordStorageDialogs,
+                         ::testing::Bool(),
+                         [](const ::testing::TestParamInfo<bool> &info) {
+                             return info.param ? "Allowed" : "NotAllowed";
+                         });
 
 TEST(WebProfile, AProfileWithoutServersGetsRoosterRangesOnItsSecureWebSocketPort)
 {
