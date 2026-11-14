@@ -1346,6 +1346,7 @@ jobs:
             build/cockatrice/cockatrice.wasm
             build/cockatrice/qtloader.js
             build/cockatrice/qtlogo.svg
+            build/cockatrice/QT.txt
           if-no-files-found: error
 
   prune-caches:

@@ -77,6 +77,10 @@ keep_previous() {
     echo "::error::the files in $url/app/$previous/ do not match their version"
     exit 1
   fi
+  # A version published before this notice existed has none
+  if ! curl -fsSL --retry 3 -o "$site/app/$previous/QT.txt" "$url/app/$previous/QT.txt"; then
+    rm -f "$site/app/$previous/QT.txt"
+  fi
   echo "kept the previous version $previous from $url"
 }
 
@@ -86,9 +90,9 @@ assemble() {
   repo="$(dirname "$0")/.."
   web="$repo/cockatrice/web"
   worker="$web/coi-serviceworker.js"
-  require_files "$app" "${app_files[@]}"
+  require_files "$app" "${app_files[@]}" QT.txt
   require_files "$database" cards.xml tokens.xml
-  require_files "$web" index.html coi-serviceworker.js coi-serviceworker.LICENSE
+  require_files "$web" index.html coi-serviceworker.js coi-serviceworker.LICENSE LICENSE.GPL3.txt
   require_files "$repo" LICENSE
   # The address goes into the page as it is
   if [[ -n $source && ! $source =~ ^https://[A-Za-z0-9./_-]+$ ]]; then
@@ -111,8 +115,8 @@ assemble() {
   chmod 755 "$staging"
   hash=$(app_hash "$app")
   mkdir -p "$staging/app/$hash"
-  cp "${app_files[@]/#/$app/}" "$staging/app/$hash/"
-  cp "$database/cards.xml" "$database/tokens.xml" "$worker" "$staging/"
+  cp "${app_files[@]/#/$app/}" "$app/QT.txt" "$staging/app/$hash/"
+  cp "$database/cards.xml" "$database/tokens.xml" "$worker" "$web/LICENSE.GPL3.txt" "$app/QT.txt" "$staging/"
   # With an extension a static host serves them as text; without one a browser downloads them
   cp "$web/coi-serviceworker.LICENSE" "$staging/coi-serviceworker.LICENSE.txt"
   cp "$repo/LICENSE" "$staging/LICENSE.txt"
@@ -151,10 +155,10 @@ self_test() {
   local script="$work/repo/.ci/web_site.sh" web="$work/repo/cockatrice/web" served="$work/served" out="$work/out"
   mkdir -p "$work/repo/.ci" "$web" "$work/app" "$work/database" "$served"
   cp "$0" "$script"
-  cp "$(dirname "$0")"/../cockatrice/web/{index.html,coi-serviceworker.js,coi-serviceworker.LICENSE} "$web/"
+  cp "$(dirname "$0")"/../cockatrice/web/{index.html,coi-serviceworker.js,coi-serviceworker.LICENSE,LICENSE.GPL3.txt} "$web/"
   cp "$(dirname "$0")/../LICENSE" "$work/repo/"
   local file
-  for file in "${app_files[@]}"; do
+  for file in "${app_files[@]}" QT.txt; do
     echo "fixture $file" >"$work/app/$file"
   done
   for file in cards.xml tokens.xml; do
@@ -199,8 +203,8 @@ self_test() {
   local a
   a=$(cd "$work/app" && cat "${app_files[@]}" | sha256 | cut -c1-16)
   assembles "$work/app" "$work/database" "$work/a"
-  for file in index.html coi-serviceworker.js coi-serviceworker.LICENSE.txt LICENSE.txt versions.json cards.xml tokens.xml \
-    "${app_files[@]/#/app/$a/}"; do
+  for file in index.html coi-serviceworker.js coi-serviceworker.LICENSE.txt LICENSE.txt LICENSE.GPL3.txt QT.txt versions.json \
+    cards.xml tokens.xml "${app_files[@]/#/app/$a/}" "app/$a/QT.txt"; do
     if [[ ! -s $work/a/$file ]]; then
       echo "self-test FAILED: the site has no $file"
       return 1
@@ -236,8 +240,20 @@ self_test() {
 
   cp -R "$work/app" "$work/app-b"
   printf '\0' >>"$work/app-b/cockatrice.wasm"
+  echo "another Qt" >"$work/app-b/QT.txt"
   cp -R "$work/a" "$served/a"
   assembles "$work/app-b" "$work/database" "$work/b" "$url/a"
+  if [[ $(<"$work/b/app/$a/QT.txt") != "fixture QT.txt" || $(<"$work/b/QT.txt") != "another Qt" ]]; then
+    echo "self-test FAILED: each version must keep its own QT.txt, and the site's must be the current one"
+    return 1
+  fi
+  cp -R "$work/a" "$served/a-without-notice"
+  rm "$served/a-without-notice/app/$a/QT.txt"
+  assembles "$work/app-b" "$work/database" "$work/b-older-site" "$url/a-without-notice"
+  if [[ ! -s $work/b-older-site/app/$a/cockatrice.wasm || -e $work/b-older-site/app/$a/QT.txt ]]; then
+    echo "self-test FAILED: a live version published without QT.txt was not kept"
+    return 1
+  fi
   local b
   b=$(<"$work/b/versions.json")
   b=${b#*\"current\": \"}
@@ -327,6 +343,14 @@ self_test() {
   WEB_SITE_SOURCE_URL='https://example.org/"><script>' refuses "a site with a source address that is not a plain https address" \
     "$work/app" "$work/database" "$work/x12"
 
+  cp -R "$work/app" "$work/app-no-notice"
+  rm "$work/app-no-notice/QT.txt"
+  refuses "a site without the application's QT.txt" "$work/app-no-notice" "$work/database" "$work/x14"
+  if ! grep -q 'QT.txt' "$out"; then
+    echo "self-test FAILED: the missing QT.txt was not named: $(<"$out")"
+    return 1
+  fi
+
   cp -R "$work/app" "$work/app-incomplete"
   rm "$work/app-incomplete/qtloader.js"
   refuses "a site without qtloader.js" "$work/app-incomplete" "$work/database" "$work/x5"
@@ -352,6 +376,12 @@ self_test() {
     return 1
   fi
   cp "$(dirname "$0")/../LICENSE" "$work/repo/"
+  rm "$web/LICENSE.GPL3.txt"
+  refuses "a site without the GPL version 3 text" "$work/app" "$work/database" "$work/x15"
+  if ! grep -q 'LICENSE.GPL3.txt' "$out"; then
+    echo "self-test FAILED: the missing GPL version 3 text was not named: $(<"$out")"
+    return 1
+  fi
   rm "$web/coi-serviceworker.js"
   refuses "a site without the isolation worker" "$work/app" "$work/database" "$work/x7"
   if ! grep -q 'coi-serviceworker.js' "$out"; then
