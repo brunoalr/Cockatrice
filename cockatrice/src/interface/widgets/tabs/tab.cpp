@@ -48,7 +48,7 @@ void Tab::deleteCardInfoPopup(const QString &cardName)
     }
 }
 
-bool Tab::closeRequest()
+void Tab::closeRequest()
 {
-    return close();
+    close();
 }

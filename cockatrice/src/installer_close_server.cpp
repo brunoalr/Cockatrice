@@ -52,10 +52,8 @@ bool InstallerCloseServer::listen()
 
     connect(server, &QLocalServer::newConnection, this, [this]() {
         while (QLocalSocket *socket = server->nextPendingConnection()) {
-            // No disconnected -> deleteLater() slot: the close request can spin a nested
-            // event loop, the probe disconnects while it runs, and a deferred delete would
-            // then free the socket from inside its own readyRead emission. The reaper covers
-            // a client that never sends the line; the handler below deletes after the emit.
+            // No disconnected -> deleteLater() slot: it could free the socket inside its own readyRead emission.
+            // The reaper covers a client that never sends the line; the handler below deletes after the emit.
             auto *reaper = new QTimer(socket);
             reaper->setSingleShot(true);
             connect(reaper, &QTimer::timeout, socket, &QObject::deleteLater);
@@ -67,9 +65,8 @@ bool InstallerCloseServer::listen()
                 if (socket->readLine() != CLOSE_COMMAND) {
                     return;
                 }
-                // Stop the reaper before the emit: the receiver may close the window and run
-                // a nested event loop for as long as the user takes, and the reaper must not
-                // free the socket from inside that loop while this handler still holds it.
+                // Stop the reaper before the emit: it must not free the socket while this
+                // handler still holds it, however long the receiver takes.
                 reaper->stop();
                 emit closeRequested();
                 socket->disconnectFromServer();

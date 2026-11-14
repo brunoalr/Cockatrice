@@ -286,12 +286,15 @@ void TabDeckEditorVisual::processDatabaseCardClick(const QMouseEvent *event, con
 }
 
 /** @brief Performs "Save Deck As..." while temporarily disabling the search bar. */
-bool TabDeckEditorVisual::actSaveDeckAs()
+void TabDeckEditorVisual::actSaveDeckAs(std::function<void(bool saved)> then)
 {
     tabContainer->visualDeckView->searchBar->setEnabled(false);
-    auto result = AbstractTabDeckEditor::actSaveDeckAs();
-    tabContainer->visualDeckView->searchBar->setEnabled(true);
-    return result;
+    AbstractTabDeckEditor::actSaveDeckAs([this, then = std::move(then)](bool saved) {
+        tabContainer->visualDeckView->searchBar->setEnabled(true);
+        if (then) {
+            then(saved);
+        }
+    });
 }
 
 /** @brief Prompts for and creates a new custom deck zone. Returns the name of the created zone. */

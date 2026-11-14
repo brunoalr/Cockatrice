@@ -545,10 +545,11 @@ void TabGame::refreshShortcuts()
     }
 }
 
-bool TabGame::closeRequest()
+void TabGame::closeRequest()
 {
     if (game->getGameState()->isGameClosed() || game->getPlayerManager()->isSpectator()) {
-        return leaveGame();
+        leaveGame();
+        return;
     }
 
     tabSupervisor->setCurrentWidget(this);
@@ -560,7 +561,6 @@ bool TabGame::closeRequest()
             }
         },
         QMessageBox::No);
-    return false;
 }
 
 void TabGame::closeEvent(QCloseEvent *event)

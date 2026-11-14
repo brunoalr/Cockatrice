@@ -345,6 +345,7 @@ set(cockatrice_SOURCES
     src/interface/widgets/visual_deck_storage/visual_deck_storage_sort_widget.cpp
     src/interface/widgets/visual_deck_storage/visual_deck_storage_tag_filter_widget.cpp
     src/interface/widgets/visual_deck_storage/visual_deck_storage_widget.cpp
+    src/interface/shutdown_chain.cpp
     src/interface/window_main.cpp
     src/main.cpp
     src/interface/widgets/tabs/abstract_tab_deck_editor.cpp
@@ -417,6 +418,7 @@ set(cockatrice_SOURCES
     src/interface/widgets/tabs/tab_server.cpp
     src/interface/widgets/tabs/tab_supervisor.cpp
     src/interface/widgets/tabs/tab_visual_database_display.cpp
+    src/interface/widgets/tabs/unsaved_deck_guard.cpp
     src/interface/widgets/tabs/visual_deck_editor/tab_deck_editor_visual.cpp
     src/interface/widgets/tabs/visual_deck_editor/tab_deck_editor_visual_tab_widget.cpp
     src/interface/widgets/tabs/visual_deck_storage/tab_deck_storage_visual.cpp
