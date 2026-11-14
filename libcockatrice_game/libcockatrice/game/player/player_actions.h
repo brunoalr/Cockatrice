@@ -141,9 +141,7 @@ signals:
     void requestDrawBottomCardsDialog(int defaultNumberBottomCards, int maxCards);
     void requestRollDieDialog();
     void requestCreateTokenDialog(const QStringList &predefinedTokens);
-    /**
-     * @param thenFinished Called once the related card is created, or its count dialog cancelled.
-     */
+    /// thenFinished runs when the request ends, created or not; never if the card or relation died meanwhile.
     void requestCreateRelatedFromRelationDialog(const CardState *sourceCard,
                                                 const CardRelation *cardRelation,
                                                 const std::function<void()> &thenFinished);
