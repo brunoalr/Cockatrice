@@ -93,8 +93,8 @@ void DlgLoadDeckFromWebsite::accept()
     if (DeckLinkToApiTransformer::parseDeckUrl(urlEdit->text(), info)) {
         qCInfo(DlgLoadDeckFromWebsiteLog) << info.baseUrl << info.deckID << info.fullUrl;
 
-        auto jsonParser = createParserForProvider(info.provider);
-        if (!jsonParser && info.provider != DeckProvider::Deckstats && info.provider != DeckProvider::TappedOut) {
+        if (!createParserForProvider(info.provider) && info.provider != DeckProvider::Deckstats &&
+            info.provider != DeckProvider::TappedOut) {
             qCWarning(DlgLoadDeckFromWebsiteLog) << "No parser found for provider";
             warn(tr("No parser available for this deck provider.") + "\n" +
                  tr("Supported services: %1").arg(SUPPORTED_PROVIDERS.join(", ")));
