@@ -21,7 +21,6 @@ const routes = [
   ['card-images.archidekt.com', 'GET', /^\/.*\.(webp|jpe?g|png)$/, /^$/],
   ['storage.googleapis.com', 'GET', /^\/(archidekt-card-images|topdekt-user\/images)\/.*\.(webp|jpe?g|png)$/, /^$/],
   ['cloud.manabox.app', 'GET', /^\/decks\/[\w-]+$/, /^$/],
-  ['api.moxfield.com', 'GET', /^\/v2\/decks\/all\/[\w-]+\/$/, /^$/],
   ['backend.commanderspellbook.com', 'POST', /^\/estimate-bracket$/, /^$/],
 ]
 const tricks = /\.\.|\/\/|%2f|%5c|%2e/i
