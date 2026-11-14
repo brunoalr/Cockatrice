@@ -1,6 +1,7 @@
 #include "dlg_report_user.h"
 
 #include "../interface/theme_manager.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "../utility/report_utils.h"
 #include "abstract_client.h"
 #include "libcockatrice/protocol/pb/response.pb.h"
@@ -14,7 +15,6 @@
 #include <QLatin1String>
 #include <QLineEdit>
 #include <QList>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QSharedPointer>
 #include <QTextEdit>
@@ -22,7 +22,6 @@
 #include <QVariant>
 #include <libcockatrice/protocol/pb/command_report.pb.h>
 #include <libcockatrice/protocol/pending_command.h>
-#include <libcockatrice/utility/qt_utils.h>
 #include <libcockatrice/utility/report_categories.h>
 #include <qnamespace.h>
 #include <string>
@@ -133,15 +132,21 @@ void DlgReportUser::actSubmit()
 {
     const QString description = descriptionEdit->toPlainText().trimmed();
     if (description.isEmpty()) {
-        QMessageBox::warning(this, tr("Missing description"), tr("Please describe what happened before submitting."));
+        Dialogs::warning(this, tr("Missing description"), tr("Please describe what happened before submitting."));
         return;
     }
 
-    if (!QtUtils::confirm(this, tr("Confirm Report"),
-                          tr("Submit report against %1 for %2?").arg(reportedUser, categoryBox->currentText()))) {
-        return;
-    }
+    Dialogs::confirm(this, tr("Confirm Report"),
+                     tr("Submit report against %1 for %2?").arg(reportedUser, categoryBox->currentText()),
+                     [this, description](bool confirmed) {
+                         if (confirmed) {
+                             submit(description);
+                         }
+                     });
+}
 
+void DlgReportUser::submit(const QString &description)
+{
     buttonBox->setEnabled(false);
     buttonBox->button(QDialogButtonBox::Ok)->setText(tr("Submitting..."));
 
@@ -176,18 +181,17 @@ void DlgReportUser::reportResponse(const Response &response)
     buttonBox->button(QDialogButtonBox::Ok)->setText(tr("Submit Report"));
 
     if (response.response_code() == Response::RespOk) {
-        QMessageBox::information(this, tr("Report Submitted"),
-                                 tr("Your report has been submitted and will be reviewed by a moderator. Thank you."));
-        accept();
+        Dialogs::information(this, tr("Report Submitted"),
+                             tr("Your report has been submitted and will be reviewed by a moderator. Thank you."),
+                             [this] { accept(); });
     } else if (response.response_code() == Response::RespTooManyRequests) {
-        QMessageBox::warning(this, tr("Submission Failed"),
-                             tr("You have reached the daily report limit. Please try again later."));
+        Dialogs::warning(this, tr("Submission Failed"),
+                         tr("You have reached the daily report limit. Please try again later."));
     } else if (response.response_code() == Response::RespNameNotFound) {
-        QMessageBox::warning(
-            this, tr("Submission Failed"),
-            tr("The reported user could not be found. Guests (unregistered users) cannot be reported."));
+        Dialogs::warning(this, tr("Submission Failed"),
+                         tr("The reported user could not be found. Guests (unregistered users) cannot be reported."));
     } else {
-        QMessageBox::warning(this, tr("Submission Failed"), tr("Failed to submit report. Please try again."));
+        Dialogs::warning(this, tr("Submission Failed"), tr("Failed to submit report. Please try again."));
     }
 }
 

@@ -6,6 +6,7 @@
 #include "../interface/widgets/server/user/user_list_manager.h"
 #include "../interface/widgets/server/user/user_list_widget.h"
 #include "../interface/widgets/utility/custom_line_edit.h"
+#include "../interface/widgets/utility/non_blocking_dialogs.h"
 #include "libcockatrice/protocol/pb/response.pb.h"
 #include "libcockatrice/protocol/pb/serverinfo_user.pb.h"
 #include "tab_supervisor.h"
@@ -263,7 +264,5 @@ void TabAccount::processRemoveFromListEvent(const Event_RemoveFromList &event)
 
 void TabAccount::openMyReports()
 {
-    auto *dlg = new DlgMyReports(client, this);
-    dlg->setAttribute(Qt::WA_DeleteOnClose);
-    dlg->exec();
+    Dialogs::open(new DlgMyReports(client, this), {});
 }

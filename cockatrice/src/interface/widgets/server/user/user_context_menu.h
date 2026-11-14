@@ -113,6 +113,7 @@ public:
     // Individual action entry points — used by UserInfoPopup to trigger
     // actions without re-running the full context menu flow.
     void execChat(const QString &userName);
+    void execReport(const QString &userName, const ChatView *chatView);
     void execInvite(const QString &userName);
     void execDetails(const QString &userName);
     void execShowGames(const QString &userName);
@@ -135,6 +136,7 @@ public:
 
 private:
     void execInvite(const QString &userName, const GameInviteOption &option);
+    void execMenuAction(const QAction *actionClicked, const QString &userName, int playerId, const ChatView *chatView);
 };
 
 #endif
