@@ -1209,10 +1209,11 @@ jobs:
           bash .ci/blocking_calls.sh --self-test
           bash .ci/blocking_calls.sh --check
 
-      - name: "Test the site and card database scripts"
+      - name: "Test the site, card database and relay scripts"
         run: |
           bash .ci/web_site.sh --self-test
           bash .ci/card_database.sh --self-test
+          node --test cockatrice/web/relay/worker.test.mjs
 
       - name: "Check the WebAssembly kit is the desktop legs' Qt ${{ needs.resolve-qt.outputs.mac }}"
         env:
