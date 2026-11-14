@@ -39,6 +39,13 @@
 
 class QWidget;
 
+// Edits change the loaded database at once. A dialog destroyed with its window never reports a result,
+// so the file is written here.
+DlgEditTokens::~DlgEditTokens()
+{
+    CardDatabaseManager::getInstance()->saveCustomTokensToFile();
+}
+
 DlgEditTokens::DlgEditTokens(QWidget *parent) : QDialog(parent), currentCard(nullptr)
 {
     setObjectName("editTokensDialog");

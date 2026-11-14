@@ -539,6 +539,23 @@ TEST_F(TokenDialog, AColourlessTokenGetsAnEmptyColour)
     EXPECT_EQ(token->getColors(), QString());
 }
 
+TEST_F(TokenDialog, ADialogDestroyedWithItsWindowStillSavesTheTokens)
+{
+    QInputDialog *prompt = askForAToken();
+    ASSERT_NE(prompt, nullptr);
+    enter(prompt, "Goblin");
+    const QDir folder(SettingsCache::instance().getCustomCardDatabasePath());
+    ASSERT_TRUE(folder.mkpath("."));
+    const QString path = folder.filePath(QString(CardSet::TOKENS_SETNAME) + ".xml");
+    QFile::remove(path);
+
+    window.reset();
+
+    QFile saved(path);
+    ASSERT_TRUE(saved.open(QIODevice::ReadOnly));
+    EXPECT_TRUE(saved.readAll().contains("Goblin"));
+}
+
 class DatabaseMenu : public DeckDialogs // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:
@@ -837,6 +854,7 @@ int main(int argc, char **argv)
     return DialogTest::run(argc, argv, QStringLiteral("deck-dialogs-test"), [] {
         ThemeManager theme;
         themeManager = &theme;
+        CardDatabaseManager::setCardDatabasePathProvider(&SettingsCache::instance());
 
         const int result = RUN_ALL_TESTS();
 

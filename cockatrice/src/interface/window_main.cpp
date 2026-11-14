@@ -1827,6 +1827,5 @@ void MainWindow::actManageSets()
 
 void MainWindow::actEditTokens()
 {
-    auto *dlg = new DlgEditTokens(this);
-    Dialogs::open(dlg, [](int) { CardDatabaseManager::getInstance()->saveCustomTokensToFile(); });
+    Dialogs::open(new DlgEditTokens(this), {});
 }
