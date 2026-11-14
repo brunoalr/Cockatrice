@@ -17,6 +17,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
@@ -29,6 +30,7 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QTemporaryDir>
+#include <QTreeView>
 #include <cstring>
 #include <gtest/gtest.h>
 #include <libcockatrice/card/card_info.h>
@@ -517,6 +519,43 @@ TEST_F(TokenDialog, AFreeNameAddsTheToken)
     EXPECT_TRUE(openDialogs<QInputDialog>().isEmpty());
 }
 
+TEST_F(TokenDialog, AColourlessTokenGetsAnEmptyColour)
+{
+    QInputDialog *prompt = askForAToken();
+    ASSERT_NE(prompt, nullptr);
+    enter(prompt, "Wurm");
+    auto *tokens = dialog->findChild<QTreeView *>();
+    auto *colour = dialog->findChild<QComboBox *>();
+    ASSERT_NE(tokens, nullptr);
+    ASSERT_NE(colour, nullptr);
+    const QModelIndex first = tokens->model()->index(0, 0);
+    tokens->setCurrentIndex(first);
+
+    colour->setCurrentIndex(colour->findText("green"));
+    colour->setCurrentIndex(colour->findText("colorless"));
+
+    const CardInfoPtr token = CardDatabaseManager::query()->getCardInfo(first.data().toString());
+    ASSERT_TRUE(token);
+    EXPECT_EQ(token->getColors(), QString());
+}
+
+TEST_F(TokenDialog, ADialogDestroyedWithItsWindowStillSavesTheTokens)
+{
+    QInputDialog *prompt = askForAToken();
+    ASSERT_NE(prompt, nullptr);
+    enter(prompt, "Goblin");
+    const QDir folder(SettingsCache::instance().getCustomCardDatabasePath());
+    ASSERT_TRUE(folder.mkpath("."));
+    const QString path = folder.filePath(QString(CardSet::TOKENS_SETNAME) + ".xml");
+    QFile::remove(path);
+
+    window.reset();
+
+    QFile saved(path);
+    ASSERT_TRUE(saved.open(QIODevice::ReadOnly));
+    EXPECT_TRUE(saved.readAll().contains("Goblin"));
+}
+
 class DatabaseMenu : public DeckDialogs // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:
@@ -815,6 +854,7 @@ int main(int argc, char **argv)
     return DialogTest::run(argc, argv, QStringLiteral("deck-dialogs-test"), [] {
         ThemeManager theme;
         themeManager = &theme;
+        CardDatabaseManager::setCardDatabasePathProvider(&SettingsCache::instance());
 
         const int result = RUN_ALL_TESTS();
 

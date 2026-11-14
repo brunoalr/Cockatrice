@@ -1,7 +1,10 @@
 #ifndef COCKATRICE_PATH_SAFETY_WARNING_H
 #define COCKATRICE_PATH_SAFETY_WARNING_H
 
-class QString;
+#include <QFileDialog>
+#include <QString>
+#include <functional>
+
 class QWidget;
 
 namespace PathSafetyWarning
@@ -19,6 +22,13 @@ namespace PathSafetyWarning
  * @return true when the path is outside the program directory and safe to apply
  */
 bool confirmOutsideProgramDir(QWidget *parent, const QString &path);
+
+void choosePath(QWidget *parent,
+                const QString &title,
+                QFileDialog::FileMode mode,
+                const QString &current,
+                std::function<void(const QString &path)> apply,
+                const QString &fileInChosenDir = {});
 
 } // namespace PathSafetyWarning
 

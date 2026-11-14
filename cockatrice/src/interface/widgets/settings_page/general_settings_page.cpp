@@ -5,6 +5,7 @@
 #include "../interface/card_picture_loader/card_picture_loader.h"
 #include "../main.h"
 #include "../server/user/user_info_connection.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "update/client/release_channel.h"
 
 #include <QByteArray>
@@ -33,7 +34,6 @@
 #include <libcockatrice/settings/tabs_settings.h>
 #include <libcockatrice/settings/updates_settings.h>
 #include <libcockatrice/utility/macros.h>
-#include <libcockatrice/utility/qt_utils.h>
 #include <libcockatrice/utility/translation_loader.h>
 #include <qlogging.h>
 #include <qnamespace.h>
@@ -388,102 +388,50 @@ QStringList GeneralSettingsPage::findQmFiles()
                                                  TranslationLoader::applicationTranslationPaths(translationPath));
 }
 
+void GeneralSettingsPage::choosePath(QLineEdit *pathEdit,
+                                     QFileDialog::FileMode mode,
+                                     const std::function<void(PathsSettings &, const QString &)> &apply)
+{
+    PathSafetyWarning::choosePath(this, tr("Choose path"), mode, pathEdit->text(),
+                                  [pathEdit, apply](const QString &path) {
+                                      pathEdit->setText(path);
+                                      apply(SettingsCache::instance().paths(), path);
+                                  });
+}
+
 void GeneralSettingsPage::deckPathButtonClicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this, tr("Choose path"), deckPathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    deckPathEdit->setText(path);
-    SettingsCache::instance().paths().setDeckPath(path);
+    choosePath(deckPathEdit, QFileDialog::Directory, &PathsSettings::setDeckPath);
 }
 
 void GeneralSettingsPage::filtersPathButtonClicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this, tr("Choose path"), filtersPathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    filtersPathEdit->setText(path);
-    SettingsCache::instance().paths().setFiltersPath(path);
+    choosePath(filtersPathEdit, QFileDialog::Directory, &PathsSettings::setFiltersPath);
 }
 
 void GeneralSettingsPage::replaysPathButtonClicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this, tr("Choose path"), replaysPathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    replaysPathEdit->setText(path);
-    SettingsCache::instance().paths().setReplaysPath(path);
+    choosePath(replaysPathEdit, QFileDialog::Directory, &PathsSettings::setReplaysPath);
 }
 
 void GeneralSettingsPage::picsPathButtonClicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this, tr("Choose path"), picsPathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    picsPathEdit->setText(path);
-    SettingsCache::instance().paths().setPicsPath(path);
+    choosePath(picsPathEdit, QFileDialog::Directory, &PathsSettings::setPicsPath);
 }
 
 void GeneralSettingsPage::cardDatabasePathButtonClicked()
 {
-    QString path = QFileDialog::getOpenFileName(this, tr("Choose path"), cardDatabasePathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    cardDatabasePathEdit->setText(path);
-    SettingsCache::instance().paths().setCardDatabasePath(path);
+    choosePath(cardDatabasePathEdit, QFileDialog::ExistingFile, &PathsSettings::setCardDatabasePath);
 }
 
 void GeneralSettingsPage::customCardDatabaseButtonClicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this, tr("Choose path"), customCardDatabasePathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    customCardDatabasePathEdit->setText(path);
-    SettingsCache::instance().paths().setCustomCardDatabasePath(path);
+    choosePath(customCardDatabasePathEdit, QFileDialog::Directory, &PathsSettings::setCustomCardDatabasePath);
 }
 
 void GeneralSettingsPage::tokenDatabasePathButtonClicked()
 {
-    QString path = QFileDialog::getOpenFileName(this, tr("Choose path"), tokenDatabasePathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    tokenDatabasePathEdit->setText(path);
-    SettingsCache::instance().paths().setTokenDatabasePath(path);
+    choosePath(tokenDatabasePathEdit, QFileDialog::ExistingFile, &PathsSettings::setTokenDatabasePath);
 }
 
 void GeneralSettingsPage::resetAllPathsClicked()
@@ -542,9 +490,14 @@ void GeneralSettingsPage::cardLanguageBoxChanged(int index)
 
     // The answer only controls whether Oracle starts right away; the caches stay
     // cleared so the next import or launch rebuilds them in the new language.
-    if (QtUtils::confirm(this, tr("Card text & images language changed"), message, QMessageBox::Yes)) {
-        emit cardDatabaseUpdateRequested();
-    }
+    Dialogs::confirm(
+        this, tr("Card text & images language changed"), message,
+        [this](bool confirmed) {
+            if (confirmed) {
+                emit cardDatabaseUpdateRequested();
+            }
+        },
+        QMessageBox::Yes);
 }
 
 void GeneralSettingsPage::cardSearchLanguageBoxChanged(int index)
