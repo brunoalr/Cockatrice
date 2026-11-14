@@ -9,11 +9,12 @@
 
 #include "libcockatrice/card/printing/exact_card.h"
 
+#include <QMenu>
+#include <QPointer>
 #include <QWidget>
 #include <qtmetamacros.h>
 
 class QAction;
-class QMenu;
 class AllZonesCardAmountWidget;
 class CardInfoPictureWidget;
 class PrintingSelectorHost;
@@ -62,7 +63,7 @@ private:
     ExactCard rootCard;
     QLabel *cardOverridePreviewLabel = nullptr;
     ExactCard hoveredOverrideCard;
-    QMenu *previewSourceMenu = nullptr;
+    QPointer<QMenu> previewSourceMenu;
     QAction *hoveredOverrideAction = nullptr;
 };
 

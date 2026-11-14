@@ -41,7 +41,6 @@ private:
 
 private slots:
     void filterViewCustomContextMenu(const QPoint &point);
-    void filterRemove(const QAction *action);
     void actClearFilterAll();
     void actClearFilterOne();
     void refreshShortcuts();

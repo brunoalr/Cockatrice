@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QString>
 #include <QWidget>
+#include <functional>
 #include <qtmetamacros.h>
 
 class DeckListStatisticsAnalyzer;
@@ -47,7 +48,7 @@ public:
     }
 
     // Unified helper to run config dialog and update widget
-    bool applyConfigFromDialog();
+    void applyConfigFromDialog(std::function<void(bool accepted)> then = {});
 
     // Dialog → JSON must be supplied by each subclass
     virtual QJsonObject extractConfigFromDialog(QDialog *dlg) const = 0;
