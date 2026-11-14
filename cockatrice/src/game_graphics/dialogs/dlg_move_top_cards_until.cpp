@@ -1,5 +1,6 @@
 #include "dlg_move_top_cards_until.h"
 
+#include "../../interface/widgets/utility/non_blocking_dialogs.h"
 #include "libcockatrice/card/card_info.h"
 
 #include <QCheckBox>
@@ -77,39 +78,38 @@ static bool matchExistsInDb(const FilterString &filterString)
 }
 
 /**
- * @brief Validates that a card matching the expr exists in the card database.
+ * @brief Accepts the dialog if a card matching the expr exists in the card database.
  * If no match is found, then pop up a window to warn the user, giving them a chance to back out.
- *
- * @returns whether to proceed with the action
  */
-bool DlgMoveTopCardsUntil::validateMatchExists(const FilterString &filterString)
+void DlgMoveTopCardsUntil::confirmMatchExistsThenAccept(const FilterString &filterString)
 {
     if (matchExistsInDb(filterString)) {
-        return true;
+        acceptExpr();
+        return;
     }
 
     const auto msg = tr("No cards matching the search expression exists in the card database. Proceed anyways?");
-    const auto res =
-        QMessageBox::warning(this, tr("Cockatrice"), msg, QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-    if (res == QMessageBox::No) {
-        return false;
-    }
-
-    return true;
+    Dialogs::ask(this, QMessageBox::Warning, tr("Cockatrice"), msg, QMessageBox::Yes | QMessageBox::No, QMessageBox::No,
+                 [this](QMessageBox::StandardButton answer) {
+                     if (answer != QMessageBox::No) {
+                         acceptExpr();
+                     }
+                 });
 }
 
 void DlgMoveTopCardsUntil::validateAndAccept()
 {
     auto movingCardsUntilFilter = FilterString(exprComboBox->currentText());
     if (!movingCardsUntilFilter.valid()) {
-        QMessageBox::warning(this, tr("Invalid filter"), movingCardsUntilFilter.error(), QMessageBox::Ok);
+        Dialogs::warning(this, tr("Invalid filter"), movingCardsUntilFilter.error());
         return;
     }
 
-    if (!validateMatchExists(movingCardsUntilFilter)) {
-        return;
-    }
+    confirmMatchExistsThenAccept(movingCardsUntilFilter);
+}
 
+void DlgMoveTopCardsUntil::acceptExpr()
+{
     // move currently selected text to top of history list
     if (exprComboBox->currentIndex() != 0) {
         QString currentExpr = exprComboBox->currentText();
