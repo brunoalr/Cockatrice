@@ -21,6 +21,7 @@ const routes = [
   ['card-images.archidekt.com', 'GET', /^\/.*\.(webp|jpe?g|png)$/, /^$/],
   ['storage.googleapis.com', 'GET', /^\/(archidekt-card-images|topdekt-user\/images)\/.*\.(webp|jpe?g|png)$/, /^$/],
   ['cloud.manabox.app', 'GET', /^\/decks\/[\w-]+$/, /^$/],
+  ['api.moxfield.com', 'GET', /^\/v2\/decks\/all\/[\w-]+\/$/, /^$/],
   ['backend.commanderspellbook.com', 'POST', /^\/estimate-bracket$/, /^$/],
 ]
 const tricks = /\.\.|\/\/|%2f|%5c|%2e/i
@@ -49,7 +50,9 @@ export async function handle(request, env, upstreamFetch = fetch) {
   const answer = (status, text, headers) => new Response(text, { status, headers: { ...cors, ...headers } })
 
   const url = new URL(request.url)
-  const [, host, path] = url.pathname.match(/^\/([^/]*)(.*)$/)
+  const slash = `${url.pathname}/`.indexOf('/', 1)
+  const host = url.pathname.slice(1, slash)
+  const path = url.pathname.slice(slash)
   const route = routes.find(([h, , p, q]) => h === host && p.test(path) && q.test(url.search.slice(1)))
   // The URL parser turns a backslash into a slash, so only the raw URL still shows one.
   if (!route || tricks.test(url.pathname) || request.url.split('?')[0].includes('\\')) return answer(404, 'Not found')

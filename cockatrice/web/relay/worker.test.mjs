@@ -68,6 +68,7 @@ test('every table row is forwarded to its upstream URL with its method', async (
     ['GET', '/storage.googleapis.com/archidekt-card-images/a/b.webp', 'https://storage.googleapis.com/archidekt-card-images/a/b.webp'],
     ['GET', '/storage.googleapis.com/topdekt-user/images/shadow.jpg', 'https://storage.googleapis.com/topdekt-user/images/shadow.jpg'],
     ['GET', '/cloud.manabox.app/decks/XYZxxa-YZ99Yyyx_yzXzzz', 'https://cloud.manabox.app/decks/XYZxxa-YZ99Yyyx_yzXzzz'],
+    ['GET', '/api.moxfield.com/v2/decks/all/XYZxx-XYZ99Yyy_xyzXzzz/', 'https://api.moxfield.com/v2/decks/all/XYZxx-XYZ99Yyy_xyzXzzz/'],
     ['POST', spellbook, 'https://backend.commanderspellbook.com/estimate-bracket'],
   ]
   for (const [method, path, upstreamUrl] of rows) {
@@ -269,6 +270,11 @@ test('a path off the table is not found', async () => {
     '/cloud.manabox.app/decks/',
     '/cloud.manabox.app/decks/a.b',
     '/cloud.manabox.app/decks/a/b',
+    '/api.moxfield.com/v2/decks/all/',
+    '/api.moxfield.com/v2/decks/all/abc',
+    '/api.moxfield.com/v2/decks/all/a.b/',
+    '/api.moxfield.com/v2/decks/all/a/b/',
+    '/api.moxfield.com/v2/users/abc/',
     `${spellbook}/`,
   ]
   for (const path of paths) {
@@ -311,6 +317,7 @@ test('a wrong query on a query-restricted row is not found', async () => {
     [`${image}?v=1`],
     ['/storage.googleapis.com/archidekt-card-images/a.png?v=1'],
     ['/cloud.manabox.app/decks/abc?v=1'],
+    ['/api.moxfield.com/v2/decks/all/abc/?v=1'],
     [`${spellbook}?v=1`, json],
   ]
   for (const [path, init] of requests) {
