@@ -352,18 +352,17 @@ void AbstractTabDeckEditor::actSaveDeckAs(std::function<void(bool saved)> then)
         reportSaved(then, false);
         return;
     }
-    DeckList deckList = deckStateManager->getDeckList();
-
     auto *dialog = new QFileDialog(this, tr("Save deck"));
     dialog->setDirectory(SettingsCache::instance().paths().getDeckPath());
     dialog->setAcceptMode(QFileDialog::AcceptSave);
     dialog->setDefaultSuffix("cod");
     dialog->setNameFilters(DeckLoader::FILE_NAME_FILTERS);
-    dialog->selectFile(deckList.getName().trimmed());
+    dialog->selectFile(deckStateManager->getDeckList().getName().trimmed());
 
-    Dialogs::open(dialog, [this, dialog, deckList, then = std::move(then)](int result) {
+    Dialogs::open(dialog, [this, dialog, then = std::move(then)](int result) {
         if (result == QDialog::Accepted) {
-            saveDeckToFile(deckList, dialog->selectedFiles().at(0), then);
+            // The deck as it is now: on macOS the menu bar stays usable under the save sheet.
+            saveDeckToFile(deckStateManager->getDeckList(), dialog->selectedFiles().at(0), then);
         } else {
             reportSaved(then, false);
         }
@@ -464,6 +463,9 @@ void AbstractTabDeckEditor::openDeckList(const DeckList &deckList, DeckOpenLocat
  */
 void AbstractTabDeckEditor::editDeckInClipboard(bool annotated)
 {
+    if (unsavedDeckGuard->raiseOpenDialog()) {
+        return;
+    }
     LoadedDeck loadedDeck = deckStateManager->toLoadedDeck();
     auto *dlg = new DlgEditDeckInClipboard(loadedDeck.deckList, annotated, this);
     Dialogs::open(dlg, [this, dlg, lastLoadInfo = loadedDeck.lastLoadInfo](int result) {
