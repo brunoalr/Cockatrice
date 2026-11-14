@@ -1217,6 +1217,9 @@ jobs:
           bash .ci/card_database.sh --self-test
           node --test cockatrice/web/relay/worker.test.mjs
 
+      - name: "Test the font download script"
+        run: bash .ci/web_fonts.sh --self-test
+
       - name: "Check the WebAssembly kit is the desktop legs' Qt ${{ needs.resolve-qt.outputs.mac }}"
         env:
           QT_DESKTOP: ${{ needs.resolve-qt.outputs.mac }}
@@ -1318,6 +1321,13 @@ jobs:
           # No card database sits beside this page: the client must say so and still start
           WASM_SMOKE_CARDS: missing
         run: .ci/wasm_smoke.sh build/cockatrice cockatrice.html
+
+      # The steps below read the two variables: the site gets this one small font, and the start-up checks wait for it
+      - name: "Download a small font for the site"
+        run: |
+          .ci/web_fonts.sh "$RUNNER_TEMP/fonts" NotoSansThai-Regular.ttf
+          echo "WEB_SITE_FONTS=$RUNNER_TEMP/fonts" >>"$GITHUB_ENV"
+          echo "WASM_SMOKE_FONT=NotoSansThai-Regular.ttf" >>"$GITHUB_ENV"
 
       - name: "Assemble a site from the build and the tests' card database"
         run: .ci/web_site.sh build/cockatrice tests/carddatabase/data "$RUNNER_TEMP/site"
