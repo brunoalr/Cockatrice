@@ -38,19 +38,42 @@ const send = (method, params = {}) =>
 const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value
 const screen = "document.querySelector('#qt-shadow-container').shadowRoot"
 
+// Qt mirrors its widgets into the page only once a screen reader is asked for
+await evaluate(`${screen}.querySelectorAll('button.hidden-visually-read-by-screen-reader').forEach(b => b.click())`)
 // Qt takes keys from the focused window's input element, and reads Command as Ctrl on a Mac.
 const mac = await evaluate(`${screen}.querySelector('.qt-window-input-element').focus(), navigator.platform.startsWith('Mac')`)
 for (const type of ['rawKeyDown', 'keyUp']) {
   await send('Input.dispatchKeyEvent', { type, modifiers: mac ? 4 : 2, key: 'l', code: 'KeyL', windowsVirtualKeyCode: 76 })
 }
 
-for (let tick = 0; tick < seconds * 4; tick++) {
-  const titles = await evaluate(`[...${screen}.querySelectorAll('.window-name')].map(name => name.textContent)`)
-  if (titles.includes('Connect to Server')) {
-    console.log('the connect dialog opened')
-    process.exit(0)
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+const opened = async () => {
+  for (let tick = 0; tick < seconds * 4; tick++) {
+    const titles = await evaluate(`[...${screen}.querySelectorAll('.window-name')].map(name => name.textContent)`)
+    if (titles.includes('Connect to Server')) {
+      return true
+    }
+    await sleep(250)
   }
-  await new Promise(resolve => setTimeout(resolve, 250))
+  return false
 }
-console.log('the connect dialog did not open')
-process.exit(1)
+if (!(await opened())) {
+  console.log('the connect dialog did not open')
+  process.exit(1)
+}
+console.log('the connect dialog opened')
+
+// the player name field is the text field just before the password field
+await send('Input.insertText', { text: 'abc' })
+const fields = `(inputs => inputs.slice(inputs.findIndex(e => e.type === 'password') - 1).map(e => e.value))
+  ([...${screen}.querySelectorAll('.qt-window-a11y-container input')].filter(e => e.type === 'text' || e.type === 'password'))`
+let player, password
+for (let tick = 0; tick < 20 && !player && !password; tick++) {
+  await sleep(250);
+  [player, password] = await evaluate(fields)
+}
+if (player !== 'abc' || password) {
+  console.log(`typing in the connect dialog went elsewhere: player name "${player}", password of ${password?.length} characters`)
+  process.exit(1)
+}
+process.exit(0)

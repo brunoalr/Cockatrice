@@ -98,6 +98,32 @@ TEST_F(ConnectionControllerDialogs, ConnectReturnsWithTheDialogOpen)
     EXPECT_EQ(dialog->windowModality(), Qt::ApplicationModal);
 }
 
+TEST_F(ConnectionControllerDialogs, ConnectOpensWithTheFocusOnThePlayerName)
+{
+    controller->connectToServer();
+    settle();
+
+    DlgConnect *dialog = onlyOpen<DlgConnect>();
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_EQ(dialog->focusWidget(), dialog->findChild<QLineEdit *>("connectPlayernameEdit"));
+}
+
+TEST_F(ConnectionControllerDialogs, TheLoginPromptOpensWithTheFocusOnTheUsername)
+{
+    ContextConnectToServer context{"focused.example", "4747", {}, {}};
+    std::make_unique<IntentGetLoginCredentials>(&context, true).release()->execute();
+    settle();
+
+    DlgLoginPrompt *prompt = openLoginPrompt();
+    ASSERT_NE(prompt, nullptr);
+    auto *username = qobject_cast<QLineEdit *>(prompt->focusWidget());
+    ASSERT_NE(username, nullptr);
+    EXPECT_EQ(username->echoMode(), QLineEdit::Normal);
+    EXPECT_EQ(username, prompt->findChildren<QLineEdit *>().value(0));
+    prompt->reject();
+    settle();
+}
+
 TEST_F(ConnectionControllerDialogs, AcceptingConnectConnectsWithTheTypedLogin)
 {
     std::optional<QStringList> request;
