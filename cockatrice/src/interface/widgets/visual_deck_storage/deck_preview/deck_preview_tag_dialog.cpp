@@ -2,6 +2,7 @@
 
 #include "../../../../client/settings/cache_settings.h"
 #include "../../../../interface/widgets/dialogs/dlg_default_tags_editor.h"
+#include "../../utility/non_blocking_dialogs.h"
 #include "deck_preview_tag_item_widget.h"
 
 #include <QCheckBox>
@@ -10,7 +11,6 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QListWidgetItem>
-#include <QMessageBox>
 #include <QObject>
 #include <QPushButton>
 #include <QSharedPointer>
@@ -147,7 +147,7 @@ void DeckPreviewTagDialog::addTag()
 {
     QString newTag = newTagInput->text().trimmed();
     if (newTag.isEmpty()) {
-        QMessageBox::warning(this, tr("Invalid Input"), tr("Tag name cannot be empty!"));
+        Dialogs::warning(this, tr("Invalid Input"), tr("Tag name cannot be empty!"));
         return;
     }
 
@@ -156,7 +156,7 @@ void DeckPreviewTagDialog::addTag()
         auto *item = tagListView->item(i);
         auto *tagWidget = qobject_cast<DeckPreviewTagItemWidget *>(tagListView->itemWidget(item));
         if (tagWidget && tagWidget->checkBox()->text() == newTag) {
-            QMessageBox::warning(this, tr("Duplicate Tag"), tr("This tag already exists."));
+            Dialogs::warning(this, tr("Duplicate Tag"), tr("This tag already exists."));
             return;
         }
     }

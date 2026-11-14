@@ -2,6 +2,7 @@
 
 #include "../../../interface/widgets/dialogs/dlg_load_deck_from_clipboard.h"
 #include "../general/layout_containers/flow_widget.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "deck_list_model.h"
 #include "filter_tree_model.h"
 #include "libcockatrice/deck_list/deck_list.h"
@@ -92,17 +93,19 @@ void VisualDatabaseDisplayNameFilterWidget::actLoadFromDeck()
 
 void VisualDatabaseDisplayNameFilterWidget::actLoadFromClipboard()
 {
-    DlgLoadDeckFromClipboard dlg(this);
-    if (!dlg.exec()) {
-        return;
-    }
+    auto *dlg = new DlgLoadDeckFromClipboard(this);
+    Dialogs::open(dlg, [this, dlg](int result) {
+        if (result != QDialog::Accepted) {
+            return;
+        }
 
-    QStringList cardsInClipboard = dlg.getDeckList().getCardList();
-    for (QString cardName : cardsInClipboard) {
-        createNameFilter(cardName);
-    }
+        QStringList cardsInClipboard = dlg->getDeckList().getCardList();
+        for (QString cardName : cardsInClipboard) {
+            createNameFilter(cardName);
+        }
 
-    updateFilterModel();
+        updateFilterModel();
+    });
 }
 
 void VisualDatabaseDisplayNameFilterWidget::createNameFilter(const QString &name)

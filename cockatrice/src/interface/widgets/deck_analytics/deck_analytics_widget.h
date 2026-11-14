@@ -52,6 +52,7 @@ protected:
     int indexOfSelectedWrapper() const;
 
 private:
+    void configureNewPanel(const QString &typeId);
     void addPanelInstance(const QString &typeId, AbstractAnalyticsPanelWidget *panel, const QJsonObject &cfg = {});
 
     QVBoxLayout *layout;

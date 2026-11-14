@@ -11,13 +11,16 @@
 #include "../interface/widgets/server/remote/remote_decklist_tree_widget.h"
 #include "tab.h"
 
+#include <QFileInfo>
 #include <QList>
 #include <QString>
 #include <QStringList>
 #include <QVariant>
+#include <functional>
 #include <libcockatrice/network/client/abstract/abstract_client.h>
 #include <qtmetamacros.h>
 
+class DeckList;
 struct LoadedDeck;
 class ServerInfo_User;
 class QTreeView;
@@ -61,8 +64,13 @@ private:
 
     void setShareModeEnabled(bool enabled);
 
-    void uploadDeck(const QString &filePath, const QString &targetPath);
-    void deleteRemoteDeck(const RemoteDeckList_TreeModel::Node *node);
+    void renameLocalFiles(QList<QFileInfo> files);
+    void uploadDecks(QStringList filePaths, const QString &targetPath);
+    void uploadDeck(const QString &filePath, const QString &targetPath, std::function<void()> thenNext);
+    void sendDeck(const DeckList &deck, const QString &targetPath, const std::function<void()> &thenNext);
+    void createRemoteFolder(const QString &targetPath, const QString &folderName);
+    void deleteRemoteFolder(const QString &targetPath);
+    void deleteRemoteDeck(int deckId);
 
     void downloadNodeAtIndex(const QModelIndex &curLeft, const QModelIndex &curRight);
 

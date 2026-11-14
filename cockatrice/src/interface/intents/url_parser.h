@@ -12,6 +12,7 @@
 class Intent;
 class MainWindow;
 struct ContextJoinGame;
+struct ContextOpenDeck;
 
 /**
  * @brief One queued intent chain with the session-migration bookkeeping for it.
@@ -61,9 +62,12 @@ private:
     void parseFirstLink();
     void queueChain(const PendingIntentChain &chain, const Intent *firstIntent);
     void finishLink();
+    void skipLink(const QString &title, const QString &message);
     void askToJoinGame(const QUrlQuery &query);
     Intent *createJoinGameIntent(const ContextJoinGame &context, PendingIntentChain &chain);
-    Intent *createOpenDeckIntent(const QUrlQuery &query, PendingIntentChain &chain);
+    void askToOpenDeck(const QUrlQuery &query);
+    void confirmOpenDeckServer(const ContextOpenDeck &context);
+    Intent *createOpenDeckIntent(const ContextOpenDeck &context, PendingIntentChain &chain);
     QString generateJoinGameMessage(const ContextJoinGame &context, const QString &gameDescription);
     [[nodiscard]] bool isConnectedTo(const QString &hostname, const QString &port) const;
     void startNextChain();

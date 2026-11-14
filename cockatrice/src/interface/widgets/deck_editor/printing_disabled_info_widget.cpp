@@ -54,5 +54,5 @@ void PrintingDisabledInfoWidget::retranslateUi()
 
 void PrintingDisabledInfoWidget::disableOverridePrintings()
 {
-    OverridePrintingWarning::execMessageBox(this, false);
+    OverridePrintingWarning::confirm(this, false);
 }

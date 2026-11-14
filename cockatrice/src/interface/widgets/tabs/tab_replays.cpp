@@ -46,6 +46,8 @@
 #include <QTreeView>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <algorithm>
+#include <functional>
 #include <libcockatrice/network/client/abstract/abstract_client.h>
 #include <libcockatrice/protocol/pb/command_replay_delete_match.pb.h>
 #include <libcockatrice/protocol/pb/command_replay_download.pb.h>
@@ -366,6 +368,9 @@ void TabReplays::actRenameLocal()
     for (const auto &curLeft : localDirView->selectionModel()->selectedRows()) {
         files.append(localDirModel->fileInfo(curLeft));
     }
+    // A folder goes after what it holds: renamed first, it would move the files still waiting for their turn.
+    std::ranges::stable_sort(files, std::ranges::greater{},
+                             [](const QFileInfo &file) { return file.absoluteFilePath().count(QLatin1Char('/')); });
     renameLocalInTurn(this, files);
 }
 

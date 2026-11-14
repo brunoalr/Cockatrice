@@ -790,6 +790,52 @@ if(WITH_CLIENT)
   )
   cockatrice_add_test(
     NAME
+    deck_dialogs_test
+    SOURCES
+    ${CLIENT_SRC}/client/network/parsers/deck_link_to_api_transformer.cpp
+    ${CLIENT_SRC}/interface/deck_loader/card_node_function.cpp
+    ${CLIENT_SRC}/interface/key_signals.cpp
+    ${CLIENT_SRC}/interface/pixel_map_generator.cpp
+    ${CLIENT_SRC}/interface/theme_config.cpp
+    ${CLIENT_SRC}/interface/theme_icon.cpp
+    ${CLIENT_SRC}/interface/theme_icon_badge.cpp
+    ${CLIENT_SRC}/interface/theme_icon_fill.cpp
+    ${CLIENT_SRC}/interface/theme_icon_ink.cpp
+    ${CLIENT_SRC}/interface/theme_icon_sticker.cpp
+    ${CLIENT_SRC}/interface/theme_manager.cpp
+    ${CLIENT_SRC}/interface/widgets/deck_editor/card_database_view.cpp
+    ${CLIENT_SRC}/interface/widgets/deck_editor/deck_state_manager.cpp
+    ${CLIENT_SRC}/interface/widgets/deck_editor/deck_zone_dialog.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_convert_deck_to_cod_format.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_default_tags_editor.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_tokens.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_load_deck_from_website.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/override_printing_warning.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/api_response/card_in_deck_request.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/api_response/commander_spellbook_card_result.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/api_response/commander_spellbook_deck_request.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/api_response/commander_spellbook_estimate_bracket_result.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/api_response/commander_spellbook_variant_result.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_bracket_service.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_bracket_widget.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_spellbook_api_accessor.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_spellbook_bracket_explainer.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/get_text_with_max.cpp
+    ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_dialog.cpp
+    ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_item_widget.cpp
+    ${SETTINGS_SOURCES}
+    deck_dialogs_test.cpp
+    LIBS
+    libcockatrice_card
+    libcockatrice_deck_list
+    libcockatrice_models
+    libcockatrice_utility
+    ${SETTINGS_LIBS}
+    INCLUDE_DIRS
+    ${SETTINGS_INCLUDE_DIRS}
+  )
+  cockatrice_add_test(
+    NAME
     lobby_dialogs_test
     SOURCES
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_avatar.cpp

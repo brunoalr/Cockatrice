@@ -2,6 +2,7 @@
 
 #include "../../theme_icon.h"
 #include "../general/display/banner_widget.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "deck_list_statistics_analyzer.h"
 
 #include <QDialog>
@@ -30,7 +31,7 @@ AbstractAnalyticsPanelWidget::AbstractAnalyticsPanelWidget(QWidget *parent, Deck
     configureButton = new QPushButton(this);
     configureButton->setIcon(loadThemedIcon(QStringLiteral("icons/settings")));
     configureButton->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
-    connect(configureButton, &QPushButton::clicked, this, &AbstractAnalyticsPanelWidget::applyConfigFromDialog);
+    connect(configureButton, &QPushButton::clicked, this, [this] { applyConfigFromDialog(); });
     bannerAndSettingsLayout->addWidget(configureButton, 0);
 
     layout->addWidget(bannerAndSettingsContainer);
@@ -38,20 +39,26 @@ AbstractAnalyticsPanelWidget::AbstractAnalyticsPanelWidget(QWidget *parent, Deck
     connect(analyzer, &DeckListStatisticsAnalyzer::statsUpdated, this, &AbstractAnalyticsPanelWidget::updateDisplay);
 }
 
-bool AbstractAnalyticsPanelWidget::applyConfigFromDialog()
+void AbstractAnalyticsPanelWidget::applyConfigFromDialog(std::function<void(bool accepted)> then)
 {
     QDialog *dlg = createConfigDialog(this);
     if (!dlg) {
-        return false;
+        if (then) {
+            then(false);
+        }
+        return;
     }
 
-    bool ok = dlg->exec() == QDialog::Accepted;
-    if (ok) {
-        // dialog must expose its final config as JSON
-        auto newCfg = extractConfigFromDialog(dlg);
-        loadConfig(newCfg);
-        updateDisplay();
-    }
-    dlg->deleteLater();
-    return ok;
+    Dialogs::open(dlg, [this, dlg, then = std::move(then)](int result) {
+        const bool ok = result == QDialog::Accepted;
+        if (ok) {
+            // dialog must expose its final config as JSON
+            auto newCfg = extractConfigFromDialog(dlg);
+            loadConfig(newCfg);
+            updateDisplay();
+        }
+        if (then) {
+            then(ok);
+        }
+    });
 }

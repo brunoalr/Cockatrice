@@ -88,7 +88,7 @@ private:
     [[nodiscard]] QString getDisplayName() const;
     void refreshBannerCardText();
     void updateBannerCardComboBox(const QString &currentText);
-    bool promptFileConversionIfRequired();
+    void promptFileConversionIfRequired(std::function<void()> thenConvertible);
     QMenu *createRightClickMenu();
     void addSetBannerCardMenu(QMenu *menu);
     void imageClickedEvent(QMouseEvent *event, DeckPreviewCardPictureWidget *instance);

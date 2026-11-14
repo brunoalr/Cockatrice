@@ -1,6 +1,7 @@
 #include "dlg_default_tags_editor.h"
 
 #include "../../../client/settings/cache_settings.h"
+#include "../utility/non_blocking_dialogs.h"
 
 #include <QAbstractItemView>
 #include <QHBoxLayout>
@@ -8,7 +9,6 @@
 #include <QList>
 #include <QListWidget>
 #include <QListWidgetItem>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QSharedPointer>
 #include <QSizePolicy>
@@ -101,7 +101,7 @@ void DlgDefaultTagsEditor::addItem()
 {
     QString newTag = inputField->text().trimmed();
     if (newTag.isEmpty()) {
-        QMessageBox::warning(this, tr("Invalid Input"), tr("Tag name cannot be empty!"));
+        Dialogs::warning(this, tr("Invalid Input"), tr("Tag name cannot be empty!"));
         return;
     }
 
@@ -113,7 +113,7 @@ void DlgDefaultTagsEditor::addItem()
         }
         QLineEdit *lineEdit = widget->findChild<QLineEdit *>();
         if (lineEdit && lineEdit->text() == newTag) {
-            QMessageBox::warning(this, tr("Duplicate Tag"), tr("This tag already exists."));
+            Dialogs::warning(this, tr("Duplicate Tag"), tr("This tag already exists."));
             return;
         }
     }
