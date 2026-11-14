@@ -1,10 +1,12 @@
 #include "client/settings/cache_settings.h"
+#include "client/settings/shortcuts_settings.h"
 #include "dialog_test_support.h"
 #include "interface/card_picture_loader/card_picture_loader.h"
 #include "interface/theme_manager.h"
 #include "interface/widgets/dialogs/settings_close_check.h"
 #include "interface/widgets/settings_page/deck_editor_settings_page.h"
 #include "interface/widgets/settings_page/general_settings_page.h"
+#include "interface/widgets/settings_page/shortcut_settings_page.h"
 #include "interface/widgets/utility/non_blocking_dialogs.h"
 #include "main.h"
 
@@ -12,7 +14,9 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QInputDialog>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMessageBox>
 #include <QPointer>
 #include <QPushButton>
@@ -21,6 +25,7 @@
 #include <gtest/gtest.h>
 #include <libcockatrice/card/database/card_database.h>
 #include <libcockatrice/card/database/card_database_manager.h>
+#include <libcockatrice/settings/download_settings.h>
 #include <libcockatrice/settings/paths_settings.h>
 #include <memory>
 
@@ -60,6 +65,19 @@ protected:
         auto page = std::make_unique<Page>();
         page->setParent(window.get());
         return page.release();
+    }
+
+    QInputDialog *openPrompt(QObject *page, const char *action) const
+    {
+        QMetaObject::invokeMethod(page, action);
+        settle();
+        return onlyOpen<QInputDialog>();
+    }
+
+    static void accept(QInputDialog *prompt)
+    {
+        prompt->accept();
+        settle();
     }
 
     void answer(const QString &textPart, QMessageBox::StandardButton button) const
@@ -260,6 +278,177 @@ TEST_F(PathChoosers, TheSpoilerFileGoesIntoTheChosenDirectory)
     choose(page, "spoilerPathButtonClicked", chosen.path());
 
     EXPECT_EQ(SettingsCache::instance().getSpoilerCardDatabasePath(), chosen.filePath("spoiler.xml"));
+}
+class ShortcutPrompts : public SettingsDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    const QString shortcut = QStringLiteral("MainWindow/aConnect");
+    QWidget *page = addPage<ShortcutSettingsPage>();
+
+    void SetUp() override
+    {
+        SettingsCache::instance().shortcuts().setShortcuts(shortcut, QStringLiteral("Ctrl+K"));
+    }
+
+    QString current() const
+    {
+        return SettingsCache::instance().shortcuts().getShortcutString(shortcut);
+    }
+
+    void ask(const char *action, const QString &question, QMessageBox::StandardButton button) const
+    {
+        QMetaObject::invokeMethod(page, action);
+        settle();
+        EXPECT_EQ(current(), "Ctrl+K");
+        answer(question, button);
+    }
+};
+
+TEST_F(ShortcutPrompts, YesRestoresTheDefaultShortcuts)
+{
+    ask("resetShortcuts", "Do you really want to restore all default shortcuts?", QMessageBox::Yes);
+    EXPECT_EQ(current(), "Ctrl+L");
+}
+
+TEST_F(ShortcutPrompts, NoKeepsTheShortcutsWhenAskedToRestore)
+{
+    ask("resetShortcuts", "Do you really want to restore all default shortcuts?", QMessageBox::No);
+    EXPECT_EQ(current(), "Ctrl+K");
+}
+
+TEST_F(ShortcutPrompts, YesClearsEveryShortcut)
+{
+    ask("clearShortcuts", "Do you really want to clear all shortcuts?", QMessageBox::Yes);
+    EXPECT_EQ(current(), "");
+}
+
+TEST_F(ShortcutPrompts, NoKeepsTheShortcutsWhenAskedToClear)
+{
+    ask("clearShortcuts", "Do you really want to clear all shortcuts?", QMessageBox::No);
+    EXPECT_EQ(current(), "Ctrl+K");
+}
+
+class UrlPrompts : public SettingsDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    const QString first = QStringLiteral("https://example.com/first/!name!");
+    const QString second = QStringLiteral("https://example.org/second/!name!");
+    QWidget *page = nullptr;
+    QListWidget *urls = nullptr;
+
+    void SetUp() override
+    {
+        SettingsCache::instance().downloads().setDownloadUrls({first, second});
+        SettingsCache::instance().downloads().setHostRequestLimits({});
+        page = addPage<DeckEditorSettingsPage>();
+        urls = page->findChild<QListWidget *>();
+    }
+
+    static QStringList stored()
+    {
+        return SettingsCache::instance().downloads().getAllURLs();
+    }
+
+    static QHash<QString, int> limits()
+    {
+        return SettingsCache::instance().downloads().getHostRequestLimits();
+    }
+};
+
+TEST_F(UrlPrompts, AnAcceptedUrlIsAdded)
+{
+    QInputDialog *prompt = openPrompt(page, "actAddURL");
+    ASSERT_NE(prompt, nullptr);
+    prompt->setTextValue("https://example.net/!name!");
+    accept(prompt);
+
+    EXPECT_EQ(stored(), (QStringList{first, second, "https://example.net/!name!"}));
+    EXPECT_EQ(urls->count(), 3);
+}
+
+TEST_F(UrlPrompts, ACancelledUrlIsNotAdded)
+{
+    QInputDialog *prompt = openPrompt(page, "actAddURL");
+    ASSERT_NE(prompt, nullptr);
+    prompt->reject();
+    settle();
+
+    EXPECT_EQ(stored(), (QStringList{first, second}));
+    EXPECT_EQ(urls->count(), 2);
+}
+
+TEST_F(UrlPrompts, AnEditChangesTheUrlItWasOpenedOn)
+{
+    urls->setCurrentRow(0);
+    QInputDialog *prompt = openPrompt(page, "actEditURL");
+    ASSERT_NE(prompt, nullptr);
+    EXPECT_EQ(prompt->textValue(), first);
+
+    urls->setCurrentRow(1);
+    prompt->setTextValue("https://example.net/!name!");
+    accept(prompt);
+
+    EXPECT_EQ(stored(), (QStringList{"https://example.net/!name!", second}));
+}
+
+TEST_F(UrlPrompts, ResettingTheUrlsSaysSoWithoutBlocking)
+{
+    QMetaObject::invokeMethod(page, "resetDownloadedURLsButtonClicked");
+    settle();
+    EXPECT_NE(stored(), (QStringList{first, second}));
+
+    answer("Download URLs have been reset.", QMessageBox::Ok);
+    EXPECT_EQ(urls->count(), stored().size());
+}
+
+TEST_F(UrlPrompts, ARateLimitNeedsASelectedUrl)
+{
+    QMetaObject::invokeMethod(page, "actAdjustRateLimit");
+    settle();
+
+    answer("Select a URL in the list first.", QMessageBox::Ok);
+    EXPECT_TRUE(openDialogs<QInputDialog>().isEmpty());
+}
+
+TEST_F(UrlPrompts, ARateLimitNeedsAUrlWithAHost)
+{
+    SettingsCache::instance().downloads().setDownloadUrls({"!name!"});
+    page = addPage<DeckEditorSettingsPage>();
+    page->findChild<QListWidget *>()->setCurrentRow(0);
+    QMetaObject::invokeMethod(page, "actAdjustRateLimit");
+    settle();
+
+    answer("The selected URL does not have a valid host.", QMessageBox::Ok);
+    EXPECT_TRUE(openDialogs<QInputDialog>().isEmpty());
+}
+
+TEST_F(UrlPrompts, AnAcceptedRateLimitIsStoredForTheHostItWasOpenedOn)
+{
+    urls->setCurrentRow(0);
+    QInputDialog *prompt = openPrompt(page, "actAdjustRateLimit");
+    ASSERT_NE(prompt, nullptr);
+    EXPECT_EQ(prompt->intValue(), DownloadSettings::DEFAULT_HOST_REQUEST_LIMIT);
+    EXPECT_EQ(prompt->intMinimum(), DownloadSettings::MIN_HOST_REQUEST_LIMIT);
+    EXPECT_EQ(prompt->intMaximum(), DownloadSettings::DEFAULT_HOST_REQUEST_LIMIT);
+
+    urls->setCurrentRow(1);
+    SettingsCache::instance().downloads().setHostRequestLimits({{"example.org", 2}});
+    prompt->setIntValue(3);
+    accept(prompt);
+
+    EXPECT_EQ(limits(), (QHash<QString, int>{{"example.org", 2}, {"example.com", 3}}));
+}
+
+TEST_F(UrlPrompts, ACancelledRateLimitChangesNothing)
+{
+    urls->setCurrentRow(0);
+    QInputDialog *prompt = openPrompt(page, "actAdjustRateLimit");
+    ASSERT_NE(prompt, nullptr);
+    prompt->setIntValue(3);
+    prompt->reject();
+    settle();
+
+    EXPECT_TRUE(limits().isEmpty());
 }
 } // namespace
 

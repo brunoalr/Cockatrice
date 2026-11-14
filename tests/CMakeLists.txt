@@ -840,6 +840,7 @@ if(WITH_CLIENT)
     SOURCES
     ${CLIENT_SRC}/client/network/update/card_spoiler/spoiler_background_updater.cpp
     ${CLIENT_SRC}/client/network/update/card_spoiler/spoiler_file.cpp
+    ${CLIENT_SRC}/client/settings/shortcut_treeview.cpp
     ${CLIENT_SRC}/interface/pixel_map_generator.cpp
     ${CLIENT_SRC}/interface/shutdown_chain.cpp
     ${CLIENT_SRC}/interface/theme_config.cpp
@@ -856,6 +857,9 @@ if(WITH_CLIENT)
     ${CLIENT_SRC}/interface/widgets/settings_page/general_settings_page.cpp
     ${CLIENT_SRC}/interface/widgets/server/user/user_info_connection.cpp
     ${CLIENT_SRC}/interface/widgets/settings_page/settings_search_model.cpp
+    ${CLIENT_SRC}/interface/widgets/settings_page/shortcut_settings_page.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/custom_line_edit.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/sequence_edit.cpp
     ${SETTINGS_SOURCES}
     settings_dialogs_test.cpp
     LIBS
