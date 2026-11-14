@@ -25,6 +25,7 @@
 #include <QMessageBox>
 #include <QPointer>
 #include <QPushButton>
+#include <QScreen>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QToolButton>
@@ -648,6 +649,8 @@ protected:
     void SetUp() override
     {
         menu->addAction("Clear chat");
+        window->setGeometry(200, 100, 300, 200);
+        button->move(100, 50);
         window->show();
         Dialogs::showMenuOnClick(button, menu);
     }
@@ -657,16 +660,38 @@ protected:
         menu->close();
         settle();
     }
+
+    QRect shownMenu() const
+    {
+        QTest::mouseClick(button, Qt::LeftButton);
+        settle();
+        EXPECT_TRUE(menu->isVisible());
+        return menu->geometry();
+    }
 };
 
 TEST_F(ToolButtonMenu, AClickShowsTheMenuBelowTheButton)
 {
-    QTest::mouseClick(button, Qt::LeftButton);
+    EXPECT_EQ(shownMenu().topLeft(), button->mapToGlobal(QPoint(0, button->height())));
+}
+
+TEST_F(ToolButtonMenu, InARightToLeftLayoutTheMenuIsRightAligned)
+{
+    window->setLayoutDirection(Qt::RightToLeft);
+
+    EXPECT_EQ(shownMenu().topRight(), button->mapToGlobal(QPoint(button->width() - 1, button->height())));
+}
+
+TEST_F(ToolButtonMenu, WithoutRoomBelowTheMenuOpensAboveTheButton)
+{
+    const QRect area = button->screen()->availableGeometry();
+    window->move(window->x(), area.bottom() + 1 - window->height());
+    button->move(button->x(), window->height() - button->height());
     settle();
 
-    EXPECT_TRUE(menu->isVisible());
-    EXPECT_EQ(menu->pos(), button->mapToGlobal(QPoint(0, button->height())));
+    EXPECT_EQ(shownMenu().bottomLeft(), button->mapToGlobal(QPoint(0, -1)));
 }
+
 } // namespace
 
 int main(int argc, char **argv)
