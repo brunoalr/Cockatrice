@@ -6,6 +6,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QVBoxLayout>
+#include <libcockatrice/settings/servers_settings.h>
 
 class QWidget;
 
@@ -26,6 +27,7 @@ DlgLoginPrompt::DlgLoginPrompt(const QString &serverText, QWidget *parent) : QDi
     mainLayout->addLayout(formLayout);
 
     savePasswordCheckBox = new QCheckBox(tr("Save password for this server"), this);
+    savePasswordCheckBox->setVisible(ServersSettings::canStorePasswords());
     mainLayout->addWidget(savePasswordCheckBox);
 
     auto *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);

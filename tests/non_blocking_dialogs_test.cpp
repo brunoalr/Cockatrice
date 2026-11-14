@@ -23,8 +23,10 @@
 #include <QColorDialog>
 #include <QFileDialog>
 #include <QInputDialog>
+#include <QLineEdit>
 #include <QPointer>
 #include <QPushButton>
+#include <QVBoxLayout>
 #include <QWidget>
 #include <gtest/gtest.h>
 #include <memory>
@@ -55,6 +57,29 @@ protected:
     void closeEvent(QCloseEvent *event) override
     {
         event->accept();
+    }
+};
+
+// As the browser does: the window is activated before its widgets are visible, and the focus moves on.
+class DialogThatLosesItsFocus : public QDialog
+{
+public:
+    QLineEdit *first = new QLineEdit(this);
+    QLineEdit *second = new QLineEdit(this);
+
+    explicit DialogThatLosesItsFocus(QWidget *parent) : QDialog(parent)
+    {
+        auto *layout = new QVBoxLayout(this);
+        layout->addWidget(first);
+        layout->addWidget(second);
+        first->setFocus();
+    }
+
+protected:
+    void showEvent(QShowEvent *event) override
+    {
+        QDialog::showEvent(event);
+        focusNextChild();
     }
 };
 
@@ -89,6 +114,16 @@ TEST_F(NonBlockingDialogs, ConfirmReturnsBeforeTheCallbackRuns)
     QMessageBox *box = onlyMessageBox();
     ASSERT_NE(box, nullptr);
     EXPECT_TRUE(box->isVisible());
+}
+
+TEST_F(NonBlockingDialogs, ADialogOpensWithTheFocusItChose)
+{
+    auto *dialog = new DialogThatLosesItsFocus(parent.get());
+
+    Dialogs::open(dialog, {});
+    settle();
+
+    EXPECT_EQ(dialog->focusWidget(), dialog->first);
 }
 
 TEST_F(NonBlockingDialogs, ADialogWithAParentBlocksTheWholeApplication)

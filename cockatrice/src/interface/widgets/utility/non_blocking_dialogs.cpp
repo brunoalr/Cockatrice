@@ -95,7 +95,13 @@ void show(QDialog *dialog, std::function<void(int result)> thenFinished)
     // A file dialog must be that sheet: macOS defers an application-modal native one to an exec() that never comes.
     const bool isFileDialog = qobject_cast<QFileDialog *>(dialog) != nullptr;
     dialog->setWindowModality(isFileDialog ? Qt::WindowModal : Qt::ApplicationModal);
+    // The browser activates the window before its widgets are visible, and Qt then gives the focus to the
+    // widget after the one the dialog chose.
+    const QPointer<QWidget> chosen = dialog->focusWidget();
     dialog->show();
+    if (chosen) {
+        chosen->setFocus();
+    }
 }
 
 void notify(QWidget *parent,
