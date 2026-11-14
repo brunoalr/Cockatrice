@@ -77,10 +77,19 @@ keep_previous() {
     echo "::error::the files in $url/app/$previous/ do not match their version"
     exit 1
   fi
-  # A version published before this notice existed has none
-  if ! curl -fsSL --retry 3 -o "$site/app/$previous/QT.txt" "$url/app/$previous/QT.txt"; then
-    rm -f "$site/app/$previous/QT.txt"
+  if ! status=$(curl -sSL --retry 3 -w '%{http_code}' -o "$site/app/$previous/QT.txt" "$url/app/$previous/QT.txt"); then
+    echo "::error::cannot read $url/app/$previous/QT.txt"
+    exit 1
   fi
+  case $status in
+    200) ;;
+    # A version published before this notice existed has none
+    404) rm -f "$site/app/$previous/QT.txt" ;;
+    *)
+      echo "::error::$url/app/$previous/QT.txt answered HTTP $status"
+      exit 1
+      ;;
+  esac
   echo "kept the previous version $previous from $url"
 }
 

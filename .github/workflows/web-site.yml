@@ -11,9 +11,10 @@ on:
         type: boolean
         default: false
 
-# One run at a time: each reads the live site to keep its version before it publishes
+# One publishing run at a time: each reads the live site to keep its version. A trial run has a group of
+# its own, or it would take the one waiting place in the group from a publish.
 concurrency:
-  group: web-site
+  group: web-site-${{ inputs.publish && 'publish' || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -35,14 +36,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # A run started again later would pair this commit's page with a newer application
-          head=$(git ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" refs/heads/master | cut -f1)
-          if [[ $head != "$GITHUB_SHA" ]]; then
-            echo "::error::master has moved from $GITHUB_SHA to $head since this run was started: start a new run"
-            exit 1
-          fi
           if [[ $GITHUB_REF != refs/heads/master ]]; then
             echo "::error::The site is built from master: start this workflow there, not on $GITHUB_REF"
+            exit 1
+          fi
+          # A run started again later would pair this commit's page with a newer application
+          head=$(git ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" refs/heads/master | cut -f1)
+          if [[ -z $head ]]; then
+            echo "::error::cannot read master's head from $GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+            exit 1
+          fi
+          if [[ $head != "$GITHUB_SHA" ]]; then
+            echo "::error::master has moved from $GITHUB_SHA to $head since this run was started: start a new run"
             exit 1
           fi
           # Pushes that change no built file start no run, so the newest run is the build of what master holds
@@ -197,6 +202,10 @@ jobs:
       - name: "Refuse a site that master has moved past"
         run: |
           head=$(git ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" refs/heads/master | cut -f1)
+          if [[ -z $head ]]; then
+            echo "::error::cannot read master's head from $GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+            exit 1
+          fi
           if [[ $head != "$GITHUB_SHA" ]]; then
             echo "::error::master has moved from $GITHUB_SHA to $head since this site was built: start a new run"
             exit 1
