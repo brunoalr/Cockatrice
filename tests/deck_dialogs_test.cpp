@@ -43,6 +43,7 @@
 #include <libcockatrice/settings/visual_deck_storage_settings.h>
 #include <optional>
 
+ThemeManager *themeManager = nullptr; // NOSONAR: the client declares it extern and assigns it
 RNG_Abstract *rng = nullptr;          // NOSONAR: the client declares it extern and assigns it
 
 namespace
@@ -70,6 +71,17 @@ QLineEdit *lineEditWithPlaceholder(const QWidget *parent, const QString &placeho
         }
     }
     ADD_FAILURE() << "no line edit has a placeholder starting with " << placeholderStart.toStdString();
+    return nullptr;
+}
+
+QAction *actionWithText(const QWidget *parent, const QString &text)
+{
+    for (QAction *action : parent->findChildren<QAction *>()) {
+        if (action->text() == text) {
+            return action;
+        }
+    }
+    ADD_FAILURE() << "no action reads " << text.toStdString();
     return nullptr;
 }
 
@@ -420,11 +432,72 @@ TEST_F(TagDialogs, TheDeckTagDialogWarnsAboutADuplicateTag)
     expectWarningKeepsDialogOpen(dialog, "This tag already exists.");
 }
 
+class TokenDialog : public DeckDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    QPointer<DlgEditTokens> dialog;
+
+    void SetUp() override
+    {
+        CardDatabaseManager::getInstance()->addCard(CardInfo::newInstance("Existing"));
+        dialog = new DlgEditTokens(window.get());
+        dialog->show();
+    }
+
+    QInputDialog *askForAToken() const
+    {
+        actionWithText(dialog, "Add token")->trigger();
+        settle();
+        return onlyOpen<QInputDialog>();
+    }
+
+    static QInputDialog *enter(QInputDialog *prompt, const QString &name)
+    {
+        prompt->setTextValue(name);
+        prompt->accept();
+        settle();
+        return prompt;
+    }
+};
+
+TEST_F(TokenDialog, ATakenNameIsRefusedAndAskedForAgainUntilCancelled)
+{
+    QInputDialog *prompt = askForAToken();
+    ASSERT_NE(prompt, nullptr);
+    enter(prompt, "Existing");
+    clickInOnlyBox(QMessageBox::Ok, "The chosen name conflicts with an existing card or token.\nMake sure to enable "
+                                    "the 'Token' set in the \"Manage sets\" dialog to display them correctly.");
+
+    prompt = onlyOpen<QInputDialog>();
+    ASSERT_NE(prompt, nullptr);
+    prompt->reject();
+    settle();
+
+    EXPECT_TRUE(openDialogs<QInputDialog>().isEmpty());
+    EXPECT_TRUE(openDialogs<QMessageBox>().isEmpty());
+    EXPECT_TRUE(dialog->isVisible());
+}
+
+TEST_F(TokenDialog, AFreeNameAddsTheToken)
+{
+    QInputDialog *prompt = askForAToken();
+    ASSERT_NE(prompt, nullptr);
+    enter(prompt, "Goblin");
+
+    const CardInfoPtr token = CardDatabaseManager::query()->getCardInfo("Goblin");
+    ASSERT_TRUE(token);
+    EXPECT_TRUE(token->getIsToken());
+    EXPECT_TRUE(openDialogs<QInputDialog>().isEmpty());
+}
+
 } // namespace
 
 int main(int argc, char **argv)
 {
     return DialogTest::run(argc, argv, QStringLiteral("deck-dialogs-test"), [] {
+        ThemeManager theme;
+        themeManager = &theme;
+
         const int result = RUN_ALL_TESTS();
 
         QDir(SettingsCache::instance().getDataPath()).removeRecursively();

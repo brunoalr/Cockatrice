@@ -5,6 +5,7 @@
 #include "../../theme_icon.h"
 #include "../cards/card_size_widget.h"
 #include "../general/layout_containers/flow_widget.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "../interface/theme_manager.h"
 #include "../visual_deck_storage/deck_preview/deck_preview_color_identity_filter_widget.h"
 #include "../visual_deck_storage/deck_preview/public_deck_preview_widget.h"
@@ -21,7 +22,6 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QList>
-#include <QMessageBox>
 #include <QPixmap>
 #include <QSet>
 #include <QStringList>
@@ -255,9 +255,9 @@ void TabPublicDecks::openDeck(int deckId)
 void TabPublicDecks::openDeckFinished(const Response &response, const CommandContainer & /*commandContainer*/)
 {
     if (response.response_code() != Response::RespOk) {
-        QMessageBox::warning(this, tr("Open public deck"),
-                             tr("Failed to open the public deck (server response code %1).")
-                                 .arg(QString::number(static_cast<int>(response.response_code()))));
+        Dialogs::warning(this, tr("Open public deck"),
+                         tr("Failed to open the public deck (server response code %1).")
+                             .arg(QString::number(static_cast<int>(response.response_code()))));
         return;
     }
 
@@ -265,7 +265,7 @@ void TabPublicDecks::openDeckFinished(const Response &response, const CommandCon
     std::optional<LoadedDeck> deckOpt =
         DeckLoader::loadFromRemote(QString::fromStdString(resp.deck()), LoadedDeck::LoadInfo::NON_REMOTE_ID);
     if (!deckOpt) {
-        QMessageBox::warning(this, tr("Open public deck"), tr("The public deck could not be parsed."));
+        Dialogs::warning(this, tr("Open public deck"), tr("The public deck could not be parsed."));
         return;
     }
 

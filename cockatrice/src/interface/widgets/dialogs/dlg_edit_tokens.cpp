@@ -2,6 +2,7 @@
 
 #include "../../theme_icon.h"
 #include "../interface/widgets/utility/get_text_with_max.h"
+#include "../interface/widgets/utility/non_blocking_dialogs.h"
 #include "card_database_display_model.h"
 #include "libcockatrice/card/card_info.h"
 #include "libcockatrice/card/database/card_database_querier.h"
@@ -17,10 +18,10 @@
 #include <QHBoxLayout>
 #include <QHash>
 #include <QHeaderView>
+#include <QInputDialog>
 #include <QItemSelectionModel>
 #include <QLabel>
 #include <QLineEdit>
-#include <QMessageBox>
 #include <QModelIndex>
 #include <QSharedPointer>
 #include <QStringLiteral>
@@ -164,21 +165,25 @@ void DlgEditTokens::tokenSelectionChanged(const QModelIndex &current, const QMod
 
 void DlgEditTokens::actAddToken()
 {
-    QString name;
-    for (;;) {
-        name = getTextWithMax(this, tr("Add token"), tr("Please enter the name of the token:"));
+    auto *prompt = newTextDialogWithMax(this, tr("Add token"), tr("Please enter the name of the token:"));
+    Dialogs::open(prompt, [this, prompt](int result) {
+        const QString name = result == QDialog::Accepted ? prompt->textValue() : QString();
         if (name.isEmpty()) {
             return;
         }
         if (databaseModel->getDatabase()->query()->getCardInfo(name)) {
-            QMessageBox::critical(this, tr("Error"),
-                                  tr("The chosen name conflicts with an existing card or token.\nMake sure to enable "
-                                     "the 'Token' set in the \"Manage sets\" dialog to display them correctly."));
-        } else {
-            break;
+            Dialogs::critical(this, tr("Error"),
+                              tr("The chosen name conflicts with an existing card or token.\nMake sure to enable "
+                                 "the 'Token' set in the \"Manage sets\" dialog to display them correctly."),
+                              [this] { actAddToken(); });
+            return;
         }
-    }
+        addToken(name);
+    });
+}
 
+void DlgEditTokens::addToken(const QString &name)
+{
     QString setName = CardSet::TOKENS_SETNAME;
     SetToPrintingsMap sets;
     sets[setName].append(PrintingInfo(databaseModel->getDatabase()->getSet(setName)));

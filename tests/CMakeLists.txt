@@ -794,10 +794,20 @@ if(WITH_CLIENT)
     SOURCES
     ${CLIENT_SRC}/client/network/parsers/deck_link_to_api_transformer.cpp
     ${CLIENT_SRC}/interface/deck_loader/card_node_function.cpp
+    ${CLIENT_SRC}/interface/pixel_map_generator.cpp
+    ${CLIENT_SRC}/interface/theme_config.cpp
+    ${CLIENT_SRC}/interface/theme_icon.cpp
+    ${CLIENT_SRC}/interface/theme_icon_badge.cpp
+    ${CLIENT_SRC}/interface/theme_icon_fill.cpp
+    ${CLIENT_SRC}/interface/theme_icon_ink.cpp
+    ${CLIENT_SRC}/interface/theme_icon_sticker.cpp
+    ${CLIENT_SRC}/interface/theme_manager.cpp
     ${CLIENT_SRC}/interface/widgets/deck_editor/deck_state_manager.cpp
     ${CLIENT_SRC}/interface/widgets/deck_editor/deck_zone_dialog.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_default_tags_editor.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_tokens.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_load_deck_from_website.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/get_text_with_max.cpp
     ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_dialog.cpp
     ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_item_widget.cpp
     ${SETTINGS_SOURCES}

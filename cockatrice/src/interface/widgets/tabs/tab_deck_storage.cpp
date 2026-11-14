@@ -8,6 +8,7 @@
 #include "../deck_share/share_bar_widget.h"
 #include "../interface/widgets/server/remote/remote_decklist_tree_widget.h"
 #include "../interface/widgets/utility/get_text_with_max.h"
+#include "../interface/widgets/utility/non_blocking_dialogs.h"
 #include "abstract_client.h"
 #include "libcockatrice/protocol/pb/commands.pb.h"
 #include "libcockatrice/protocol/pb/serverinfo_user.pb.h"
@@ -33,6 +34,7 @@
 #include <QMessageBox>
 #include <QModelIndex>
 #include <QModelIndexList>
+#include <QPersistentModelIndex>
 #include <QPixmap>
 #include <QSharedPointer>
 #include <QSize>
@@ -365,20 +367,28 @@ void TabDeckStorage::actOpenLocalDeck()
 
 void TabDeckStorage::actRenameLocal()
 {
-    QModelIndexList curLefts = localDirView->selectionModel()->selectedRows();
-    for (const auto &curLeft : curLefts) {
-        const QFileInfo info = localDirModel->fileInfo(curLeft);
+    QList<QFileInfo> files;
+    for (const auto &curLeft : localDirView->selectionModel()->selectedRows()) {
+        files.append(localDirModel->fileInfo(curLeft));
+    }
+    renameLocalFiles(files);
+}
 
-        const QString oldName = info.baseName();
-        const QString title = info.isDir() ? tr("Rename local folder") : tr("Rename local file");
+void TabDeckStorage::renameLocalFiles(QList<QFileInfo> files)
+{
+    if (files.isEmpty()) {
+        return;
+    }
+    const QFileInfo info = files.takeFirst();
 
-        bool ok;
-        QString newName = QInputDialog::getText(this, title, tr("New name:"), QLineEdit::Normal, oldName, &ok);
-        if (!ok) { // terminate all remaining selections if user cancels
-            return;
-        }
+    const QString oldName = info.baseName();
+    const QString title = info.isDir() ? tr("Rename local folder") : tr("Rename local file");
+
+    // Cancelling reports nothing, which ends the remaining selections too.
+    Dialogs::getText(this, title, tr("New name:"), oldName, [this, files, info, oldName](const QString &newName) {
         if (newName.isEmpty() || oldName == newName) {
-            continue;
+            renameLocalFiles(files);
+            return;
         }
 
         QString newFileName = newName;
@@ -388,9 +398,11 @@ void TabDeckStorage::actRenameLocal()
         const QString newFilePath = QFileInfo(info.dir(), newFileName).filePath();
 
         if (!QFile::rename(info.filePath(), newFilePath)) {
-            QMessageBox::critical(this, tr("Error"), tr("Rename failed"));
+            Dialogs::critical(this, tr("Error"), tr("Rename failed"), [this, files] { renameLocalFiles(files); });
+            return;
         }
-    }
+        renameLocalFiles(files);
+    });
 }
 
 void TabDeckStorage::actUpload()
@@ -406,20 +418,28 @@ void TabDeckStorage::actUpload()
         return;
     }
 
+    QStringList filePaths;
     for (const auto &curLeft : curLefts) {
-        if (localDirModel->isDir(curLeft)) {
-            continue;
+        if (!localDirModel->isDir(curLeft)) {
+            filePaths.append(localDirModel->filePath(curLeft));
         }
-
-        QString filePath = localDirModel->filePath(curLeft);
-        uploadDeck(filePath, targetPath);
     }
+    uploadDecks(filePaths, targetPath);
 }
 
-void TabDeckStorage::uploadDeck(const QString &filePath, const QString &targetPath)
+void TabDeckStorage::uploadDecks(QStringList filePaths, const QString &targetPath)
+{
+    if (filePaths.isEmpty()) {
+        return;
+    }
+    const QString filePath = filePaths.takeFirst();
+    uploadDeck(filePath, targetPath, [this, filePaths, targetPath] { uploadDecks(filePaths, targetPath); });
+}
+
+void TabDeckStorage::uploadDeck(const QString &filePath, const QString &targetPath, std::function<void()> thenNext)
 {
     if (!isSupportedDeckFile(filePath)) {
-        QMessageBox::critical(this, tr("Error"), tr("Invalid deck file"));
+        Dialogs::critical(this, tr("Error"), tr("Invalid deck file"), thenNext);
         return;
     }
 
@@ -428,31 +448,40 @@ void TabDeckStorage::uploadDeck(const QString &filePath, const QString &targetPa
 
     std::optional<LoadedDeck> deckOpt = DeckLoader::loadFromFile(filePath, DeckFileFormat::Cockatrice, true);
     if (!deckOpt) {
-        QMessageBox::critical(this, tr("Error"), tr("Invalid deck file"));
+        Dialogs::critical(this, tr("Error"), tr("Invalid deck file"), thenNext);
         return;
     }
 
     DeckList deck = deckOpt.value().deckList;
 
-    if (deck.getName().isEmpty()) {
-        bool ok;
-        QString deckName =
-            getTextWithMax(this, tr("Enter deck name"), tr("This decklist does not have a name.\nPlease enter a name:"),
-                           QLineEdit::Normal, deckFileInfo.completeBaseName(), &ok);
-        if (!ok) {
+    if (!deck.getName().isEmpty()) {
+        deck.setName(deck.getName().left(MAX_NAME_LENGTH));
+        sendDeck(deck, targetPath, thenNext);
+        return;
+    }
+
+    auto *prompt =
+        newTextDialogWithMax(this, tr("Enter deck name"), tr("This decklist does not have a name.\nPlease enter a name:"),
+                             QLineEdit::Normal, deckFileInfo.completeBaseName());
+    Dialogs::open(prompt, [this, prompt, deck, targetPath, thenNext](int result) mutable {
+        if (result != QDialog::Accepted) {
+            thenNext();
             return;
         }
+        QString deckName = prompt->textValue();
         if (deckName.isEmpty()) {
             deckName = tr("Unnamed deck");
         }
         deck.setName(deckName);
-    } else {
-        deck.setName(deck.getName().left(MAX_NAME_LENGTH));
-    }
+        sendDeck(deck, targetPath, thenNext);
+    });
+}
 
+void TabDeckStorage::sendDeck(const DeckList &deck, const QString &targetPath, const std::function<void()> &thenNext)
+{
     QString deckString = deck.writeToString_Native();
     if (deckString.length() > MAX_FILE_LENGTH) {
-        QMessageBox::critical(this, tr("Error"), tr("Invalid deck file"));
+        Dialogs::critical(this, tr("Error"), tr("Invalid deck file"), thenNext);
         return;
     }
 
@@ -465,13 +494,14 @@ void TabDeckStorage::uploadDeck(const QString &filePath, const QString &targetPa
     PendingCommand *pend = client->prepareSessionCommand(cmd);
     connect(pend, &PendingCommand::finished, this, &TabDeckStorage::uploadFinished);
     client->sendCommand(pend);
+    thenNext();
 }
 
 void TabDeckStorage::uploadFinished(const Response &r, const CommandContainer &commandContainer)
 {
     if (r.response_code() != Response::RespOk) {
         qCritical() << "failed to upload deck:" << r.response_code();
-        QMessageBox::critical(this, tr("Error"), tr("Failed to upload deck to server"));
+        Dialogs::critical(this, tr("Error"), tr("Failed to upload deck to server"));
         return;
     }
 
@@ -492,34 +522,33 @@ void TabDeckStorage::actNewLocalFolder()
         dirIndex = curLeft;
     }
 
-    bool ok;
-    QString folderName =
-        QInputDialog::getText(this, tr("New folder"), tr("Name of new folder:"), QLineEdit::Normal, "", &ok);
-    if (!ok || folderName.isEmpty()) {
-        return;
-    }
-
-    localDirModel->mkdir(dirIndex, folderName);
+    Dialogs::getText(this, tr("New folder"), tr("Name of new folder:"), "",
+                     [this, parentFolder = QPersistentModelIndex(dirIndex)](const QString &folderName) {
+                         if (!folderName.isEmpty()) {
+                             localDirModel->mkdir(parentFolder, folderName);
+                         }
+                     });
 }
 
 void TabDeckStorage::actDeleteLocalDeck()
 {
-    const QModelIndexList curLefts = localDirView->selectionModel()->selectedRows();
-
-    if (curLefts.isEmpty()) {
+    if (localDirView->selectionModel()->selectedRows().isEmpty()) {
         return;
     }
 
-    if (QMessageBox::warning(this, tr("Delete local file"), tr("Are you sure you want to delete the selected files?"),
-                             QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
-        return;
-    }
-
-    for (const auto &curLeft : curLefts) {
-        if (curLeft.isValid()) {
-            localDirModel->remove(curLeft);
-        }
-    }
+    // The files are read from the selection again once answered: the model may have changed meanwhile.
+    Dialogs::ask(this, QMessageBox::Warning, tr("Delete local file"),
+                 tr("Are you sure you want to delete the selected files?"), QMessageBox::Yes | QMessageBox::No,
+                 QMessageBox::NoButton, [this](QMessageBox::StandardButton answer) {
+                     if (answer != QMessageBox::Yes) {
+                         return;
+                     }
+                     for (const auto &curLeft : localDirView->selectionModel()->selectedRows()) {
+                         if (curLeft.isValid()) {
+                             localDirModel->remove(curLeft);
+                         }
+                     }
+                 });
 }
 
 void TabDeckStorage::actOpenDecksFolder()
@@ -669,20 +698,21 @@ void TabDeckStorage::newFolderFinished(const Response &response, const CommandCo
 
 void TabDeckStorage::actDeleteRemoteDeck()
 {
-    auto curRights = serverDirView->getCurrentSelection();
-
-    if (curRights.isEmpty()) {
+    if (serverDirView->getCurrentSelection().isEmpty()) {
         return;
     }
 
-    if (QMessageBox::warning(this, tr("Delete remote decks"), tr("Are you sure you want to delete the selected decks?"),
-                             QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
-        return;
-    }
-
-    for (const auto &curRight : curRights) {
-        deleteRemoteDeck(curRight);
-    }
+    // The nodes are read from the selection again once answered: a refreshed tree frees the old ones.
+    Dialogs::ask(this, QMessageBox::Warning, tr("Delete remote decks"),
+                 tr("Are you sure you want to delete the selected decks?"), QMessageBox::Yes | QMessageBox::No,
+                 QMessageBox::NoButton, [this](QMessageBox::StandardButton answer) {
+                     if (answer != QMessageBox::Yes) {
+                         return;
+                     }
+                     for (const auto &curRight : serverDirView->getCurrentSelection()) {
+                         deleteRemoteDeck(curRight);
+                     }
+                 });
 }
 
 void TabDeckStorage::deleteRemoteDeck(const RemoteDeckList_TreeModel::Node *curRight)
@@ -892,9 +922,11 @@ void TabDeckStorage::shareFromTreeFinished(const Response &response, const Comma
 
 void TabDeckStorage::showShareNotice(const QString &message, bool warning)
 {
-    QMessageBox box(warning ? QMessageBox::Warning : QMessageBox::Information, tr("Share link"), message,
-                    QMessageBox::Ok, this);
-    box.exec();
+    if (warning) {
+        Dialogs::warning(this, tr("Share link"), message);
+    } else {
+        Dialogs::information(this, tr("Share link"), message);
+    }
 }
 
 void TabDeckStorage::onShareFromTreeTimeout()
@@ -964,7 +996,7 @@ void TabDeckStorage::setVisibilityFinished(const Response &r, const CommandConta
         visibilityRefreshTimer->setInterval(VISIBILITY_REFRESH_DELAY);
         visibilityRefreshTimer->start();
     } else {
-        QMessageBox::critical(this, tr("Error"), message);
+        Dialogs::critical(this, tr("Error"), message);
     }
 }
 
@@ -972,9 +1004,8 @@ void TabDeckStorage::onVisibilityRefreshTimeout()
 {
     visibilityRefreshStarted = false;
     if (!visibilityFailures.isEmpty()) {
-        QMessageBox::critical(
-            this, tr("Error"),
-            tr("Failed to change the visibility of %n selected deck(s).", "", visibilityFailures.size()));
+        Dialogs::critical(this, tr("Error"),
+                          tr("Failed to change the visibility of %n selected deck(s).", "", visibilityFailures.size()));
         visibilityFailures.clear();
     }
     serverDirView->refreshTree();
