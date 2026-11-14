@@ -3,6 +3,7 @@
 #include "../../../client/crash/crash_reporter.h"
 #include "../../../client/settings/cache_settings.h"
 #include "../../logger.h"
+#include "../utility/non_blocking_dialogs.h"
 
 #include <QCheckBox>
 #include <QDateTime>
@@ -195,28 +196,29 @@ void DlgCrashReport::actSend()
         // closes via QDialog::reject() without touching the setting (calling
         // our reject() override here would wrongly persist NeverSend over the
         // AlwaysSend stored above when Remember was checked).
-        QMessageBox failureBox(QMessageBox::Warning, tr("Send crash report"),
-                               tr("Sending the crash report failed. Save the report locally instead?"),
-                               QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
-        failureBox.setDefaultButton(QMessageBox::Save);
-        failureBox.setEscapeButton(QMessageBox::Cancel);
-        const QMessageBox::StandardButton choice = static_cast<QMessageBox::StandardButton>(failureBox.exec());
-        if (choice == QMessageBox::Save) {
-            const QString savedPath = writeMockReport(preview, userNote);
-            if (savedPath.isEmpty()) {
-                QMessageBox::warning(this, tr("Send crash report"), tr("Could not save the crash report locally."));
-            } else {
-                QMessageBox::information(this, tr("Send crash report"),
-                                         tr("Crash report saved locally to:\n%1").arg(savedPath));
+        auto *failureBox = new QMessageBox(QMessageBox::Warning, tr("Send crash report"),
+                                           tr("Sending the crash report failed. Save the report locally instead?"),
+                                           QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
+        failureBox->setDefaultButton(QMessageBox::Save);
+        failureBox->setEscapeButton(QMessageBox::Cancel);
+        Dialogs::open(failureBox, [this, failureBox, preview, userNote](QAbstractButton *clicked) {
+            const QMessageBox::StandardButton choice = failureBox->standardButton(clicked);
+            if (choice == QMessageBox::Save) {
+                const QString savedPath = writeMockReport(preview, userNote);
+                if (savedPath.isEmpty()) {
+                    Dialogs::warning(this, tr("Send crash report"), tr("Could not save the crash report locally."),
+                                     [this] { accept(); });
+                } else {
+                    Dialogs::information(this, tr("Send crash report"),
+                                         tr("Crash report saved locally to:\n%1").arg(savedPath), [this] { accept(); });
+                }
+                return;
             }
-            accept();
-            return;
-        }
-        if (choice == QMessageBox::Discard) {
-            reporter->revokeConsent();
-            QDialog::reject();
-            return;
-        }
+            if (choice == QMessageBox::Discard) {
+                reporter->revokeConsent();
+                QDialog::reject();
+            }
+        });
         return;
     }
     const QString savedPath = writeMockReport(preview, userNote);

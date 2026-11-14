@@ -35,6 +35,7 @@
 #include "interface/pixel_map_generator.h"
 #include "interface/theme_manager.h"
 #include "interface/widgets/dialogs/dlg_crash_report.h"
+#include "interface/widgets/utility/non_blocking_dialogs.h"
 #include "interface/window_main.h"
 #include "libcockatrice/card/database/card_database.h"
 #include "libcockatrice/rng/rng_abstract.h"
@@ -204,8 +205,8 @@ static void runCrashReportFlow(CrashReporter &crashReporter, QWidget *parent, in
     } else if (crashMode == PersonalSettings::CrashReportingMode::Ask) {
         // Real mode: Send gives consent + captures the event, Don't send revokes
         // consent; the dialog owns both via the reporter.
-        DlgCrashReport crashDialog(parent, crashReady, crashReady ? &crashReporter : nullptr);
-        crashDialog.exec();
+        auto *crashDialog = new DlgCrashReport(parent, crashReady, crashReady ? &crashReporter : nullptr);
+        Dialogs::open(crashDialog, {});
     }
     // NeverSend: skip silently (no dialog, nothing written or sent).
 }
