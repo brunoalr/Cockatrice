@@ -435,7 +435,7 @@ TEST_F(ConnectionControllerDialogs, CancellingTheLoginPromptCancelsTheLink)
     EXPECT_TRUE(context.username.isEmpty());
 }
 
-class PasswordStorageDialogs : public ConnectionControllerDialogs, public ::testing::WithParamInterface<bool>
+class PasswordStorageDialogs : public ConnectionControllerDialogs, public ::testing::WithParamInterface<bool> // NOSONAR
 {
 protected:
     bool previous = ServersSettings::canStorePasswords();
