@@ -2,6 +2,8 @@
 
 #include "gtest/gtest.h"
 #include <QString>
+#include <QStringList>
+#include <functional>
 #include <libcockatrice/game/player/player_actions.h>
 #include <libcockatrice/game/zones/table_zone_logic.h>
 #include <libcockatrice/protocol/pb/command_create_token.pb.h>
@@ -178,4 +180,27 @@ TEST(TokenCommandTest, FaceUpKnownTokenPreservesExplicitPowerToughness)
     EXPECT_FALSE(command.face_down());
     EXPECT_EQ(command.pt(), "7/9");
     EXPECT_EQ(command.annotation(), "Flying");
+}
+
+TEST(PlayerActionsTest, CreateAllRelatedCardsSetsTheNextTokenOnlyAfterTheCountIsAnswered)
+{
+    GameHarness harness;
+    const CardState *caller = harness.addCardToZone(ZoneNames::TABLE, QStringLiteral("Kitten Caller"), 11);
+    ASSERT_NE(caller, nullptr);
+    PlayerActions *actions = harness.player()->getPlayerActions();
+    std::function<void()> answer;
+    QObject::connect(actions, &PlayerActions::requestCreateRelatedFromRelationDialog,
+                     [&answer](const CardState *, const CardRelation *, const std::function<void()> &thenFinished) {
+                         answer = thenFinished;
+                     });
+    QStringList nextTokens;
+    QObject::connect(actions, &PlayerActions::requestSetLastToken,
+                     [&nextTokens](const CardInfoPtr &token) { nextTokens.append(token->getName()); });
+
+    actions->actCreateAllRelatedCards(caller);
+
+    EXPECT_TRUE(nextTokens.isEmpty());
+    ASSERT_TRUE(answer);
+    answer();
+    EXPECT_EQ(nextTokens, QStringList{QStringLiteral("Kitten")});
 }

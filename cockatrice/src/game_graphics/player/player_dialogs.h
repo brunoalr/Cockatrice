@@ -13,12 +13,14 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <functional>
 #include <qtmetamacros.h>
 
 class CardItem;
 class CardRelation;
 class CardState;
 class PlayerActions;
+class QDialog;
 class QWidget;
 struct MoveTopCardsUntilOptions;
 
@@ -53,7 +55,9 @@ public slots:
                                             bool faceDown);
     void onDrawBottomCardsDialogRequested(int defaultNumberBottomCards, int maxCards);
     void onRollDieDialogRequested();
-    void onCreateRelatedFromRelationDialogRequested(const CardState *sourceCard, const CardRelation *cardRelation);
+    void onCreateRelatedFromRelationDialogRequested(const CardState *sourceCard,
+                                                    const CardRelation *cardRelation,
+                                                    const std::function<void()> &thenFinished);
     void onCreateTokenDialogRequested(const QStringList &predefinedTokens);
     void onMoveCardXCardsFromTopDialogRequested(int defaultNumberTopCardsToPlaceBelow, int deckSize);
     void onSetPTDialogRequested(const QString &oldPT);
@@ -64,6 +68,18 @@ public slots:
 private:
     PlayerGraphicsItem *player;
     PlayerActions *playerActions;
+
+    void getNumber(const QString &title,
+                   const QString &label,
+                   int value,
+                   int minimum,
+                   int maximum,
+                   const std::function<void(int number)> &thenAccepted);
+    void openHoldingDialogSemaphore(QDialog *dialog, const std::function<void(int result)> &thenFinished);
+    void createRelated(const CardState *sourceCard,
+                       const CardRelation *cardRelation,
+                       int count,
+                       const std::function<void()> &thenFinished);
 
     QWidget *dialogParent() const
     {

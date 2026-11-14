@@ -47,6 +47,21 @@
             </prop>
         </card>
         <card>
+            <name>Kitten Caller</name>
+            <set>CAT</set>
+            <tablerow>0</tablerow>
+            <text>Create X Kittens.</text>
+            <related count="x">Kitten</related>
+            <prop>
+                <muid>115</muid>
+                <colors>G</colors>
+                <manacost>XG</manacost>
+                <cmc>1</cmc>
+                <type>Sorcery</type>
+                <maintype>Sorcery</maintype>
+            </prop>
+        </card>
+        <card>
             <name>Forest</name>
             <set>LEA</set>
             <tablerow>2</tablerow>

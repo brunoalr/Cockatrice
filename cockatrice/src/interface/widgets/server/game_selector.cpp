@@ -364,9 +364,8 @@ void GameSelector::actCreate()
     // dialog is open, e.g. on server disconnect, Qt deletes its children. A stack-allocated
     // child would then be deleted by Qt and crash.
     auto *dlg = new DlgCreateGame(room, room->getGameTypes(), this);
-    dlg->setAttribute(Qt::WA_DeleteOnClose);
     connect(dlg, &QDialog::finished, this, &GameSelector::updateTitle);
-    dlg->exec();
+    Dialogs::open(dlg, {});
 }
 
 void GameSelector::actQuickHost()

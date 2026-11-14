@@ -4,6 +4,7 @@
 #include "../../client/settings/shortcuts_settings.h"
 #include "../../game_graphics/board/translate_counter_name.h"
 #include "../../interface/widgets/menus/tearoff_menu.h"
+#include "../../interface/widgets/utility/non_blocking_dialogs.h"
 
 #include <QAction>
 #include <QApplication>
@@ -146,7 +147,7 @@ void AbstractCounter::mousePressEvent(QGraphicsSceneMouseEvent *event)
 
     if (event->button() == Qt::MiddleButton || QApplication::keyboardModifiers() & Qt::ShiftModifier) {
         if (menu) {
-            menu->exec(event->screenPos());
+            menu->popup(event->screenPos());
         }
     } else {
         player->getPlayerActions()->actIncrementCounter(id, event->button() == Qt::LeftButton ? 1 : -1);
@@ -172,26 +173,31 @@ void AbstractCounter::incrementCounter()
 
 void AbstractCounter::setCounter()
 {
+    if (dialogSemaphore) {
+        return;
+    }
+
     QWidget *parent = nullptr;
     if (auto *view = scene() ? scene()->views().value(0) : nullptr) {
         parent = view->window();
     }
 
     dialogSemaphore = true;
-    AbstractCounterDialog dlg(name, QString::number(value), parent);
-    const int ok = dlg.exec();
-    dialogSemaphore = false;
+    auto *dlg = new AbstractCounterDialog(name, QString::number(value), parent);
+    Dialogs::open(dlg, Dialogs::whileAlive(this, [this, dlg](int result) {
+                      dialogSemaphore = false;
 
-    if (deleteAfterDialog) {
-        deleteLater();
-        return;
-    }
-    if (!ok) {
-        return;
-    }
+                      if (deleteAfterDialog) {
+                          deleteLater();
+                          return;
+                      }
+                      if (result != QDialog::Accepted) {
+                          return;
+                      }
 
-    Expression exp(value);
-    player->getPlayerActions()->actSetCounter(id, static_cast<int>(exp.parse(dlg.textValue())));
+                      Expression exp(value);
+                      player->getPlayerActions()->actSetCounter(id, static_cast<int>(exp.parse(dlg->textValue())));
+                  }));
 }
 
 AbstractCounterDialog::AbstractCounterDialog(const QString &name, const QString &value, QWidget *parent)
