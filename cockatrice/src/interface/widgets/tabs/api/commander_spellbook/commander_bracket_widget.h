@@ -8,6 +8,7 @@
 #include <QString>
 #include <QWidget>
 #include <QtGlobal>
+#include <functional>
 #include <qtmetamacros.h>
 
 class QLabel;
@@ -36,7 +37,8 @@ private slots:
     void maybeAutoEstimateBracket();
 
 private:
-    bool promptCommanderSpellbookIntegration();
+    void promptCommanderSpellbookIntegration(std::function<void(bool accepted)> then);
+    void showBracket();
     void updateBracketVisibility(bool visible);
     void cancelEstimate();
     void displayEstimate();

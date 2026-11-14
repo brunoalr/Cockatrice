@@ -2,6 +2,7 @@
 
 #include "../../../client/settings/cache_settings.h"
 #include "../../key_signals.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "card_database_display_model.h"
 #include "card_database_model.h"
 #include "libcockatrice/card/card_info.h"
@@ -26,6 +27,7 @@
 #include <libcockatrice/card/relation/card_relation.h>
 #include <libcockatrice/deck_list/tree/inner_deck_list_node.h>
 #include <libcockatrice/settings/layouts_settings.h>
+#include <memory>
 #include <qnamespace.h>
 #include <utility>
 
@@ -109,10 +111,10 @@ void CardDatabaseView::decrementCard(const QString &zoneName)
 }
 
 void CardDatabaseView::setZoneMenuProvider(const std::function<QList<QPair<QString, QStringList>>()> &provider,
-                                           const std::function<QString()> &newZoneHandler)
+                                           const NewZoneHandler &handler)
 {
     zoneMenuProvider = provider;
-    this->newZoneHandler = newZoneHandler;
+    newZoneHandler = handler;
 }
 
 void CardDatabaseView::updateCard(const QModelIndex &current, const QModelIndex & /*previous*/)
@@ -156,19 +158,24 @@ void CardDatabaseView::openCustomMenu(QPoint point)
         return;
     }
 
-    QMenu menu;
+    auto menu = std::make_unique<QMenu>();
+    menu->setAttribute(Qt::WA_DeleteOnClose);
     // add to deck and sideboard options
-    QAction *addToDeck = menu.addAction(tr("Add to Deck"));
-    QAction *addToSideboard = menu.addAction(tr("Add to Sideboard"));
-    QAction *selectPrinting = menu.addAction(tr("Select Printing"));
+    const QAction *addToDeck = menu->addAction(tr("Add to Deck"));
+    const QAction *addToSideboard = menu->addAction(tr("Add to Sideboard"));
+    const QAction *selectPrinting = menu->addAction(tr("Select Printing"));
 
     connect(addToDeck, &QAction::triggered, this, [this, card] { emit cardAdded(card->getName(), DECK_ZONE_MAIN); });
     connect(addToSideboard, &QAction::triggered, this,
             [this, card] { emit cardAdded(card->getName(), DECK_ZONE_SIDE); });
-    connect(selectPrinting, &QAction::triggered, this, &CardDatabaseView::selectPrintingClicked);
+    // The menu stays up while the selection may move: show the card it was opened on before the selector.
+    connect(selectPrinting, &QAction::triggered, this, [this, card] {
+        emit cardChanged(card->getName());
+        emit selectPrintingClicked();
+    });
 
     if (zoneMenuProvider) {
-        QMenu *addToZoneMenu = menu.addMenu(tr("Add to Zone"));
+        QMenu *addToZoneMenu = menu->addMenu(tr("Add to Zone"));
         const auto zoneBoards = zoneMenuProvider();
         for (const QString &boardName : InnerDecklistNode::boardZoneNames()) {
             // Boards with zones nest their children so no two menu entries
@@ -202,25 +209,23 @@ void CardDatabaseView::openCustomMenu(QPoint point)
             addToZoneMenu->addSeparator();
 
             QAction *newZoneAction = addToZoneMenu->addAction(tr("Create &new zone..."));
-            connect(newZoneAction, &QAction::triggered, this, [this, card] {
-                const QString zoneName = newZoneHandler();
-                if (!zoneName.isEmpty()) {
-                    emit cardAdded(card->getName(), zoneName);
-                }
+            connect(newZoneAction, &QAction::triggered, this, [this, card, handler = newZoneHandler] {
+                handler(Dialogs::whileAlive(
+                    this, [this, card](const QString &zoneName) { emit cardAdded(card->getName(), zoneName); }));
             });
         }
     }
 
     if (canBeCommander(*card)) {
-        QAction *edhRecCommander = menu.addAction(tr("Show on EDHRec (Commander)"));
+        const QAction *edhRecCommander = menu->addAction(tr("Show on EDHRec (Commander)"));
         connect(edhRecCommander, &QAction::triggered, this, [this, card] { emit edhrecClicked(card, true); });
     }
-    QAction *edhRecCard = menu.addAction(tr("Show on EDHRec (Card)"));
+    const QAction *edhRecCard = menu->addAction(tr("Show on EDHRec (Card)"));
     connect(edhRecCard, &QAction::triggered, this, [this, card] { emit edhrecClicked(card, false); });
 
     // filling out the related cards submenu
-    auto *relatedMenu = new QMenu(tr("Show Related cards"));
-    menu.addMenu(relatedMenu);
+    auto *relatedMenu = new QMenu(tr("Show Related cards"), menu.get());
+    menu->addMenu(relatedMenu);
     auto relatedCards = card->getAllRelatedCards();
     if (relatedCards.isEmpty()) {
         relatedMenu->setDisabled(true);
@@ -233,5 +238,5 @@ void CardDatabaseView::openCustomMenu(QPoint point)
         }
     }
 
-    menu.exec(mapToGlobal(point));
+    menu.release()->popup(mapToGlobal(point));
 }
