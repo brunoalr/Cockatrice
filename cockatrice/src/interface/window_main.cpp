@@ -725,10 +725,7 @@ void MainWindow::startupConfigCheck()
     firstRunWizardActive = true;
     if (SettingsCache::instance().network().getClientVersion() == CLIENT_INFO_NOT_SET) {
         SettingsCache::instance().downloads().resetToDefaultURLs();
-        // The desktop start-up fills the saved servers from the public list. A page reaches a server only
-        // through its secure WebSocket port, so it starts with the one server that is known to offer it.
-        SettingsCache::instance().servers().addNewServer(QStringLiteral("Rooster Ranges"), SERVERSETTINGS_DEFAULT_HOST,
-                                                         QStringLiteral("443"), QString(), QString(), false);
+        DlgConnect::saveWebServer(SettingsCache::instance().servers());
     }
     SettingsCache::instance().network().setClientVersion(VERSION_STRING);
     const QUrl page(QString::fromStdString(emscripten::val::global("location")["href"].as<std::string>()));

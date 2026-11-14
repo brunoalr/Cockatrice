@@ -435,11 +435,17 @@ void DlgRegister::preRebuildComboBoxList()
     UserConnection_Information uci;
     savedHostList = uci.getServerInfo();
 
+#ifdef Q_OS_WASM
+    // The public list would add servers that a page is not known to reach.
+    btnRefreshServers->hide();
+    rebuildComboBoxList();
+#else
     if (savedHostList.size() == 1) {
         downloadThePublicServers();
     } else {
         rebuildComboBoxList();
     }
+#endif
 }
 
 void DlgRegister::rebuildComboBoxList(int failure)

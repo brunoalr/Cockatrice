@@ -495,7 +495,10 @@ void TabSupervisor::resetTabsMenu()
     tabsMenu->addAction(aTabDeckEditor);
     tabsMenu->addAction(aTabVisualDeckEditor);
     tabsMenu->addAction(aTabEdhRec);
+#ifndef Q_OS_WASM
+    // Archidekt admits no origin but its own, so a page cannot read it.
     tabsMenu->addAction(aTabArchidekt);
+#endif
     tabsMenu->addSeparator();
     tabsMenu->addAction(aTabHome);
     tabsMenu->addAction(aTabVisualDeckStorage);
