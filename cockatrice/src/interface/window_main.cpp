@@ -204,12 +204,12 @@ void MainWindow::actDisconnect()
 
 void MainWindow::actSinglePlayer()
 {
-    DlgLocalGameOptions dlg(this);
-    if (dlg.exec() != QDialog::Accepted) {
-        return;
-    }
-
-    startLocalGame(dlg.getOptions());
+    auto *dlg = new DlgLocalGameOptions(this);
+    Dialogs::open(dlg, [this, dlg](int result) {
+        if (result == QDialog::Accepted) {
+            startLocalGame(dlg->getOptions());
+        }
+    });
 }
 
 void MainWindow::startLocalGame(const LocalGameOptions &options)
