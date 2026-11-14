@@ -1,5 +1,7 @@
 #!/bin/bash
 set -euo pipefail
+# cd prints the directory it found through CDPATH, and that text would enter the hash
+unset CDPATH
 
 app_files=(cockatrice.js cockatrice.wasm qtloader.js qtlogo.svg)
 
@@ -176,6 +178,14 @@ self_test() {
   fi
   if [[ $(<"$work/a/versions.json") != "{\"current\": \"$a\", \"previous\": null}" ]]; then
     echo "self-test FAILED: versions.json holds $(<"$work/a/versions.json")"
+    return 1
+  fi
+  if ! (cd "$work" && CDPATH=$work bash "$script" app database a-cdpath >"$out" 2>&1); then
+    echo "self-test FAILED: assembling with CDPATH exported failed: $(<"$out")"
+    return 1
+  fi
+  if [[ $(versions_of "$work/a-cdpath") != "$a" ]]; then
+    echo "self-test FAILED: with CDPATH exported the site holds versions '$(versions_of "$work/a-cdpath")', expected $a"
     return 1
   fi
 
