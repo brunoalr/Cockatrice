@@ -202,6 +202,16 @@ cockatrice_add_test(
   INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR}/cockatrice/src
 )
+cockatrice_add_test(
+  NAME
+  card_database_fetcher_test
+  SOURCES
+  ${CMAKE_SOURCE_DIR}/cockatrice/src/client/network/card_database_fetcher.cpp
+  card_database_fetcher_test.cpp
+  INCLUDE_DIRS
+  ${CMAKE_SOURCE_DIR}/cockatrice/src
+  ${CMAKE_SOURCE_DIR}/libcockatrice_network
+)
 # The installer's holder probe is Windows-only, but the wording it produces and the
 # question which programs are the payload's own are plain C++ and are what a stuck user
 # has to act on, so they are tested everywhere.
