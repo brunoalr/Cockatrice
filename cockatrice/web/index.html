@@ -12,6 +12,7 @@
     </style>
     <script>
       let isolationReloaded = false;
+      let isolationReloadPending = false;
       try {
         isolationReloaded = sessionStorage.getItem('isolation-reload') !== null;
         sessionStorage.removeItem('isolation-reload');
@@ -29,7 +30,10 @@
             return;
           }
           // the worker asks on updatefound, before it is active: a reload then would not be controlled
-          navigator.serviceWorker.ready.then(() => location.reload());
+          navigator.serviceWorker.ready.then(() => {
+            isolationReloadPending = true;
+            location.reload();
+          });
         },
       };
     </script>
@@ -50,6 +54,9 @@
       const message = document.querySelector('#message');
 
       const notIsolated = () => {
+        // clients.claim() can set controller on this page while its reload is on the way
+        if (isolationReloadPending)
+          return;
         message.textContent = 'This browser is not supported for now: it did not allow the cross-origin isolation ' +
           'that Cockatrice needs. Private windows in some browsers do not allow it; a normal window may.';
         console.error(message.textContent);
