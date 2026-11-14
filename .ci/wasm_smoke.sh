@@ -24,6 +24,10 @@ case ${WASM_SMOKE_CARDS:-} in
     ;;
   *) expected="cards\\.xml.* Cards = $WASM_SMOKE_CARDS Sets" ;;
 esac
+if [[ ${WASM_SMOKE_PERSIST:-0} == 1 && ${WASM_SMOKE_ISOLATION_HEADERS:-1} == 0 ]]; then
+  echo "WASM_SMOKE_PERSIST=1 reloads the page, and WASM_SMOKE_ISOLATION_HEADERS=0 expects exactly two page loads: set one of them only" >&2
+  exit 3
+fi
 serve_flag=
 if [[ ${WASM_SMOKE_ISOLATION_HEADERS:-1} == 0 ]]; then
   serve_flag=--no-isolation-headers
