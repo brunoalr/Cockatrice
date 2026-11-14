@@ -11,6 +11,7 @@
 #include <QSpinBox>
 #include <QString>
 #include <QStringList>
+#include <functional>
 #include <qtmetamacros.h>
 
 class QGroupBox;
@@ -107,7 +108,9 @@ private:
     QPushButton *resetAllPathsButton;
     QLabel *allPathsResetLabel;
 
-    void choosePath(QLineEdit *pathEdit, QFileDialog::FileMode mode, void (PathsSettings::*apply)(const QString &));
+    void choosePath(QLineEdit *pathEdit,
+                    QFileDialog::FileMode mode,
+                    const std::function<void(PathsSettings &, const QString &)> &apply);
 };
 
 #endif // COCKATRICE_GENERAL_SETTINGS_PAGE_H

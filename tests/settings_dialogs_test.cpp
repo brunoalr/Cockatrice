@@ -242,8 +242,7 @@ protected:
     static bool showsPath(const QWidget *page, const QString &path)
     {
         const auto edits = page->findChildren<QLineEdit *>();
-        return std::any_of(edits.cbegin(), edits.cend(),
-                           [&path](const QLineEdit *edit) { return edit->text() == path; });
+        return std::ranges::any_of(edits, [&path](const QLineEdit *edit) { return edit->text() == path; });
     }
 };
 
@@ -305,7 +304,7 @@ protected:
 
     void chooseAnotherLanguage()
     {
-        auto *page = addPage<GeneralSettingsPage>();
+        const auto *page = addPage<GeneralSettingsPage>();
         QObject::connect(page, &GeneralSettingsPage::cardDatabaseUpdateRequested, page, [this] { ++updateRequests; });
         for (QComboBox *box : page->findChildren<QComboBox *>()) {
             if (box->itemData(0) == "en" && box->count() > 1) {

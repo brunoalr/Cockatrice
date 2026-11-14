@@ -37,12 +37,13 @@ bool SettingsCloseCheck::eventFilter(QObject *, QEvent *event)
 
 bool SettingsCloseCheck::mayClose()
 {
+    using enum ShutdownChain::State;
     switch (chain.state()) {
-        case ShutdownChain::State::Accepted:
+        case Accepted:
             return true;
-        case ShutdownChain::State::Confirming:
+        case Confirming:
             return false;
-        case ShutdownChain::State::Idle:
+        case Idle:
             break;
     }
 

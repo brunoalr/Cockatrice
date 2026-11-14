@@ -87,25 +87,7 @@ AppearanceSettingsPage::AppearanceSettingsPage()
 
     connect(&styleCombo, &QComboBox::currentIndexChanged, this, &AppearanceSettingsPage::styleComboChanged);
 
-    connect(themeManager, &ThemeManager::themeChanged, this, [this, dirPath] {
-        const QString newDir = themeManager->getAvailableThemes().value(SettingsCache::instance().getThemeName());
-        const ThemeConfig cfg = ThemeConfig::fromThemeDir(newDir);
-        const QString current = cfg.colorScheme;
-
-        schemeCombo.blockSignals(true);
-        const int idx = schemeCombo.findData(current);
-        schemeCombo.setCurrentIndex(idx >= 0 ? idx : 0);
-        schemeCombo.blockSignals(false);
-
-        styleCombo.blockSignals(true);
-        const QString currentStyle = cfg.styleName;
-        const int styleIdx = currentStyle.isEmpty() ? 0 : styleCombo.findData(currentStyle);
-        styleCombo.setCurrentIndex(styleIdx >= 0 ? styleIdx : 0);
-        styleCombo.blockSignals(false);
-        previousStyle = styleCombo.currentData().toString();
-
-        updateStyleWarning();
-    });
+    connect(themeManager, &ThemeManager::themeChanged, this, &AppearanceSettingsPage::showThemeConfig);
 
     connect(&editPaletteButton, &QPushButton::clicked, this, &AppearanceSettingsPage::editPalette);
 
@@ -477,6 +459,27 @@ static int findFusionIndex(const QComboBox &combo)
         }
     }
     return -1;
+}
+
+void AppearanceSettingsPage::showThemeConfig()
+{
+    const QString newDir = themeManager->getAvailableThemes().value(SettingsCache::instance().getThemeName());
+    const ThemeConfig cfg = ThemeConfig::fromThemeDir(newDir);
+    const QString current = cfg.colorScheme;
+
+    schemeCombo.blockSignals(true);
+    const int idx = schemeCombo.findData(current);
+    schemeCombo.setCurrentIndex(idx >= 0 ? idx : 0);
+    schemeCombo.blockSignals(false);
+
+    styleCombo.blockSignals(true);
+    const QString currentStyle = cfg.styleName;
+    const int styleIdx = currentStyle.isEmpty() ? 0 : styleCombo.findData(currentStyle);
+    styleCombo.setCurrentIndex(styleIdx >= 0 ? styleIdx : 0);
+    styleCombo.blockSignals(false);
+    previousStyle = styleCombo.currentData().toString();
+
+    updateStyleWarning();
 }
 
 void AppearanceSettingsPage::updateStyleWarning()

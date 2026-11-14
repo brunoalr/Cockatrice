@@ -390,12 +390,12 @@ QStringList GeneralSettingsPage::findQmFiles()
 
 void GeneralSettingsPage::choosePath(QLineEdit *pathEdit,
                                      QFileDialog::FileMode mode,
-                                     void (PathsSettings::*apply)(const QString &))
+                                     const std::function<void(PathsSettings &, const QString &)> &apply)
 {
     PathSafetyWarning::choosePath(this, tr("Choose path"), mode, pathEdit->text(),
                                   [pathEdit, apply](const QString &path) {
                                       pathEdit->setText(path);
-                                      (SettingsCache::instance().paths().*apply)(path);
+                                      apply(SettingsCache::instance().paths(), path);
                                   });
 }
 
