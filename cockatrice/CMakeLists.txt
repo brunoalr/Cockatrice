@@ -851,6 +851,20 @@ if(Qt6LinguistTools_FOUND)
       QM_FILES_OUTPUT_VARIABLE
       cockatrice_QM
     )
+  elseif(EMSCRIPTEN)
+    # A browser tab has no directory beside the program and no Qt install: embed the .qm files, with Qt's own texts.
+    # Qt has no qtbase catalog for el, nb, zh-Hans and a few others, which the desktop goes without as well.
+    set(QT_NO_MISSING_CATALOG_LANGUAGE_WARNING ON)
+    qt_add_translations(
+      cockatrice
+      TS_FILES
+      ${cockatrice_TS}
+      RESOURCE_PREFIX
+      /translations
+      MERGE_QT_TRANSLATIONS
+      QT_TRANSLATION_CATALOGS
+      qtbase
+    )
   else()
     qt_add_translations(cockatrice TS_FILES ${cockatrice_TS} QM_FILES_OUTPUT_VARIABLE cockatrice_QM)
   endif()
