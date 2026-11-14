@@ -64,6 +64,8 @@
 #include <QMessageLogger>
 #ifdef Q_OS_WASM
 #include <QRandomGenerator>
+#include <QSignalBlocker>
+#include <libcockatrice/settings/paths_settings.h>
 #else
 #include <QNetworkInterface>
 #endif
@@ -465,6 +467,15 @@ int main(int argc, char *argv[])
 
     qCInfo(MainLog) << "Starting main program";
 
+#ifdef Q_OS_WASM
+    {
+        const QString inMemoryCacheRoot = SettingsCache::instance().getCachePath();
+        PathsSettings &paths = SettingsCache::instance().paths();
+        const QSignalBlocker noReloadBeforeMainWindowFetchesTheFiles(&paths);
+        paths.setCardDatabasePath(inMemoryCacheRoot + "/cards.xml");
+        paths.setTokenDatabasePath(inMemoryCacheRoot + "/tokens.xml");
+    }
+#else
     // Front-load the card database before constructing the main window. The
     // binary-cache read is cheap when uncontended (~1s); doing it here -- while no
     // GUI work yet competes for CPU -- avoids the multi-second, GUI-freezing
@@ -478,6 +489,7 @@ int main(int argc, char *argv[])
     // experience MainWindow::startupConfigCheck() and the onboarding wizard
     // provide. Callers that load after startup own the check.
     CardDatabaseManager::getInstance()->loadCardDatabases();
+#endif
 
     MainWindow ui;
 
