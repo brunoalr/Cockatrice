@@ -133,6 +133,7 @@
 #include <utility>
 #ifdef Q_OS_WASM
 #include "../client/network/card_database_fetcher.h"
+#include "../client/network/fallback_font_fetcher.h"
 
 #include <emscripten/val.h>
 #endif
@@ -792,6 +793,11 @@ void MainWindow::startupConfigCheck()
         });
         warning->show();
     });
+    auto *fonts = new FallbackFontFetcher(page, this);
+    connect(fonts, &FallbackFontFetcher::finished, fonts, &QObject::deleteLater);
+    // The card database has a time limit for its whole download, so the fonts wait until the link is free.
+    connect(fetcher, &CardDatabaseFetcher::fetched, fonts, &FallbackFontFetcher::fetch);
+    connect(fetcher, &CardDatabaseFetcher::failed, fonts, &FallbackFontFetcher::fetch);
     fetcher->fetch();
 #else
     AtRiskDataWarning::warnAboutDataPathsInProgramDir(this, [this] { continueStartupConfigCheck(); });
