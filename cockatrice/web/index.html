@@ -76,8 +76,11 @@
             },
           });
         } catch (e) {
+          message.textContent = `Cockatrice could not start: ${e?.message ?? e}`;
+          container.hidden = true;
+          statusBox.hidden = false;
           console.error(e);
-          console.error(e.stack);
+          console.error(e?.stack);
         }
       };
 
