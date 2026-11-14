@@ -400,9 +400,8 @@ void TabDeckStorage::renameLocalFiles(QList<QFileInfo> files)
         if (!info.suffix().isEmpty()) {
             newFileName += "." + info.suffix();
         }
-        const QString newFilePath = QFileInfo(info.dir(), newFileName).filePath();
-
-        if (!QFile::rename(info.filePath(), newFilePath)) {
+        if (const QString newFilePath = QFileInfo(info.dir(), newFileName).filePath();
+            !QFile::rename(info.filePath(), newFilePath)) {
             Dialogs::critical(this, tr("Error"), tr("Rename failed"), [this, files] { renameLocalFiles(files); });
             return;
         }
