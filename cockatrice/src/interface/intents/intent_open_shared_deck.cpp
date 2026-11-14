@@ -3,6 +3,7 @@
 #include "../deck_loader/deck_loader.h"
 #include "../widgets/dialogs/dlg_shared_decks_preview.h"
 #include "../widgets/tabs/tab_supervisor.h"
+#include "../widgets/utility/non_blocking_dialogs.h"
 #include "abstract_client.h"
 #include "contexts/context_connect_to_server.h"
 #include "intent_connect_to_server.h"
@@ -21,7 +22,6 @@
 #include <libcockatrice/protocol/pb/response_deck_share_list.pb.h>
 #include <libcockatrice/protocol/pb/serverinfo_deck_share_item.pb.h>
 #include <libcockatrice/protocol/pending_command.h>
-#include <libcockatrice/utility/qt_utils.h>
 #include <optional>
 #include <qnamespace.h>
 #include <string>
@@ -185,16 +185,20 @@ void IntentOpenSharedDeck::onItemFailure(const QString &reason)
     }
 
     const int downloadedCount = loadedDecks.size();
-    if (QtUtils::confirm(previewDialog, tr("Open shared decks"),
-                         tr("Could not download the deck \"%1\".\n\n%n deck(s) were already downloaded. Open them?", "",
-                            downloadedCount)
-                             .arg(itemNames.value(currentItemId, tr("Unknown deck"))),
-                         QMessageBox::Yes)) {
-        finishAll();
-    } else {
-        previewDialog->deleteLater();
-        emitCancelled();
-    }
+    Dialogs::confirm(previewDialog, tr("Open shared decks"),
+                     tr("Could not download the deck \"%1\".\n\n%n deck(s) were already downloaded. Open them?", "",
+                        downloadedCount)
+                         .arg(itemNames.value(currentItemId, tr("Unknown deck"))),
+                     Dialogs::whileAlive(this,
+                                         [this](bool confirmed) {
+                                             if (confirmed) {
+                                                 finishAll();
+                                             } else {
+                                                 previewDialog->deleteLater();
+                                                 emitCancelled();
+                                             }
+                                         }),
+                     QMessageBox::Yes);
 }
 
 void IntentOpenSharedDeck::onDownloadTimeout()
