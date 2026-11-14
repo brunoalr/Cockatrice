@@ -261,6 +261,15 @@ void SettingsCache::loadPaths()
         for (const QString key : {"pics", "customPics", "cardDatabase", "tokenDatabase", "spoilerDatabase"}) {
             pathsIni.remove("paths/" + key);
         }
+        // what an earlier web build stored in the data root
+        for (const QString folder : {"/settings/logs", "/settings/sentry", "/pics"}) {
+            QDir(dataPath + folder).removeRecursively();
+        }
+        QDir dataRoot(dataPath);
+        const QStringList cardFiles = {"spoiler.xml", "cards.xml", "tokens.xml", "*.cache"};
+        for (const QString &file : dataRoot.entryList(cardFiles, QDir::Files)) {
+            dataRoot.remove(file);
+        }
     }
 
     auto computePath = [&](const QString &key, const QString &defaultPath) -> QString {

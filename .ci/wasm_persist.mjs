@@ -28,6 +28,8 @@ const noStorage = 'does not let the page store data'
 const loadFailed = 'could not be loaded'
 const mayDelete = text => text.includes('may delete') && text.includes('Deck Editor > Save deck to clipboard')
 const deck = 'decks/persist-smoke.cod'
+const deckFile = '<?xml version="1.0" encoding="UTF-8"?>\n<cockatrice_deck version="1">\n' +
+  '    <deckname>persist smoke</deckname>\n    <comments></comments>\n</cockatrice_deck>\n'
 const servers = 'settings/servers.ini'
 const playerData = ['settings/', 'decks/', 'replays/', 'filters/', 'themes/', 'customsets/']
 const notPlayerData = path =>
@@ -162,13 +164,15 @@ const clientId = async page => {
   return id
 }
 
-const plant = (page, path, text) =>
+// without text, a folder
+const plant = (page, path, text = null) =>
   page.evaluate(`new Promise((resolve, reject) => {
     const open = indexedDB.open(${JSON.stringify(database)})
     open.onsuccess = () => {
       const store = open.result.transaction('FILE_DATA', 'readwrite').objectStore('FILE_DATA')
-      const contents = new TextEncoder().encode(${JSON.stringify(text)})
-      store.put({ timestamp: new Date(1000), mode: 0o100644, contents }, ${JSON.stringify(root + path)})
+      const text = ${JSON.stringify(text)}
+      const entry = text === null ? { mode: 0o40755 } : { mode: 0o100644, contents: new TextEncoder().encode(text) }
+      store.put({ timestamp: new Date(1000), ...entry }, ${JSON.stringify(root + path)})
       store.transaction.oncomplete = () => (open.result.close(), resolve())
       store.transaction.onerror = () => reject(store.transaction.error)
     }
@@ -248,8 +252,7 @@ const checks = {
     await closeTab(first)
     state.page = second
     // nothing holds the data root now, so nothing writes over this deck
-    await plant(second, deck, '<?xml version="1.0" encoding="UTF-8"?>\n<cockatrice_deck version="1">\n' +
-      '    <deckname>persist smoke</deckname>\n    <comments></comments>\n</cockatrice_deck>\n')
+    await plant(second, deck, deckFile)
     await second.started(await second.reload())
     if (keptMessage) {
       throw new Error('the refused tab kept its loading message instead of the refusal')
@@ -332,7 +335,8 @@ const checks = {
     await sleep(30000)
     await state.page.evaluate('cockatricePersist.flush()')
     const files = await state.page.evaluate('cockatricePersist.files()')
-    const size = Object.values(await readStore(state.page)).reduce((sum, file) => sum + file.size, 0)
+    const stored = await readStore(state.page)
+    const size = Object.values(stored).reduce((sum, file) => sum + file.size, 0)
     console.log(`files after a session of 30 s: ${files.join(' ')} (${size} bytes)`)
     const kept = files.filter(path => !playerData.some(dir => path.startsWith(dir)) || notPlayerData(path))
     if (kept.length) {
@@ -364,6 +368,37 @@ const checks = {
     }
     if (/\\(password=\S|savePassword=true)/.test(text)) {
       throw new Error(`${servers} still holds the saved password`)
+    }
+  },
+
+  // an earlier build stored these in the data root
+  async i(state) {
+    const first = state.page
+    const second = await newTab(state.url)
+    await until(`the second tab did not say "${refusal}"`,
+                () => second.evaluate(`!!document.body?.innerText.includes(${JSON.stringify(refusal)})`))
+    await closeTab(first)
+    state.page = second
+    const left = ['settings/logs/cockatrice.log', 'settings/sentry/session-7', 'pics/downloadedPics/card.jpg',
+                  'spoiler.xml', 'cards.xml', 'tokens.xml', 'cards.xml.cache']
+    const kept = ['decks/kept.cod', 'settings/network.ini']
+    for (const folder of ['settings/logs', 'settings/sentry', 'pics', 'pics/downloadedPics']) {
+      await plant(second, folder)
+    }
+    for (const path of left) {
+      await plant(second, path, 'planted by the check\n')
+    }
+    await plant(second, kept[0], deckFile)
+    await second.started(await second.reload())
+    await second.evaluate('cockatricePersist.flush()')
+    const stored = await readStore(second)
+    const still = left.filter(path => path in stored)
+    if (still.length) {
+      throw new Error(`still stored after a start: ${still.join(' ')}`)
+    }
+    const lost = kept.filter(path => !(path in stored))
+    if (lost.length) {
+      throw new Error(`lost at the start: ${lost.join(' ')}`)
     }
   },
 }
