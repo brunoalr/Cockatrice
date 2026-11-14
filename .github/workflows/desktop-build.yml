@@ -1175,9 +1175,11 @@ jobs:
 
   build-wasm:
     # A job-level block replaces the workflow-level one: this job only deletes its own cache entry
+    # and, on master, publishes vcpkg binaries to GitHub Packages
     permissions:
       actions: write
       contents: read
+      packages: write
     name: WebAssembly
     needs: [configure, vcpkg-baseline, resolve-qt]
     if: github.event_name != 'schedule'
@@ -1255,40 +1257,30 @@ jobs:
           echo "QT_HOST_PATH=$RUNNER_TEMP/Qt/$QT_VERSION/gcc_64" >> "$GITHUB_ENV"
           echo "QT_WASM_DIR=$RUNNER_TEMP/Qt/$QT_VERSION/wasm_multithread" >> "$GITHUB_ENV"
 
-      - name: "Key the vcpkg binaries"
-        id: vcpkg_key
+      # nuget.exe is a .NET Framework binary that vcpkg runs through mono. Ubuntu ships the netstandard facade it
+      # loads only in mono-devel, and no cert-sync: mono's TLS reads a hashed directory such as /etc/ssl/certs.
+      - name: "Add GitHub Packages as the vcpkg NuGet source"
         env:
-          DEPS_SCRIPT_HASH: ${{ hashFiles('.ci/wasm_deps.sh') }}
-        run: echo "prefix=vcpkg-wasm-$(git -C vcpkg rev-parse HEAD)-$DEPS_SCRIPT_HASH-emsdk$EMSDK_VERSION" >> "$GITHUB_OUTPUT"
-
-      # The key ends in a hash of the archive names, which are the packages' ABI hashes. A runner image that
-      # changes a hashed tool then gives a new key and a new save, not an exact hit that is never updated.
-      - name: "Restore vcpkg binaries"
-        id: restore_vcpkg
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          key: ${{ steps.vcpkg_key.outputs.prefix }}-none
-          restore-keys: ${{ steps.vcpkg_key.outputs.prefix }}-
-          path: ${{ runner.temp }}/vcpkg-bincache
+          FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          sudo apt-get install -y --no-install-recommends mono-devel
+          sudo mkdir -p /usr/share/.mono/new-certs
+          sudo ln -s /etc/ssl/certs /usr/share/.mono/new-certs/Trust
+          vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          run=(mono "$(vcpkg/vcpkg fetch nuget | tail -n 1)")
+          "${run[@]}" sources add -Source "$FEED_URL" -StorePasswordInClearText \
+            -Name GitHubPackages -UserName "$GITHUB_REPOSITORY_OWNER" -Password "$GITHUB_TOKEN"
+          "${run[@]}" setapikey "$GITHUB_TOKEN" -Source "$FEED_URL"
 
       - name: "Build protobuf and OpenSSL for WebAssembly"
-        id: deps
         env:
-          KEY_PREFIX: ${{ steps.vcpkg_key.outputs.prefix }}
+          # Only master publishes: a pull request's binaries would land under the ABI hashes master restores
+          VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,${{ github.ref == 'refs/heads/master' && 'readwrite' || 'read' }}"
+          VCPKG_REQUIRE_PUSH: ${{ github.ref == 'refs/heads/master' && 1 || '' }}
         run: |
           source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
-          mkdir -p "$RUNNER_TEMP/vcpkg-bincache"
-          VCPKG_BINARY_SOURCES="clear;files,$RUNNER_TEMP/vcpkg-bincache,readwrite" .ci/wasm_deps.sh >> "$GITHUB_ENV"
-          archives=$(cd "$RUNNER_TEMP/vcpkg-bincache" && find . -type f | sort | sha256sum | cut -c1-16)
-          echo "key=$KEY_PREFIX-$archives" >> "$GITHUB_OUTPUT"
-
-      # Only master publishes, as with every other cache of this workflow
-      - name: "Save vcpkg binaries"
-        if: github.ref == 'refs/heads/master' && steps.restore_vcpkg.outputs.cache-matched-key != steps.deps.outputs.key
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          key: ${{ steps.deps.outputs.key }}
-          path: ${{ runner.temp }}/vcpkg-bincache
+          .ci/wasm_deps.sh >> "$GITHUB_ENV"
 
       - name: "Build Cockatrice"
         env:
@@ -1407,7 +1399,7 @@ jobs:
             # come from docker-release.yml, codeql-trap-* from codeql-action in codeql.yml),
             # so that an entry of some other workflow can never be deleted by accident
             case "$key" in
-              ccache-* | Qt* | vcpkg-wasm-* | buildkit-* | index-* | codeql-trap-*) ;;
+              ccache-* | Qt* | buildkit-* | index-* | codeql-trap-*) ;;
               *) continue ;;
             esac
 
