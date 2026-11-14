@@ -64,8 +64,6 @@
 #include <QMessageLogger>
 #ifdef Q_OS_WASM
 #include <QRandomGenerator>
-#include <QSignalBlocker>
-#include <libcockatrice/settings/paths_settings.h>
 #else
 #include <QNetworkInterface>
 #endif
@@ -278,18 +276,21 @@ int main(int argc, char *argv[])
     // attach the crashed session's tail (the in-memory buffer is lost on crash). Opened in Append
     // mode with a per-launch session marker; read back via Logger::getPreviousSessionTail().
     // Declared before crash-reporter init: the startup attach below needs the log tail while the
-    // file still holds the crashed session's lines.
+    // file still holds the crashed session's lines. The web build keeps the log in memory, so it lasts
+    // one page load.
     const QString persistentLogPath =
-        SettingsCache::instance().getSettingsPath() + QStringLiteral("logs/cockatrice.log");
+        SettingsCache::instance().getSessionDataPath() + QStringLiteral("/settings/logs/cockatrice.log");
     Logger::getInstance().setPersistentLogPath(persistentLogPath);
 
     // Crash reporting: init the SDK early so a crash anywhere below is captured into the
     // local database. Uploads stay consent-gated (require_user_consent, armed in CrashReporter::init):
     // AlwaysSend gives consent here so cached envelopes flush at startup; any other mode starts
     // unconsented and the dialog below drives give/revoke. An empty DSN skips the SDK entirely and
-    // the mock fallback further below behaves exactly as before.
+    // the mock fallback further below behaves exactly as before. The web build keeps that local database
+    // in memory, so nothing in it outlives the page.
     CrashReporter crashReporter;
-    const QString crashDatabasePath = SettingsCache::instance().getSettingsPath() + QStringLiteral("sentry");
+    const QString crashDatabasePath =
+        SettingsCache::instance().getSessionDataPath() + QStringLiteral("/settings/sentry");
     // Envelopes that received the redacted log at startup (AlwaysSend path); 0 means the log was
     // NOT folded into a pending crash event and a standalone log event is still needed below.
     int crashLogAttachedEnvelopes = 0;
@@ -432,7 +433,8 @@ int main(int argc, char *argv[])
     // not leak a lock) and after the instance hand-off (a handed-off secondary exits
     // immediately and must never take a lock). Note this counts any death without
     // endSession() as a crash, including SIGTERM at logout, Task Manager kills and
-    // session-end shutdowns; in AlwaysSend those send a report too.
+    // session-end shutdowns; in AlwaysSend those send a report too. The web build keeps the lock in
+    // memory, so there an unclean exit is never reported at the next start.
     const bool uncleanExit = crashReporter.beginSession(crashDatabasePath);
 
     rng = new RNG_SFMT(CryptoUtil::randomUInt64());
@@ -470,13 +472,6 @@ int main(int argc, char *argv[])
     qCInfo(MainLog) << "Starting main program";
 
 #ifdef Q_OS_WASM
-    {
-        const QString inMemoryCacheRoot = SettingsCache::instance().getCachePath();
-        PathsSettings &paths = SettingsCache::instance().paths();
-        const QSignalBlocker noReloadBeforeMainWindowFetchesTheFiles(&paths);
-        paths.setCardDatabasePath(inMemoryCacheRoot + "/cards.xml");
-        paths.setTokenDatabasePath(inMemoryCacheRoot + "/tokens.xml");
-    }
     // A set with no saved options keeps its printings, and is adopted as the snapshot is swapped in, before any
     // model or card reads it: a first visit then needs no second parse.
     SettingsCache::instance().cardDatabase().setUnsavedSetsEnabled(true);
