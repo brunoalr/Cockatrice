@@ -47,6 +47,7 @@
 #include <libcockatrice/network/client/abstract/abstract_client.h>
 #include <qtmetamacros.h>
 
+class CardDatabaseFetcher;
 class QAction;
 class QToolButton;
 class QWidget;
@@ -235,6 +236,9 @@ private:
     CardUpdateStage cardUpdateLoggedStage = CardUpdateStage::Unknown; ///< stage of the last logged progress update
     QElapsedTimer cardUpdateProgressLogTimer;                   ///< throttles progress logging to the running stage
     CardDatabaseUpdateStatusBar *cardUpdateStatusBar = nullptr; ///< status bar widget tracking the card database update
+#ifdef Q_OS_WASM
+    CardDatabaseFetcher *cardDatabaseFetcher = nullptr;
+#endif
     DlgViewLog *logviewDialog;
     GameReplay *replay;
     DlgTipOfTheDay *tip;

@@ -206,6 +206,16 @@ DlgConnect::DlgConnect(QWidget *parent) : QDialog(parent)
 
 DlgConnect::~DlgConnect() = default;
 
+void DlgConnect::ensureWebServer(ServersSettings &servers)
+{
+    if (!servers.getServers().isEmpty()) {
+        return;
+    }
+    // A page reaches a server only through its secure WebSocket port; the default server offers one on 443.
+    servers.addNewServer(QStringLiteral("Rooster Ranges"), SERVERSETTINGS_DEFAULT_HOST, QStringLiteral("443"),
+                         QString(), QString(), false);
+}
+
 void DlgConnect::downloadThePublicServers()
 {
     btnRefreshServers->setDisabled(true);
@@ -219,11 +229,18 @@ void DlgConnect::preRebuildComboBoxList()
     UserConnection_Information uci;
     savedHostList = uci.getServerInfo();
 
+#ifdef Q_OS_WASM
+    // The public list would add servers that a page is not known to reach.
+    btnRefreshServers->hide();
+    DlgConnect::ensureWebServer(SettingsCache::instance().servers());
+    rebuildComboBoxList();
+#else
     if (savedHostList.size() == 1) {
         downloadThePublicServers();
     } else {
         rebuildComboBoxList();
     }
+#endif
 }
 
 void DlgConnect::rebuildComboBoxList(int failure)
