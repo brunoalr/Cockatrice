@@ -5,6 +5,8 @@
 #include <QDebug>
 #include <QDialog>
 #include <QFile>
+#include <QFileDialog>
+#include <QLineEdit>
 #include <QList>
 #include <QStandardPaths>
 #include <QString>
@@ -21,6 +23,20 @@ inline void settle()
 {
     QCoreApplication::processEvents();
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+}
+
+// An empty path cancels.
+inline void answerFileDialog(QFileDialog *files, const QString &path)
+{
+    if (path.isEmpty()) {
+        files->reject();
+    } else {
+        // Typed, as selectFile() leaves a focused name field and its preselected file as they are.
+        files->findChild<QLineEdit *>(QStringLiteral("fileNameEdit"))->setText(path);
+        // QFileDialog::accept() is protected; through QDialog it still validates the chosen file.
+        static_cast<QDialog *>(files)->accept();
+    }
+    settle();
 }
 
 // A dialog that blocks runs a nested event loop: fail and close it instead of hanging.

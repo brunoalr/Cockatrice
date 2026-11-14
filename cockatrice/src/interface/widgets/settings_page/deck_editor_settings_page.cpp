@@ -408,16 +408,13 @@ QString DeckEditorSettingsPage::getLastUpdateTime()
 
 void DeckEditorSettingsPage::spoilerPathButtonClicked()
 {
-    QString lsPath = QFileDialog::getExistingDirectory(this, tr("Choose path"), mpSpoilerSavePathLineEdit->text());
-    if (lsPath.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, lsPath + "/spoiler.xml")) {
-        return;
-    }
-
-    mpSpoilerSavePathLineEdit->setText(lsPath + "/spoiler.xml");
-    SettingsCache::instance().paths().setSpoilerDatabasePath(lsPath + "/spoiler.xml");
+    PathSafetyWarning::choosePath(
+        this, tr("Choose path"), QFileDialog::Directory, mpSpoilerSavePathLineEdit->text(),
+        [this](const QString &path) {
+            mpSpoilerSavePathLineEdit->setText(path);
+            SettingsCache::instance().paths().setSpoilerDatabasePath(path);
+        },
+        "spoiler.xml");
 }
 
 void DeckEditorSettingsPage::setSpoilersEnabled(bool anInput)

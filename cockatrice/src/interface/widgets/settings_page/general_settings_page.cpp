@@ -388,102 +388,50 @@ QStringList GeneralSettingsPage::findQmFiles()
                                                  TranslationLoader::applicationTranslationPaths(translationPath));
 }
 
+void GeneralSettingsPage::choosePath(QLineEdit *pathEdit,
+                                     QFileDialog::FileMode mode,
+                                     void (PathsSettings::*apply)(const QString &))
+{
+    PathSafetyWarning::choosePath(this, tr("Choose path"), mode, pathEdit->text(),
+                                  [pathEdit, apply](const QString &path) {
+                                      pathEdit->setText(path);
+                                      (SettingsCache::instance().paths().*apply)(path);
+                                  });
+}
+
 void GeneralSettingsPage::deckPathButtonClicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this, tr("Choose path"), deckPathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    deckPathEdit->setText(path);
-    SettingsCache::instance().paths().setDeckPath(path);
+    choosePath(deckPathEdit, QFileDialog::Directory, &PathsSettings::setDeckPath);
 }
 
 void GeneralSettingsPage::filtersPathButtonClicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this, tr("Choose path"), filtersPathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    filtersPathEdit->setText(path);
-    SettingsCache::instance().paths().setFiltersPath(path);
+    choosePath(filtersPathEdit, QFileDialog::Directory, &PathsSettings::setFiltersPath);
 }
 
 void GeneralSettingsPage::replaysPathButtonClicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this, tr("Choose path"), replaysPathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    replaysPathEdit->setText(path);
-    SettingsCache::instance().paths().setReplaysPath(path);
+    choosePath(replaysPathEdit, QFileDialog::Directory, &PathsSettings::setReplaysPath);
 }
 
 void GeneralSettingsPage::picsPathButtonClicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this, tr("Choose path"), picsPathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    picsPathEdit->setText(path);
-    SettingsCache::instance().paths().setPicsPath(path);
+    choosePath(picsPathEdit, QFileDialog::Directory, &PathsSettings::setPicsPath);
 }
 
 void GeneralSettingsPage::cardDatabasePathButtonClicked()
 {
-    QString path = QFileDialog::getOpenFileName(this, tr("Choose path"), cardDatabasePathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    cardDatabasePathEdit->setText(path);
-    SettingsCache::instance().paths().setCardDatabasePath(path);
+    choosePath(cardDatabasePathEdit, QFileDialog::ExistingFile, &PathsSettings::setCardDatabasePath);
 }
 
 void GeneralSettingsPage::customCardDatabaseButtonClicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this, tr("Choose path"), customCardDatabasePathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    customCardDatabasePathEdit->setText(path);
-    SettingsCache::instance().paths().setCustomCardDatabasePath(path);
+    choosePath(customCardDatabasePathEdit, QFileDialog::Directory, &PathsSettings::setCustomCardDatabasePath);
 }
 
 void GeneralSettingsPage::tokenDatabasePathButtonClicked()
 {
-    QString path = QFileDialog::getOpenFileName(this, tr("Choose path"), tokenDatabasePathEdit->text());
-    if (path.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, path)) {
-        return;
-    }
-
-    tokenDatabasePathEdit->setText(path);
-    SettingsCache::instance().paths().setTokenDatabasePath(path);
+    choosePath(tokenDatabasePathEdit, QFileDialog::ExistingFile, &PathsSettings::setTokenDatabasePath);
 }
 
 void GeneralSettingsPage::resetAllPathsClicked()

@@ -111,14 +111,7 @@ protected:
         QFileDialog *files = onlyOpen<QFileDialog>();
         ASSERT_NE(files, nullptr);
         EXPECT_EQ(files->windowModality(), Qt::WindowModal);
-        if (path.isEmpty()) {
-            files->reject();
-        } else {
-            files->selectFile(path);
-            // QFileDialog::accept() is protected; through QDialog it still validates the chosen file.
-            static_cast<QDialog *>(files)->accept();
-        }
-        settle();
+        DialogTest::answerFileDialog(files, path);
     }
 };
 
