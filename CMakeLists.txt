@@ -504,10 +504,7 @@ include(CPack)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/libcockatrice_interfaces ${CMAKE_BINARY_DIR}/libcockatrice_interfaces)
 add_subdirectory(${CMAKE_SOURCE_DIR}/libcockatrice_protocol ${CMAKE_BINARY_DIR}/libcockatrice_protocol)
-if(WITH_CLIENT
-   OR WITH_SERVER
-   OR WITH_ORACLE
-)
+if(WITH_CLIENT OR WITH_SERVER)
   add_subdirectory(${CMAKE_SOURCE_DIR}/libcockatrice_network ${CMAKE_BINARY_DIR}/libcockatrice_network)
   add_subdirectory(${CMAKE_SOURCE_DIR}/libcockatrice_server_dev ${CMAKE_BINARY_DIR}/libcockatrice_server_dev)
 endif()
