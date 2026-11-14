@@ -772,6 +772,30 @@ if(WITH_CLIENT)
   )
   cockatrice_add_test(
     NAME
+    lobby_dialogs_test
+    SOURCES
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_avatar.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_report_user.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/report_utils.cpp
+    ${CLIENT_SRC}/interface/pixel_map_generator.cpp
+    ${CLIENT_SRC}/interface/theme_config.cpp
+    ${CLIENT_SRC}/interface/theme_icon.cpp
+    ${CLIENT_SRC}/interface/theme_icon_badge.cpp
+    ${CLIENT_SRC}/interface/theme_icon_fill.cpp
+    ${CLIENT_SRC}/interface/theme_icon_ink.cpp
+    ${CLIENT_SRC}/interface/theme_icon_sticker.cpp
+    ${CLIENT_SRC}/interface/theme_manager.cpp
+    ${SETTINGS_SOURCES}
+    lobby_dialogs_test.cpp
+    LIBS
+    libcockatrice_network_client_abstract
+    libcockatrice_protocol
+    ${SETTINGS_LIBS}
+    INCLUDE_DIRS
+    ${SETTINGS_INCLUDE_DIRS}
+  )
+  cockatrice_add_test(
+    NAME
     crash_report_dialog_test
     SOURCES
     ${CLIENT_SRC}/client/crash/crash_reporter.cpp

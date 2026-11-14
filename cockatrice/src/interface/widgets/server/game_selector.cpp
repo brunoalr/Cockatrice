@@ -9,6 +9,7 @@
 #include "../interface/widgets/tabs/tab_room.h"
 #include "../interface/widgets/tabs/tab_supervisor.h"
 #include "../interface/widgets/utility/get_text_with_max.h"
+#include "../interface/widgets/utility/non_blocking_dialogs.h"
 #include "game_link.h"
 #include "game_selector_quick_filter_toolbar.h"
 #include "games_model.h"
@@ -27,6 +28,7 @@
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QInputDialog>
 #include <QItemSelectionModel>
 #include <QLabel>
 #include <QLineEdit>
@@ -52,7 +54,7 @@
 #include <libcockatrice/protocol/pending_command.h>
 #include <libcockatrice/settings/game_settings.h>
 #include <libcockatrice/settings/interface_settings.h>
-#include <libcockatrice/utility/qt_utils.h>
+#include <memory>
 #include <qlogging.h>
 #include <qnamespace.h>
 #include <string>
@@ -323,16 +325,17 @@ void GameSelector::processRemoveFromListEvent(const Event_RemoveFromList &event)
 
 void GameSelector::actSetFilter()
 {
-    DlgFilterGames dlg(gameTypeMap, gameListProxyModel, this);
+    auto *dlg = new DlgFilterGames(gameTypeMap, gameListProxyModel, this);
+    Dialogs::open(dlg, [this, dlg](int result) {
+        if (result != QDialog::Accepted) {
+            return;
+        }
 
-    if (!dlg.exec()) {
-        return;
-    }
+        gameListProxyModel->setGameFilters(dlg->getFilters());
+        gameListProxyModel->saveFilterParameters(gameTypeMap);
 
-    gameListProxyModel->setGameFilters(dlg.getFilters());
-    gameListProxyModel->saveFilterParameters(gameTypeMap);
-
-    updateTitle();
+        updateTitle();
+    });
 }
 
 void GameSelector::checkClearFilterButtonState()
@@ -503,28 +506,28 @@ void GameSelector::checkResponse(const Response &response)
 
     switch (response.response_code()) {
         case Response::RespNotInRoom:
-            QMessageBox::critical(this, tr("Error"), tr("Please join the appropriate room first."));
+            Dialogs::critical(this, tr("Error"), tr("Please join the appropriate room first."));
             break;
         case Response::RespWrongPassword:
-            QMessageBox::critical(this, tr("Error"), tr("Wrong password."));
+            Dialogs::critical(this, tr("Error"), tr("Wrong password."));
             break;
         case Response::RespSpectatorsNotAllowed:
-            QMessageBox::critical(this, tr("Error"), tr("Spectators are not allowed in this game."));
+            Dialogs::critical(this, tr("Error"), tr("Spectators are not allowed in this game."));
             break;
         case Response::RespGameFull:
-            QMessageBox::critical(this, tr("Error"), tr("The game is already full."));
+            Dialogs::critical(this, tr("Error"), tr("The game is already full."));
             break;
         case Response::RespNameNotFound:
-            QMessageBox::critical(this, tr("Error"), tr("The game does not exist any more."));
+            Dialogs::critical(this, tr("Error"), tr("The game does not exist any more."));
             break;
         case Response::RespUserLevelTooLow:
-            QMessageBox::critical(this, tr("Error"), tr("This game is only open to registered users."));
+            Dialogs::critical(this, tr("Error"), tr("This game is only open to registered users."));
             break;
         case Response::RespOnlyBuddies:
-            QMessageBox::critical(this, tr("Error"), tr("This game is only open to its creator's buddies."));
+            Dialogs::critical(this, tr("Error"), tr("This game is only open to its creator's buddies."));
             break;
         case Response::RespInIgnoreList:
-            QMessageBox::critical(this, tr("Error"), tr("You are being ignored by the creator of this game."));
+            Dialogs::critical(this, tr("Error"), tr("You are being ignored by the creator of this game."));
             break;
         default:;
     }
@@ -565,53 +568,41 @@ void GameSelector::customContextMenu(const QPoint &point)
         return;
     }
 
-    QAction joinGame(tr("Join Game"));
-    connect(&joinGame, &QAction::triggered, this, &GameSelector::actJoin);
-
-    QAction spectateGame(tr("Spectate Game"));
-    connect(&spectateGame, &QAction::triggered, this, &GameSelector::actJoinAsSpectator);
-
-    QAction getGameInfo(tr("Game Information"));
-    connect(&getGameInfo, &QAction::triggered, this, [=, this]() {
-        const ServerInfo_Game &gameInfo = gameListModel->getGame(index.data(Qt::UserRole).toInt());
-        const QMap<int, QString> &gameTypes = gameListModel->getGameTypes().value(gameInfo.room_id());
-
-        auto *dlg = new DlgCreateGame(gameInfo, gameTypes, this);
-        dlg->setAttribute(Qt::WA_DeleteOnClose);
-        dlg->exec();
-    });
-
-    QAction copyLink(tr("Cop&y game link"));
-    connect(&copyLink, &QAction::triggered, this, [=, this]() {
-        const ServerInfo_Game &gameInfo = gameListModel->getGame(index.data(Qt::UserRole).toInt());
-        QGuiApplication::clipboard()->setText(makeGameJoinLink(client->serverName(), client->serverPort(),
-                                                               gameInfo.room_id(), gameInfo.game_id(),
-                                                               QString::fromStdString(gameInfo.description())));
-    });
-
-    QMenu menu;
-    menu.addAction(&joinGame);
+    auto menu = std::make_unique<QMenu>();
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    // The list changes while the menu is up: the menu keeps the game it was opened on.
+    const ServerInfo_Game gameInfo = gameListModel->getGame(index.data(Qt::UserRole).toInt());
+    const auto join = [this, gameInfo](bool asSpectator, bool asJudge) {
+        return [this, gameInfo, asSpectator, asJudge] {
+            // Its seats may have changed meanwhile: join the game as listed now, while it still is.
+            if (!joinGameById(gameInfo.game_id(), asSpectator, asJudge)) {
+                joinGame(gameInfo, asSpectator, asJudge);
+            }
+        };
+    };
+    connect(menu->addAction(tr("Join Game")), &QAction::triggered, this, join(false, false));
 
     if (tabSupervisor->getUserInfo()->user_level() & ServerInfo_User::IsJudge) {
-        QAction joinGameAsJudge(tr("Join Game as Judge"));
-        connect(&joinGameAsJudge, &QAction::triggered, this, &GameSelector::actJoinAsJudge);
-
-        menu.addAction(&joinGameAsJudge);
-
-        QAction spectateGameAsJudge(tr("Spectate Game as Judge"));
-        connect(&spectateGameAsJudge, &QAction::triggered, this, &GameSelector::actJoinAsJudgeSpectator);
-
-        menu.addAction(&spectateGameAsJudge);
+        connect(menu->addAction(tr("Join Game as Judge")), &QAction::triggered, this, join(false, true));
+        connect(menu->addAction(tr("Spectate Game as Judge")), &QAction::triggered, this, join(true, true));
     }
 
-    menu.addAction(&spectateGame);
-    menu.addAction(&getGameInfo);
+    connect(menu->addAction(tr("Spectate Game")), &QAction::triggered, this, join(true, false));
+    connect(menu->addAction(tr("Game Information")), &QAction::triggered, this, [this, gameInfo]() {
+        const QMap<int, QString> &gameTypes = gameListModel->getGameTypes().value(gameInfo.room_id());
+
+        Dialogs::open(new DlgCreateGame(gameInfo, gameTypes, this), {});
+    });
 
     if (!client->serverName().isEmpty()) {
-        menu.addAction(&copyLink);
+        connect(menu->addAction(tr("Cop&y game link")), &QAction::triggered, this, [this, gameInfo]() {
+            QGuiApplication::clipboard()->setText(makeGameJoinLink(client->serverName(), client->serverPort(),
+                                                                   gameInfo.room_id(), gameInfo.game_id(),
+                                                                   QString::fromStdString(gameInfo.description())));
+        });
     }
 
-    menu.exec(gameListView->mapToGlobal(point));
+    menu.release()->popup(gameListView->mapToGlobal(point));
 }
 
 void GameSelector::joinGame(const bool asSpectator, const bool asJudge)
@@ -636,38 +627,50 @@ void GameSelector::joinGame(const ServerInfo_Game &game, const bool asSpectator,
     // spectator join, so ask first instead of surprising the player.
     const bool gameFull = game.player_count() == game.max_players();
     if (gameFull && !asSpectator && !asJudge && !overrideRestrictions) {
-        if (!QtUtils::confirm(this, tr("Join game"), tr("The game is full. Join as a spectator instead?"),
-                              QMessageBox::No)) {
-            return;
-        }
+        Dialogs::confirm(
+            this, tr("Join game"), tr("The game is full. Join as a spectator instead?"),
+            [this, game, asJudge](bool confirmed) {
+                if (confirmed) {
+                    joinGame(game, true, asJudge);
+                }
+            },
+            QMessageBox::No);
+        return;
     }
 
     bool spectator = asSpectator || gameFull;
 
-    QString password;
+    Command_JoinGame cmd;
+    cmd.set_game_id(game.game_id());
+    cmd.set_spectator(spectator);
+    cmd.set_override_restrictions(overrideRestrictions);
+    cmd.set_join_as_judge(asJudge);
+
     if (game.with_password() && !(spectator && !game.spectators_need_password()) && !overrideRestrictions) {
-        bool ok;
         // Games without a description have no sensible label — fall back to the
         // game id so the prompt still tells the user which game they're entering.
         const QString gameLabel = QString::fromStdString(game.description());
         const QString prompt = gameLabel.isEmpty() ? tr("Password for game #%1:").arg(game.game_id())
                                                    : tr("Password for \"%1\":").arg(gameLabel);
-        password = getTextWithMax(this, tr("Join game"), prompt, QLineEdit::Password, QString(), &ok);
-        if (!ok) {
-            return;
-        }
+        auto *dialog = newTextDialogWithMax(this, tr("Join game"), prompt, QLineEdit::Password);
+        Dialogs::open(dialog, [this, dialog, roomId = game.room_id(), cmd](int result) {
+            if (result == QDialog::Accepted) {
+                sendJoinGame(roomId, cmd, dialog->textValue());
+            }
+        });
+        return;
     }
 
-    Command_JoinGame cmd;
-    cmd.set_game_id(game.game_id());
-    cmd.set_password(password.toStdString());
-    cmd.set_spectator(spectator);
-    cmd.set_override_restrictions(overrideRestrictions);
-    cmd.set_join_as_judge(asJudge);
+    sendJoinGame(game.room_id(), cmd, QString());
+}
 
-    TabRoom *r = tabSupervisor->getRoomTabs().value(game.room_id());
+void GameSelector::sendJoinGame(int roomId, Command_JoinGame cmd, const QString &password)
+{
+    cmd.set_password(password.toStdString());
+
+    TabRoom *r = tabSupervisor->getRoomTabs().value(roomId);
     if (!r) {
-        QMessageBox::critical(this, tr("Error"), tr("Please join the respective room first."));
+        Dialogs::critical(this, tr("Error"), tr("Please join the respective room first."));
         return;
     }
 
@@ -678,7 +681,7 @@ void GameSelector::joinGame(const ServerInfo_Game &game, const bool asSpectator,
     disableButtons();
 }
 
-bool GameSelector::joinGameById(const int gameId, const bool asSpectator)
+bool GameSelector::joinGameById(const int gameId, const bool asSpectator, const bool asJudge)
 {
     for (int row = 0; row < gameListModel->rowCount(); ++row) {
         const ServerInfo_Game &game = gameListModel->getGame(row);
@@ -686,7 +689,7 @@ bool GameSelector::joinGameById(const int gameId, const bool asSpectator)
             continue;
         }
 
-        joinGame(game, asSpectator);
+        joinGame(game, asSpectator, asJudge);
         return true;
     }
 
