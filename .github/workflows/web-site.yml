@@ -5,6 +5,11 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the site on GitHub Pages
+        type: boolean
+        default: false
 
 jobs:
   app:
@@ -123,6 +128,7 @@ jobs:
       - name: "Assemble the site"
         env:
           WEB_SITE_URL: ${{ vars.WEB_SITE_URL }}
+          WEB_SITE_SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}/tree/${{ github.sha }}
         run: .ci/web_site.sh "$RUNNER_TEMP/app" "$RUNNER_TEMP/database" "$RUNNER_TEMP/site" ${WEB_SITE_URL:+"$WEB_SITE_URL"}
 
       - name: "Start the client from the site as a static host serves it"
@@ -138,3 +144,31 @@ jobs:
           name: web-site
           path: ${{ runner.temp }}/site/
           if-no-files-found: error
+
+      - name: "Upload the site for GitHub Pages"
+        if: inputs.publish
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ${{ runner.temp }}/site/
+
+  publish:
+    if: inputs.publish
+    # A job-level block replaces the workflow-level one: publishing needs these two and nothing else
+    permissions:
+      pages: write
+      id-token: write
+    name: Publish
+    needs: site
+    runs-on: ubuntu-latest    # https://github.com/actions/runner-images
+    timeout-minutes: 15
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+
+    steps:
+      - name: "Publish on GitHub Pages"
+        id: pages
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
