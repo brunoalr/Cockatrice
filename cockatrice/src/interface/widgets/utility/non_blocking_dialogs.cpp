@@ -1,9 +1,12 @@
 #include "non_blocking_dialogs.h"
 
+#include <QAbstractButton>
 #include <QEvent>
 #include <QFileDialog>
 #include <QInputDialog>
+#include <QMenu>
 #include <QPointer>
+#include <QScreen>
 
 namespace Dialogs
 {
@@ -226,6 +229,20 @@ void open(QMessageBox *box, std::function<void(QAbstractButton *clicked)> thenCl
         if (thenClicked) {
             thenClicked(box->clickedButton());
         }
+    });
+}
+
+void showMenuOnClick(QAbstractButton *button, QMenu *menu)
+{
+    // The press that closes the menu on its button would otherwise reach the button and open it again.
+    menu->setNoReplayFor(button);
+    QObject::connect(button, &QAbstractButton::clicked, menu, [button, menu] {
+        const QSize size = menu->sizeHint();
+        const QRect area = button->screen()->availableGeometry();
+        const bool fitsBelow =
+            button->mapToGlobal(QPoint(0, button->height())).y() + size.height() <= area.y() + area.height();
+        const int x = button->isRightToLeft() ? button->width() - size.width() : 0;
+        menu->popup(button->mapToGlobal(QPoint(x, fitsBelow ? button->height() : -size.height())));
     });
 }
 

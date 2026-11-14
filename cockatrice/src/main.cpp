@@ -61,7 +61,6 @@
 #include <QIcon>
 #include <QList>
 #include <QLocale>
-#include <QMessageBox>
 #include <QMessageLogger>
 #ifdef Q_OS_WASM
 #include <QRandomGenerator>
@@ -519,9 +518,8 @@ int main(int argc, char *argv[])
             ui.handleCockatriceLink(file);
         } else if (QFileInfo(file).exists()) {
             auto openDeckIntent = new IntentOpenLocalDeck(ui.getTabSupervisor(), file);
-            QObject::connect(openDeckIntent, &Intent::failed, &ui, [&ui](const QString &reason) {
-                QMessageBox::warning(&ui, QObject::tr("Open deck"), reason);
-            });
+            QObject::connect(openDeckIntent, &Intent::failed, &ui,
+                             [&ui](const QString &reason) { Dialogs::warning(&ui, QObject::tr("Open deck"), reason); });
             openDeckIntent->execute();
         }
     };

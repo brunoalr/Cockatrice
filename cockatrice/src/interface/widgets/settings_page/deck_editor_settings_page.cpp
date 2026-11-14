@@ -3,6 +3,7 @@
 #include "../../../client/settings/cache_settings.h"
 #include "../../theme_icon.h"
 #include "../dialogs/path_safety_warning.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "update/card_spoiler/spoiler_background_updater.h"
 
 #include <QAbstractItemModel>
@@ -19,12 +20,12 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHash>
-#include <QInputDialog>
 #include <QLineEdit>
 #include <QList>
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QMessageBox>
+#include <QPersistentModelIndex>
 #include <QSet>
 #include <QSizePolicy>
 #include <QStringList>
@@ -158,17 +159,15 @@ void DeckEditorSettingsPage::resetDownloadedURLsButtonClicked()
     for (const QString &url : SettingsCache::instance().downloads().getAllURLs()) {
         addUrlItem(url);
     }
-    QMessageBox::information(this, tr("Success"), tr("Download URLs have been reset."));
+    Dialogs::information(this, tr("Success"), tr("Download URLs have been reset."));
 }
 
 void DeckEditorSettingsPage::actAddURL()
 {
-    bool ok;
-    QString msg = QInputDialog::getText(this, tr("Add URL"), tr("URL:"), QLineEdit::Normal, QString(), &ok);
-    if (ok) {
+    Dialogs::getText(this, tr("Add URL"), tr("URL:"), QString(), [this](const QString &msg) {
         addUrlItem(msg);
         storeSettings();
-    }
+    });
 }
 
 void DeckEditorSettingsPage::actRemoveURL()
@@ -181,16 +180,18 @@ void DeckEditorSettingsPage::actRemoveURL()
 
 void DeckEditorSettingsPage::actEditURL()
 {
-    QListWidgetItem *item = urlList->currentItem();
-    if (item) {
+    if (const QListWidgetItem *item = urlList->currentItem()) {
         const QString oldText = urlForItem(item);
-        bool ok;
-        QString msg = QInputDialog::getText(this, tr("Edit URL"), tr("URL:"), QLineEdit::Normal, oldText, &ok);
-        if (ok) {
-            item->setData(Qt::UserRole, msg);
-            item->setText(urlLabel(msg));
+        const QPersistentModelIndex edited(urlList->model()->index(urlList->row(item), 0));
+        Dialogs::getText(this, tr("Edit URL"), tr("URL:"), oldText, [this, edited](const QString &msg) {
+            if (!edited.isValid()) {
+                return;
+            }
+            QListWidgetItem *editedItem = urlList->item(edited.row());
+            editedItem->setData(Qt::UserRole, msg);
+            editedItem->setText(urlLabel(msg));
             storeSettings();
-        }
+        });
     }
 }
 
@@ -281,13 +282,13 @@ void DeckEditorSettingsPage::refreshUrlItems()
 void DeckEditorSettingsPage::actAdjustRateLimit()
 {
     if (urlList->currentItem() == nullptr) {
-        QMessageBox::information(this, tr("Adjust Rate Limit"), tr("Select a URL in the list first."));
+        Dialogs::information(this, tr("Adjust Rate Limit"), tr("Select a URL in the list first."));
         return;
     }
 
     const QString host = QUrl(urlForItem(urlList->currentItem())).host();
     if (host.isEmpty()) {
-        QMessageBox::information(this, tr("Adjust Rate Limit"), tr("The selected URL does not have a valid host."));
+        Dialogs::information(this, tr("Adjust Rate Limit"), tr("The selected URL does not have a valid host."));
         return;
     }
 
@@ -296,7 +297,6 @@ void DeckEditorSettingsPage::actAdjustRateLimit()
     const int devCap = devCaps.value(host, DownloadSettings::DEFAULT_HOST_REQUEST_LIMIT);
     const bool unlocked = devCap == DownloadSettings::UNLIMITED_HOST_QUOTA;
 
-    bool ok = false;
     int minimum;
     int maximum;
     int defaultValue;
@@ -313,20 +313,18 @@ void DeckEditorSettingsPage::actAdjustRateLimit()
         prompt = tr("Requests per second (developer maximum is %1):").arg(maximum);
     }
 
-    const int value = QInputDialog::getInt(this, tr("Adjust Rate Limit for %1").arg(host), prompt, defaultValue,
-                                           minimum, maximum, 1, &ok);
-    if (!ok) {
-        return;
-    }
-
-    QHash<QString, int> limits = currentLimits;
-    if (unlocked ? value == 0 : value == devCap) {
-        limits.remove(host);
-    } else {
-        limits.insert(host, value);
-    }
-    SettingsCache::instance().downloads().setHostRequestLimits(limits);
-    refreshUrlItems();
+    Dialogs::getInt(this, tr("Adjust Rate Limit for %1").arg(host), prompt, defaultValue, minimum, maximum,
+                    [this, host, unlocked, devCap](int value) {
+                        // Other hosts' limits may have changed while the question was open.
+                        QHash<QString, int> limits = SettingsCache::instance().downloads().getHostRequestLimits();
+                        if (unlocked ? value == 0 : value == devCap) {
+                            limits.remove(host);
+                        } else {
+                            limits.insert(host, value);
+                        }
+                        SettingsCache::instance().downloads().setHostRequestLimits(limits);
+                        refreshUrlItems();
+                    });
 }
 
 void DeckEditorSettingsPage::urlListChanged(const QModelIndex &, int, int, const QModelIndex &, int)
@@ -408,16 +406,13 @@ QString DeckEditorSettingsPage::getLastUpdateTime()
 
 void DeckEditorSettingsPage::spoilerPathButtonClicked()
 {
-    QString lsPath = QFileDialog::getExistingDirectory(this, tr("Choose path"), mpSpoilerSavePathLineEdit->text());
-    if (lsPath.isEmpty()) {
-        return;
-    }
-    if (!PathSafetyWarning::confirmOutsideProgramDir(this, lsPath + "/spoiler.xml")) {
-        return;
-    }
-
-    mpSpoilerSavePathLineEdit->setText(lsPath + "/spoiler.xml");
-    SettingsCache::instance().paths().setSpoilerDatabasePath(lsPath + "/spoiler.xml");
+    PathSafetyWarning::choosePath(
+        this, tr("Choose path"), QFileDialog::Directory, mpSpoilerSavePathLineEdit->text(),
+        [this](const QString &path) {
+            mpSpoilerSavePathLineEdit->setText(path);
+            SettingsCache::instance().paths().setSpoilerDatabasePath(path);
+        },
+        "spoiler.xml");
 }
 
 void DeckEditorSettingsPage::setSpoilersEnabled(bool anInput)
