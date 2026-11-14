@@ -93,6 +93,11 @@ private:
 class CardDatabaseSettingsUnsavedSetsTest : public ::testing::Test
 {
 protected:
+    void SetUp() override
+    {
+        ASSERT_TRUE(tempDir.isValid());
+    }
+
     QTemporaryDir tempDir;
 };
 
@@ -139,12 +144,8 @@ TEST_F(CardDatabaseSettingsUnsavedSetsTest, SwitchOnKeepsSavedDisabledSet)
     EXPECT_FALSE(settings.isEnabled("OLD"));
 }
 
-/**
- * @brief A card database whose sets carry metadata, loaded with the web build's settings.
- *
- * The checked-in fixtures declare no set metadata, so every one of their sets counts as
- * ignored and could never become known.
- */
+// The checked-in fixtures declare no set metadata, so every one of their sets counts as ignored and could
+// never become known.
 class WebSetAdoptionTest : public ::testing::Test
 {
 protected:
@@ -335,7 +336,7 @@ TEST_F(WebSetAdoptionTest, PlayerDisabledSetsStayDisabledAndDropped)
 TEST_F(WebSetAdoptionTest, KnownIgnoredSetDoesNotHideAFirstVisit)
 {
     CardDatabaseSettings settings(settingsDir("profile"));
-    settings.saveSets({{"XXX", 5, true, true}});
+    settings.saveSets({{"XXX", 0, true, true}});
     settings.setUnsavedSetsEnabled(true);
     NoopCardPreferenceProvider prefs;
     DirPathProvider paths(root);
@@ -348,6 +349,63 @@ TEST_F(WebSetAdoptionTest, KnownIgnoredSetDoesNotHideAFirstVisit)
     for (const CardSetPtr &set : db.getSetList()) {
         EXPECT_EQ(set->getSortKey(), expectedKeys.value(set->getShortName())) << set->getShortName().toStdString();
         EXPECT_TRUE(set->getIsKnown()) << set->getShortName().toStdString();
+    }
+}
+
+TEST_F(WebSetAdoptionTest, AdoptionKeepsTheOrderAnOverlappingLoadSaved)
+{
+    CardDatabaseSettings settings(settingsDir("profile"));
+    settings.setUnsavedSetsEnabled(true);
+    NoopCardPreferenceProvider prefs;
+    DirPathProvider paths(root);
+    CardDatabase later(nullptr, &prefs, &paths, &settings);
+    later.loadCardDatabases();
+    CardDatabase first(nullptr, &prefs, &paths, &settings);
+    first.loadCardDatabases();
+    first.adoptLoadedSets();
+    // A set the later parse created only after the first adoption had saved the order.
+    later.getSet("CCC")->loadSetOptions();
+    // The player disables a set in between.
+    settings.saveSets({{"AAA", static_cast<unsigned int>(first.getSet("AAA")->getSortKey()), false, true}});
+
+    later.adoptLoadedSets();
+
+    EXPECT_FALSE(CardDatabaseSettings(settingsDir("profile")).getSetOptions("AAA").enabled);
+    const QHash<QString, int> expectedKeys = enableAllBatchedKeys();
+    CardDatabaseSettings reread(settingsDir("profile"));
+    for (const CardSetPtr &set : later.getSetList()) {
+        const QString name = set->getShortName();
+        EXPECT_EQ(set->getSortKey(), expectedKeys.value(name)) << name.toStdString();
+        EXPECT_EQ(static_cast<int>(reread.getSetOptions(name).sortKey), expectedKeys.value(name)) << name.toStdString();
+    }
+}
+
+TEST_F(WebSetAdoptionTest, SetsWithoutMetadataKeepTheirSavedOrder)
+{
+    ASSERT_TRUE(QFile::remove(root + "/cards.xml"));
+    ASSERT_TRUE(QFile::copy(QString(CARDDB_DATADIR) + "cards.xml", root + "/cards.xml"));
+    const QHash<QString, int> customKeys = {{"WHO", 0}, {"DOG", 1}, {"CAT", 2}, {" Not a Card", 3}};
+    CardDatabaseSettings settings(settingsDir("profile"));
+    QVector<SetSaveData> custom;
+    for (auto it = customKeys.cbegin(); it != customKeys.cend(); ++it) {
+        custom.append({it.key(), static_cast<unsigned int>(it.value()), true, false});
+    }
+    settings.saveSets(custom);
+    settings.setUnsavedSetsEnabled(true);
+    NoopCardPreferenceProvider prefs;
+    DirPathProvider paths(root);
+    CardDatabase db(nullptr, &prefs, &paths, &settings);
+    db.loadCardDatabases();
+    ASSERT_EQ(db.getSetList().size(), customKeys.size());
+
+    db.adoptLoadedSets();
+
+    CardDatabaseSettings reread(settingsDir("profile"));
+    for (const CardSetPtr &set : db.getSetList()) {
+        const QString name = set->getShortName();
+        ASSERT_TRUE(set->getIsKnownIgnored()) << name.toStdString();
+        EXPECT_EQ(set->getSortKey(), customKeys.value(name)) << name.toStdString();
+        EXPECT_EQ(static_cast<int>(reread.getSetOptions(name).sortKey), customKeys.value(name)) << name.toStdString();
     }
 }
 

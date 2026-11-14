@@ -154,8 +154,8 @@ public:
     /** @brief Marks all sets as known. */
     void markAllSetsAsKnown();
 
-    /** @brief For a snapshot parsed with every unsaved set enabled: marks its sets known and keeps their enablement,
-     *         so nothing needs a reparse. With no set known yet, every set gets its default-order sort key. */
+    /** @brief For a parse that read unsaved sets as enabled: marks sets with metadata known and keeps enablement,
+     *         so nothing is reparsed. If none is known and every key is 0, every set gets its default-order key. */
     void adoptLoadedSets();
 
     /**

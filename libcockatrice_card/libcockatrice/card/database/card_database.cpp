@@ -279,8 +279,14 @@ void CardDatabase::markAllSetsAsKnown()
 void CardDatabase::adoptLoadedSets()
 {
     CardSetList loaded = getSetList();
+    for (const CardSetPtr &set : loaded) {
+        // An overlapping load may have saved these after this snapshot's parse read them.
+        const ICardSetPriorityController::SetOptions saved = setPriorityController->getSetOptions(set->getShortName());
+        set->setSortKeyInMemory(saved.sortKey);
+        set->setIsKnownInMemory(saved.isKnown);
+    }
     const bool firstVisit = std::none_of(loaded.cbegin(), loaded.cend(), [](const CardSetPtr &set) {
-        return set->getIsKnown() && !set->getIsKnownIgnored();
+        return (set->getIsKnown() && !set->getIsKnownIgnored()) || set->getSortKey() != 0;
     });
     if (firstVisit) {
         loaded.defaultSort();
