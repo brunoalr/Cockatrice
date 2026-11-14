@@ -1,5 +1,6 @@
 #include "non_blocking_dialogs.h"
 
+#include <QFileDialog>
 #include <QInputDialog>
 #include <QPointer>
 
@@ -31,8 +32,10 @@ void show(QDialog *dialog, std::function<void(int result)> thenFinished)
                 Qt::QueuedConnection);
         },
         Qt::SingleShotConnection);
-    // As exec() does. open() would block the parent window only, and makes the dialog a sheet on macOS.
-    dialog->setWindowModality(Qt::ApplicationModal);
+    // As exec() does: open() would block the parent window only and make the dialog a sheet on macOS.
+    // A file dialog must be that sheet: macOS defers an application-modal native one to an exec() that never comes.
+    const bool isFileDialog = qobject_cast<QFileDialog *>(dialog) != nullptr;
+    dialog->setWindowModality(isFileDialog ? Qt::WindowModal : Qt::ApplicationModal);
     dialog->show();
 }
 

@@ -3,6 +3,7 @@
 
 #include <QApplication>
 #include <QColorDialog>
+#include <QFileDialog>
 #include <QInputDialog>
 #include <QPointer>
 #include <QPushButton>
@@ -66,6 +67,20 @@ TEST_F(NonBlockingDialogs, ADialogWithAParentBlocksTheWholeApplication)
     QInputDialog *dialog = onlyInputDialog();
     ASSERT_NE(dialog, nullptr);
     EXPECT_EQ(dialog->windowModality(), Qt::ApplicationModal);
+}
+
+// macOS opens its native file panel from show() only as a sheet of the dialog's window.
+TEST_F(NonBlockingDialogs, AFileDialogBlocksOnlyItsWindow)
+{
+    auto *dialog = new QFileDialog(parent.get());
+    Dialogs::open(dialog, [](int) {
+        // Only the modality matters here.
+    });
+
+    EXPECT_EQ(dialog->windowModality(), Qt::WindowModal);
+
+    dialog->reject();
+    settle();
 }
 
 TEST_F(NonBlockingDialogs, ConfirmShowsAQuestionWithYesAndNo)

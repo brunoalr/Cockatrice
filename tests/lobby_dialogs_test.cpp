@@ -110,7 +110,7 @@ protected:
         }
         QFileDialog *files = onlyOpen<QFileDialog>();
         ASSERT_NE(files, nullptr);
-        EXPECT_EQ(files->windowModality(), Qt::ApplicationModal);
+        EXPECT_EQ(files->windowModality(), Qt::WindowModal);
         if (path.isEmpty()) {
             files->reject();
         } else {
