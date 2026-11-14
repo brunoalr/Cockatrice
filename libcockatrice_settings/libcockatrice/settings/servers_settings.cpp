@@ -18,12 +18,16 @@ constexpr auto SERVER_GROUP = "server";
 constexpr auto SERVER_DETAILS_GROUP = "server_details";
 constexpr auto SERVERS_ARRAY = "servers";
 
+bool &passwordStorage()
+{
 #ifdef Q_OS_WASM
-// A browser keeps the settings where every page of the same origin can read them.
-bool passwordStorage = false;
+    // A browser keeps the settings where every page of the same origin can read them.
+    static bool allowed = false;
 #else
-bool passwordStorage = true;
+    static bool allowed = true;
 #endif
+    return allowed;
+}
 
 QString legacyKey(const char *field, int index)
 {
@@ -119,12 +123,12 @@ ServersSettings::ServersSettings(const QString &settingPath, QObject *parent)
 
 bool ServersSettings::canStorePasswords()
 {
-    return passwordStorage;
+    return passwordStorage();
 }
 
 void ServersSettings::setPasswordStorageForTesting(bool allowed)
 {
-    passwordStorage = allowed;
+    passwordStorage() = allowed;
 }
 
 QList<ServersSettings::ServerEntry> ServersSettings::getServers() const

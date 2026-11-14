@@ -243,7 +243,7 @@ TEST_F(ServersSettingsTest, OutOfRangeIndexReturnsNullopt)
     EXPECT_FALSE(settings.getServer(0).has_value());
 }
 
-class PasswordStorageTest : public ServersSettingsTest, public ::testing::WithParamInterface<bool>
+class PasswordStorageTest : public ServersSettingsTest, public ::testing::WithParamInterface<bool> // NOSONAR
 {
 protected:
     bool previous = ServersSettings::canStorePasswords();
