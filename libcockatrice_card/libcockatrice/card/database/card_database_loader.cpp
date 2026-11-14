@@ -142,6 +142,9 @@ LoadStatus CardDatabaseLoader::doLoadCardDatabases(bool ignoreCache)
                 loadCardDatabase(p, data);
             }
 
+            // The web build fetches fresh sources into memory on every start, and parses sets with no saved
+            // options as enabled, which the source hash does not cover: an entry there costs time and can be stale.
+#ifndef Q_OS_WASM
             // A snapshot parsed while no set is enabled has had every printing
             // stripped by the parsers, and the cache reader re-derives enablement
             // from the priority controller, so such an entry can never be reused
@@ -161,6 +164,7 @@ LoadStatus CardDatabaseLoader::doLoadCardDatabases(bool ignoreCache)
             } else if (!saveToCache(data, sourceHash)) {
                 qCWarning(CardDatabaseLoadingLog) << "Failed to write binary cache to" << cachePath();
             }
+#endif
         }
     }
 
