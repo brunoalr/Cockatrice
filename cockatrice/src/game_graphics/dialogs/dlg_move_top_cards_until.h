@@ -33,7 +33,8 @@ class DlgMoveTopCardsUntil : public QDialog
     QCheckBox *autoPlayCheckBox;
 
     void validateAndAccept();
-    bool validateMatchExists(const FilterString &filterString);
+    void confirmMatchExistsThenAccept(const FilterString &filterString);
+    void acceptExpr();
 
     [[nodiscard]] QStringList getExprs() const;
 

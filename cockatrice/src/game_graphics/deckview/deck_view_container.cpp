@@ -9,6 +9,7 @@
 #include "../../interface/widgets/dialogs/dlg_load_deck_from_website.h"
 #include "../../interface/widgets/dialogs/dlg_load_remote_deck.h"
 #include "../../interface/widgets/tabs/tab_game.h"
+#include "../../interface/widgets/utility/non_blocking_dialogs.h"
 #include "../../interface/widgets/visual_deck_storage/visual_deck_storage_widget.h"
 #include "../board/abstract_card_item.h"
 #include "deck_view.h"
@@ -286,12 +287,12 @@ void DeckViewContainer::unloadDeck()
 
 void DeckViewContainer::loadLocalDeck()
 {
-    DlgLoadDeck dialog(this);
-    if (!dialog.exec()) {
-        return;
-    }
-
-    loadDeckFromFile(dialog.selectedFiles().at(0));
+    auto *dialog = new DlgLoadDeck(this);
+    Dialogs::open(dialog, [this, dialog](int result) {
+        if (result == QDialog::Accepted) {
+            loadDeckFromFile(dialog->selectedFiles().at(0));
+        }
+    });
 }
 
 void DeckViewContainer::loadDeckFromFile(const QString &filePath)
@@ -301,7 +302,7 @@ void DeckViewContainer::loadDeckFromFile(const QString &filePath)
     std::optional<LoadedDeck> deckOpt = DeckLoader::loadFromFile(filePath, fmt, true);
 
     if (!deckOpt) {
-        QMessageBox::critical(this, tr("Error"), tr("The selected file could not be loaded."));
+        Dialogs::critical(this, tr("Error"), tr("The selected file could not be loaded."));
         return;
     }
 
@@ -315,7 +316,7 @@ void DeckViewContainer::loadDeckFromDeckList(const DeckList &deck)
     QString deckString = deck.writeToString_Native();
 
     if (deckString.length() > MAX_FILE_LENGTH) {
-        QMessageBox::critical(this, tr("Error"), tr("Deck is greater than maximum file size."));
+        Dialogs::critical(this, tr("Error"), tr("Deck is greater than maximum file size."));
         return;
     }
 
@@ -377,36 +378,41 @@ void DeckViewContainer::advancePlaymatRotation()
 
 void DeckViewContainer::loadRemoteDeck()
 {
-    DlgLoadRemoteDeck dlg(parentGame->getGame()->getClientForPlayer(playerId), this);
-    if (dlg.exec()) {
-        PendingCommand *pend = parentGame->getGame()->getGameEventHandler()->prepareDeckSelectId(dlg.getDeckId());
+    auto *dlg = new DlgLoadRemoteDeck(parentGame->getGame()->getClientForPlayer(playerId), this);
+    Dialogs::open(dlg, [this, dlg](int result) {
+        if (result != QDialog::Accepted) {
+            return;
+        }
+        PendingCommand *pend = parentGame->getGame()->getGameEventHandler()->prepareDeckSelectId(dlg->getDeckId());
         connect(pend, &PendingCommand::finished, this, &DeckViewContainer::deckSelectFinished);
         parentGame->getGame()->getGameEventHandler()->sendGameCommand(pend, playerId);
-    }
+    });
 }
 
 void DeckViewContainer::loadFromClipboard()
 {
-    auto dlg = DlgLoadDeckFromClipboard(this);
+    auto *dlg = new DlgLoadDeckFromClipboard(this);
+    Dialogs::open(dlg, [this, dlg](int result) {
+        if (result != QDialog::Accepted) {
+            return;
+        }
 
-    if (!dlg.exec()) {
-        return;
-    }
-
-    DeckList deck = dlg.getDeckList();
-    loadDeckFromDeckList(deck);
+        DeckList deck = dlg->getDeckList();
+        loadDeckFromDeckList(deck);
+    });
 }
 
 void DeckViewContainer::loadFromWebsite()
 {
-    auto dlg = DlgLoadDeckFromWebsite(this);
+    auto *dlg = new DlgLoadDeckFromWebsite(this);
+    Dialogs::open(dlg, [this, dlg](int result) {
+        if (result != QDialog::Accepted) {
+            return;
+        }
 
-    if (!dlg.exec()) {
-        return;
-    }
-
-    DeckList deck = dlg.getDeck();
-    loadDeckFromDeckList(deck);
+        DeckList deck = dlg->getDeck();
+        loadDeckFromDeckList(deck);
+    });
 }
 
 void DeckViewContainer::deckSelectFinished(const Response &r)
@@ -424,7 +430,7 @@ void DeckViewContainer::notifyPlaymatBlacklisted(const QString &cardName, const 
         return;
     }
     lastBlacklistedPlaymatNotice = cardName;
-    QMessageBox::critical(this, tr("Error"), message);
+    Dialogs::critical(this, tr("Error"), message);
 }
 
 void DeckViewContainer::readyStart()
@@ -435,11 +441,14 @@ void DeckViewContainer::readyStart()
 void DeckViewContainer::forceStart()
 {
     const auto msg = tr("Are you sure you want to force start?\nThis will kick all non-ready players from the game.");
-    if (!QtUtils::confirm(this, tr("Cockatrice"), msg, QMessageBox::Yes)) {
-        return;
-    }
-
-    parentGame->getGame()->getGameEventHandler()->sendForceStart(playerId);
+    Dialogs::confirm(
+        this, tr("Cockatrice"), msg,
+        [this](bool confirmed) {
+            if (confirmed) {
+                parentGame->getGame()->getGameEventHandler()->sendForceStart(playerId);
+            }
+        },
+        QMessageBox::Yes);
 }
 
 void DeckViewContainer::sideboardLockButtonClicked()

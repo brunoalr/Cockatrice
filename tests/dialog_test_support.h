@@ -70,6 +70,18 @@ protected:
         return open.value(0);
     }
 
+    template <typename Dialog> static Dialog *onlyOpenTopLevel()
+    {
+        QList<Dialog *> open;
+        for (QWidget *widget : QApplication::topLevelWidgets()) {
+            if (auto *dialog = qobject_cast<Dialog *>(widget); dialog && dialog->isVisible()) {
+                open.append(dialog);
+            }
+        }
+        EXPECT_EQ(open.size(), 1);
+        return open.value(0);
+    }
+
 private:
     NestedLoopWatchdog nestedLoopWatchdog;
 };
