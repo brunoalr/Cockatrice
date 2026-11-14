@@ -83,6 +83,23 @@ TEST_F(NonBlockingDialogs, ADialogWithAParentBlocksTheWholeApplication)
     EXPECT_EQ(dialog->windowModality(), Qt::ApplicationModal);
 }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+// The platform runs a native box its own way: KDE's never finishes when it is closed from its title bar.
+TEST_F(NonBlockingDialogs, MessageBoxesAreNeverThePlatformsOwn)
+{
+    Dialogs::information(parent.get(), "Title", "Text");
+    const QMessageBox *notice = onlyMessageBox();
+    ASSERT_NE(notice, nullptr);
+    EXPECT_TRUE(notice->testOption(QMessageBox::Option::DontUseNativeDialog));
+
+    auto *custom = new QMessageBox(nullptr);
+    Dialogs::open(custom, std::function<void(QAbstractButton *)>{});
+    EXPECT_TRUE(custom->testOption(QMessageBox::Option::DontUseNativeDialog));
+    custom->reject();
+    settle();
+}
+#endif
+
 // macOS opens its native file panel from show() only as a sheet of the dialog's window.
 TEST_F(NonBlockingDialogs, AFileDialogBlocksOnlyItsWindow)
 {

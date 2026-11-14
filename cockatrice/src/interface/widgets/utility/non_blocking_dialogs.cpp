@@ -64,6 +64,13 @@ void show(QDialog *dialog, std::function<void(int result)> thenFinished)
                 Qt::QueuedConnection);
         },
         Qt::SingleShotConnection);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+    // The platform runs a native box its own way: KDE's never finishes when it is closed from its title bar,
+    // and macOS runs one in a nested loop that outlives a box destroyed with its parent.
+    if (auto *box = qobject_cast<QMessageBox *>(dialog)) {
+        box->setOption(QMessageBox::Option::DontUseNativeDialog);
+    }
+#endif
     // As exec() does: open() would block the parent window only and make the dialog a sheet on macOS.
     // A file dialog must be that sheet: macOS defers an application-modal native one to an exec() that never comes.
     const bool isFileDialog = qobject_cast<QFileDialog *>(dialog) != nullptr;
