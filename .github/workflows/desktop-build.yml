@@ -1322,20 +1322,18 @@ jobs:
         env:
           # The runner image forbids the unprivileged user namespaces that Chrome's sandbox needs
           CHROME_FLAGS: --no-sandbox
+          # No card database sits beside this page: the client must say so and still start
+          WASM_SMOKE_CARDS: missing
         run: .ci/wasm_smoke.sh build/cockatrice cockatrice.html
 
-      - name: "Assemble a site from the build and a fixture card database"
-        run: |
-          mkdir "$RUNNER_TEMP/database"
-          for file in cards.xml tokens.xml; do
-            echo '<cockatrice_carddatabase version="4"></cockatrice_carddatabase>' >"$RUNNER_TEMP/database/$file"
-          done
-          .ci/web_site.sh build/cockatrice "$RUNNER_TEMP/database" "$RUNNER_TEMP/site"
+      - name: "Assemble a site from the build and the tests' card database"
+        run: .ci/web_site.sh build/cockatrice tests/carddatabase/data "$RUNNER_TEMP/site"
 
       - name: "Start the client from the site as a static host serves it"
         env:
           CHROME_FLAGS: --no-sandbox
           WASM_SMOKE_ISOLATION_HEADERS: 0
+          WASM_SMOKE_CARDS: 5
         run: .ci/wasm_smoke.sh "$RUNNER_TEMP/site"
 
       - name: "Upload artifact"
