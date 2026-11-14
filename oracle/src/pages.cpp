@@ -403,7 +403,13 @@ bool LoadSetsPage::validatePage()
         const auto url = QUrl::fromUserInput(urlLineEdit->text());
 
         if (!url.isValid()) {
-            QMessageBox::critical(this, tr("Error"), tr("The provided URL is not valid."));
+            const QString message = tr("The provided URL is not valid.");
+            if (wizard()->backgroundMode) {
+                qWarning() << message;
+                wizard()->reject();
+                return false;
+            }
+            QMessageBox::critical(this, tr("Error"), message);
             return false;
         }
 
@@ -499,7 +505,14 @@ void LoadSetsPage::actDownloadFinishedSetsFile()
     }
     auto errorCode = reply->error();
     if (errorCode != QNetworkReply::NoError) {
-        QMessageBox::critical(this, tr("Error"), tr("Network error: %1.").arg(reply->errorString()));
+        const QString message = tr("Network error: %1.").arg(reply->errorString());
+        if (wizard()->backgroundMode) {
+            qWarning() << message;
+            reply->deleteLater();
+            wizard()->reject();
+            return;
+        }
+        QMessageBox::critical(this, tr("Error"), message);
 
         wizard()->enableButtons();
         setEnabled(true);
@@ -909,10 +922,16 @@ bool TagsPage::validatePage()
         return true;
     }
 
+    // Advancing validates this page again; a background run goes on without tags after one failure.
+    if (backgroundLoadFailed) {
+        return true;
+    }
+
     const auto rejectValidation = [this](const QString &message) {
         if (wizard()->backgroundMode) {
             qWarning() << message;
             wizard()->tagDatabase.reset();
+            backgroundLoadFailed = true;
             emit readyToContinue();
         } else {
             QMessageBox::critical(this, tr("Error"), message);
@@ -1173,6 +1192,7 @@ void TagsPage::failLoad(const QString &message)
 
     if (wizard()->backgroundMode) {
         statusLabel->setText(message);
+        backgroundLoadFailed = true;
         emit readyToContinue();
         return;
     }
