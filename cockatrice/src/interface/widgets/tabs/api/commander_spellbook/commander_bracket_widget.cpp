@@ -16,6 +16,7 @@
 #include <QLabel>
 #include <QList>
 #include <QObject>
+#include <QPointer>
 #include <QPushButton>
 #include <QStringLiteral>
 #include <QTimer>
@@ -26,6 +27,16 @@
 #include <qnamespace.h>
 
 template <class T> class QSharedPointer;
+
+namespace
+{
+// The integration prompt open in any deck editor: the others wait for its answer instead of asking too.
+QPointer<QDialog> &openIntegrationPrompt()
+{
+    static QPointer<QDialog> prompt;
+    return prompt;
+}
+} // namespace
 
 CommanderBracketWidget::CommanderBracketWidget(QWidget *parent) : QWidget(parent)
 {
@@ -167,14 +178,11 @@ void CommanderBracketWidget::promptCommanderSpellbookIntegration(std::function<v
     // Each button persists its choice; a window close persists nothing. Enable and Automatic accept.
     const auto choose = [dialog, namingCombo](int mode) {
         return [dialog, namingCombo, mode] {
-            // Persist naming choice (if not disabled)
             if (mode != commanderSpellbookIntegrationEnabledIndexDisabled) {
                 bool useOfficial = namingCombo->currentIndex() == 1;
                 SettingsCache::instance().deckEditor().setCommanderSpellbookIntegrationUseOfficialBracketNames(
                     useOfficial);
             }
-
-            // Persist integration mode
             SettingsCache::instance().deckEditor().setCommanderSpellbookIntegrationEnabled(mode);
             dialog->done(mode == commanderSpellbookIntegrationEnabledIndexDisabled ? QDialog::Rejected
                                                                                    : QDialog::Accepted);
@@ -185,6 +193,7 @@ void CommanderBracketWidget::promptCommanderSpellbookIntegration(std::function<v
             choose(commanderSpellbookIntegrationEnabledIndexAutomatic));
     connect(disableBtn, &QAbstractButton::clicked, dialog, choose(commanderSpellbookIntegrationEnabledIndexDisabled));
 
+    openIntegrationPrompt() = dialog;
     Dialogs::open(dialog, [then = std::move(then)](int result) { then(result == QDialog::Accepted); });
 }
 
@@ -298,6 +307,12 @@ void CommanderBracketWidget::maybeAutoEstimateBracket()
     }
 
     if (mode == commanderSpellbookIntegrationEnabledIndexUnprompted) {
+        if (const QDialog *otherPrompt = openIntegrationPrompt()) {
+            // Queued: the prompt counts as open until it is fully destroyed; its answer is stored by then.
+            connect(otherPrompt, &QObject::destroyed, this, &CommanderBracketWidget::maybeAutoEstimateBracket,
+                    static_cast<Qt::ConnectionType>(Qt::QueuedConnection | Qt::UniqueConnection));
+            return;
+        }
         const auto promptedDeck = deck;
         prompting = true;
         promptCommanderSpellbookIntegration([this, promptedDeck](bool accepted) {

@@ -10,6 +10,7 @@
 #include "interface/widgets/dialogs/dlg_edit_tokens.h"
 #include "interface/widgets/dialogs/dlg_load_deck_from_website.h"
 #include "interface/widgets/dialogs/override_printing_warning.h"
+#include "interface/widgets/tabs/api/commander_spellbook/commander_bracket_widget.h"
 #include "interface/widgets/utility/non_blocking_dialogs.h"
 #include "interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_dialog.h"
 
@@ -40,6 +41,7 @@
 #include <libcockatrice/models/deck_list/deck_list_model.h>
 #include <libcockatrice/rng/rng_abstract.h>
 #include <libcockatrice/settings/cards_display_settings.h>
+#include <libcockatrice/settings/deck_editor_settings.h>
 #include <libcockatrice/settings/visual_deck_storage_settings.h>
 #include <optional>
 
@@ -724,6 +726,87 @@ TEST_F(PrintingOverride, NoKeepsTheSetting)
     EXPECT_FALSE(SettingsCache::instance().cardsDisplay().getOverrideAllCardArtWithPersonalPreference());
     EXPECT_EQ(pictureCacheClears().pixmap, 0);
     EXPECT_EQ(pictureCacheClears().network, 0);
+}
+
+class BracketPrompt : public DeckDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    QPointer<CommanderBracketWidget> first = new CommanderBracketWidget(window.get());
+    QPointer<CommanderBracketWidget> second = new CommanderBracketWidget(window.get());
+
+    void SetUp() override
+    {
+        SettingsCache::instance().deckEditor().setCommanderSpellbookIntegrationEnabled(
+            commanderSpellbookIntegrationEnabledIndexUnprompted);
+    }
+
+    static QSharedPointer<DeckList> commanderDeck()
+    {
+        auto deck = QSharedPointer<DeckList>::create();
+        deck->setGameFormat("commander");
+        return deck;
+    }
+
+    void loadCommanderDecks() const
+    {
+        first->setDeck(commanderDeck());
+        second->setDeck(commanderDeck());
+        settle();
+    }
+
+    // A closed prompt is deleted after its answer, and the next deck editor asks once it is gone.
+    static void settleTwice()
+    {
+        settle();
+        settle();
+    }
+};
+
+TEST_F(BracketPrompt, OneQuestionServesEveryDeckEditor)
+{
+    loadCommanderDecks();
+    QDialog *prompt = onlyOpen<QDialog>();
+    ASSERT_NE(prompt, nullptr);
+    EXPECT_EQ(prompt->parent(), first);
+
+    buttonWithText(prompt, "Enable")->click();
+    settleTwice();
+
+    EXPECT_TRUE(openDialogs<QDialog>().isEmpty());
+    EXPECT_FALSE(first->isHidden());
+    EXPECT_FALSE(second->isHidden());
+}
+
+TEST_F(BracketPrompt, AClosedQuestionIsAskedAgainForTheNextDeckEditor)
+{
+    loadCommanderDecks();
+    QDialog *prompt = onlyOpen<QDialog>();
+    ASSERT_NE(prompt, nullptr);
+    prompt->reject();
+    settleTwice();
+    EXPECT_TRUE(first->isHidden());
+
+    prompt = onlyOpen<QDialog>();
+    ASSERT_NE(prompt, nullptr);
+    EXPECT_EQ(prompt->parent(), second);
+    buttonWithText(prompt, "Disable")->click();
+    settleTwice();
+
+    EXPECT_TRUE(openDialogs<QDialog>().isEmpty());
+    EXPECT_TRUE(second->isHidden());
+}
+
+TEST_F(BracketPrompt, ADeckEditorClosedWhileAskingHandsTheQuestionOn)
+{
+    loadCommanderDecks();
+    ASSERT_EQ(openDialogs<QDialog>().size(), 1);
+
+    first->deleteLater();
+    settleTwice();
+
+    const QDialog *prompt = onlyOpen<QDialog>();
+    ASSERT_NE(prompt, nullptr);
+    EXPECT_EQ(prompt->parent(), second);
 }
 } // namespace
 

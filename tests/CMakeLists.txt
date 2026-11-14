@@ -811,6 +811,15 @@ if(WITH_CLIENT)
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_tokens.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_load_deck_from_website.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/override_printing_warning.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/api_response/card_in_deck_request.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/api_response/commander_spellbook_card_result.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/api_response/commander_spellbook_deck_request.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/api_response/commander_spellbook_estimate_bracket_result.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/api_response/commander_spellbook_variant_result.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_bracket_service.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_bracket_widget.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_spellbook_api_accessor.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_spellbook_bracket_explainer.cpp
     ${CLIENT_SRC}/interface/widgets/utility/get_text_with_max.cpp
     ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_dialog.cpp
     ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_item_widget.cpp
