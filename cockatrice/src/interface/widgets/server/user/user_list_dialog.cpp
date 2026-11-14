@@ -1,5 +1,6 @@
 #include "user_list_dialog.h"
 
+#include "../../utility/non_blocking_dialogs.h"
 #include "libcockatrice/protocol/pb/serverinfo_user.pb.h"
 
 #include <QCheckBox>
@@ -9,7 +10,6 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRadioButton>
@@ -158,14 +158,14 @@ WarningDialog::WarningDialog(const QString &userName, const QString &clientID, Q
 void WarningDialog::okClicked()
 {
     if (nameWarning->text().simplified().isEmpty()) {
-        QMessageBox::critical(this, tr("Error"),
-                              tr("User name to send a warning to can not be blank, please specify a user to warn."));
+        Dialogs::critical(this, tr("Error"),
+                          tr("User name to send a warning to can not be blank, please specify a user to warn."));
         return;
     }
 
     if (warningOption->currentData().toString().simplified().isEmpty()) {
-        QMessageBox::critical(this, tr("Error"),
-                              tr("Warning to use can not be blank, please select a valid warning to send."));
+        Dialogs::critical(this, tr("Error"),
+                          tr("Warning to use can not be blank, please select a valid warning to send."));
         return;
     }
 
@@ -204,31 +204,31 @@ void WarningDialog::addWarningOption(const QString &warning, int startingIl)
 void BanDialog::okClicked()
 {
     if (!nameBanCheckBox->isChecked() && !ipBanCheckBox->isChecked() && !idBanCheckBox->isChecked()) {
-        QMessageBox::critical(this, tr("Error"),
-                              tr("You have to select a name-based, IP-based, clientId based, or some combination of "
-                                 "the three to place a ban."));
+        Dialogs::critical(this, tr("Error"),
+                          tr("You have to select a name-based, IP-based, clientId based, or some combination of "
+                             "the three to place a ban."));
         return;
     }
 
     if (nameBanCheckBox->isChecked()) {
         if (nameBanEdit->text().simplified() == "") {
-            QMessageBox::critical(this, tr("Error"),
-                                  tr("You must have a value in the name ban when selecting the name ban checkbox."));
+            Dialogs::critical(this, tr("Error"),
+                              tr("You must have a value in the name ban when selecting the name ban checkbox."));
             return;
         }
     }
 
     if (ipBanCheckBox->isChecked()) {
         if (ipBanEdit->text().simplified() == "") {
-            QMessageBox::critical(this, tr("Error"),
-                                  tr("You must have a value in the ip ban when selecting the ip ban checkbox."));
+            Dialogs::critical(this, tr("Error"),
+                              tr("You must have a value in the ip ban when selecting the ip ban checkbox."));
             return;
         }
     }
 
     if (idBanCheckBox->isChecked()) {
         if (idBanEdit->text().simplified() == "") {
-            QMessageBox::critical(
+            Dialogs::critical(
                 this, tr("Error"),
                 tr("You must have a value in the clientid ban when selecting the clientid ban checkbox."));
             return;

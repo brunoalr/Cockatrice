@@ -3,6 +3,7 @@
 #include "../../client/settings/cache_settings.h"
 #include "../widgets/tabs/tab_room.h"
 #include "../widgets/tabs/tab_supervisor.h"
+#include "../widgets/utility/non_blocking_dialogs.h"
 #include "../window_main.h"
 #include "contexts/context_connect_to_server.h"
 #include "contexts/context_join_game.h"
@@ -42,84 +43,117 @@ IntentUrlParser::IntentUrlParser(QObject *parent, MainWindow *_mainWindow) : QOb
 
 void IntentUrlParser::handle(const QString &urlStr)
 {
-    QUrl url(urlStr);
-
-    if (url.scheme() != "cockatrice") {
+    if (QUrl(urlStr).scheme() != "cockatrice") {
         return;
     }
+
+    pendingLinks.append(urlStr);
+    if (pendingLinks.size() == 1) {
+        parseFirstLink();
+    }
+}
+
+void IntentUrlParser::parseFirstLink()
+{
+    QUrl url(pendingLinks.first());
 
     const QString action = url.host();
     QUrlQuery query(url);
 
     qCDebug(UrlParserLog) << "Parsing intent URL, action:" << action;
 
-    PendingIntentChain chain;
-    Intent *firstIntent = nullptr;
     if (action == "joingame") {
-        firstIntent = createJoinGameIntent(query, chain);
-    } else if (action == "opendeck") {
+        askToJoinGame(query);
+        return;
+    }
+
+    PendingIntentChain chain;
+    const Intent *firstIntent = nullptr;
+    if (action == "opendeck") {
         firstIntent = createOpenDeckIntent(query, chain);
     } else {
         qWarning() << "Unknown intent:" << action;
     }
+    queueChain(chain, firstIntent);
+}
 
-    if (firstIntent == nullptr) {
-        // The link was invalid or the user declined the confirm: nothing runs.
-        // Report the idle state when no other chain is queued so that a startup
-        // launch (which skipped its own connection for this URL) falls back to it.
-        if (!chainRunning && pendingChains.isEmpty()) {
-            emit urlChainFinished(mainWindow->getRemoteClient()->getStatus() == StatusLoggedIn);
-        }
+void IntentUrlParser::queueChain(const PendingIntentChain &chain, const Intent *firstIntent)
+{
+    // Without an intent the link was invalid or the user declined the confirm: nothing runs.
+    if (firstIntent != nullptr) {
+        pendingChains.append(chain);
+        startNextChain();
+    }
+    finishLink();
+}
+
+void IntentUrlParser::finishLink()
+{
+    pendingLinks.removeFirst();
+    if (!pendingLinks.isEmpty()) {
+        parseFirstLink();
+        return;
+    }
+    // Report the idle state once no link waits for an answer and no chain is queued, so that a
+    // startup launch (which skipped its own connection for this URL) falls back to it.
+    if (!chainRunning && pendingChains.isEmpty()) {
+        emit urlChainFinished(mainWindow->getRemoteClient()->getStatus() == StatusLoggedIn);
+    }
+}
+
+void IntentUrlParser::askToJoinGame(const QUrlQuery &query)
+{
+    auto showError = [this](const QString &message) {
+        Dialogs::warning(mainWindow, tr("Open game"), message,
+                         Dialogs::whileAlive(this, [this] { queueChain(PendingIntentChain(), nullptr); }));
+    };
+
+    ContextJoinGame ctx{};
+
+    ctx.roomContext.serverContext.hostname = query.queryItemValue("hostname");
+    ctx.roomContext.serverContext.port = query.queryItemValue("port");
+
+    if (ctx.roomContext.serverContext.hostname.isEmpty()) {
+        showError(tr("Missing or empty hostname in the game link"));
         return;
     }
 
-    pendingChains.append(chain);
-    startNextChain();
-}
-
-Intent *IntentUrlParser::createJoinGameIntent(const QUrlQuery &query, PendingIntentChain &chain)
-{
-    auto showError = [this](const QString &message) { QMessageBox::warning(mainWindow, tr("Open game"), message); };
-
-    auto ctx = std::make_unique<ContextJoinGame>();
-
-    ctx->roomContext.serverContext.hostname = query.queryItemValue("hostname");
-    ctx->roomContext.serverContext.port = query.queryItemValue("port");
-
-    if (ctx->roomContext.serverContext.hostname.isEmpty()) {
-        showError(tr("Missing or empty hostname in the game link"));
-        return nullptr;
-    }
-
     bool ok = false;
-    ctx->roomContext.serverContext.port.toUShort(&ok);
+    ctx.roomContext.serverContext.port.toUShort(&ok);
     if (!ok) {
         showError(tr("Invalid or missing port in the game link"));
-        return nullptr;
+        return;
     }
 
-    ctx->roomContext.roomId = query.queryItemValue("roomid").toInt(&ok);
+    ctx.roomContext.roomId = query.queryItemValue("roomid").toInt(&ok);
 
     if (!ok) {
         showError(tr("Invalid or missing room id in the game link"));
-        return nullptr;
+        return;
     }
 
     ok = false;
-    ctx->gameId = query.queryItemValue("gameid").toInt(&ok);
+    ctx.gameId = query.queryItemValue("gameid").toInt(&ok);
 
     if (!ok) {
         showError(tr("Invalid or missing game id in the game link"));
-        return nullptr;
+        return;
     }
 
     const QString gameDescription = query.queryItemValue("game", QUrl::FullyDecoded);
-    const QString message = generateJoinGameMessage(*ctx, gameDescription);
+    const QString message = generateJoinGameMessage(ctx, gameDescription);
 
-    if (!QtUtils::confirm(mainWindow, tr("Join game"), message, QMessageBox::Yes)) {
-        return nullptr;
-    }
+    const auto answered = Dialogs::whileAlive(this, [this, ctx](bool confirmed) {
+        PendingIntentChain chain;
+        const Intent *firstIntent = confirmed ? createJoinGameIntent(ctx, chain) : nullptr;
+        queueChain(chain, firstIntent);
+    });
+    Dialogs::confirm(mainWindow, tr("Join game"), message, answered, QMessageBox::Yes);
+}
 
+Intent *IntentUrlParser::createJoinGameIntent(const ContextJoinGame &context, PendingIntentChain &chain)
+{
+    auto ctx = std::make_unique<ContextJoinGame>(context);
     RemoteClient *client = mainWindow->getRemoteClient();
     ContextConnectToServer *serverContext = &ctx->roomContext.serverContext;
 
@@ -128,7 +162,8 @@ Intent *IntentUrlParser::createJoinGameIntent(const QUrlQuery &query, PendingInt
     auto joinGameIntent = new IntentJoinServerGame(mainWindow->getTabSupervisor(), client, std::move(ctx));
     joinGameIntent->setParent(this);
     chain.intents.append(joinGameIntent);
-    connect(joinGameIntent, &Intent::failed, this, [showError](const QString &reason) { showError(reason); });
+    connect(joinGameIntent, &Intent::failed, this,
+            [this](const QString &reason) { Dialogs::warning(mainWindow, tr("Open game"), reason); });
 
     Intent *firstIntent = joinGameIntent;
     if (!isConnectedTo(serverContext->hostname, serverContext->port)) {
@@ -354,7 +389,7 @@ void IntentUrlParser::chainEnded(bool chainSucceeded)
 
     // Only report the terminal state once the queue has fully drained, so a
     // queued follow-up link keeps the startup fallback out of the picture.
-    if (!chainRunning && pendingChains.isEmpty()) {
+    if (pendingLinks.isEmpty() && !chainRunning && pendingChains.isEmpty()) {
         emit urlChainFinished(mainWindow->getRemoteClient()->getStatus() == StatusLoggedIn);
     }
 }

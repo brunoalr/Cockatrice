@@ -62,6 +62,7 @@ private slots:
 
 private:
     void leaveAndRejoinRoom(int roomId, bool setCurrent);
+    void failRoomJoin(int roomId, bool setCurrent, const QString &message);
 
     AbstractClient *client;
     RoomSelector *roomSelector;

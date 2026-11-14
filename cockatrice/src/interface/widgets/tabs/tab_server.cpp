@@ -1,5 +1,6 @@
 #include "tab_server.h"
 
+#include "../utility/non_blocking_dialogs.h"
 #include "libcockatrice/protocol/pb/response.pb.h"
 #include "libcockatrice/protocol/pb/serverinfo_room.pb.h"
 #include "tab_supervisor.h"
@@ -7,7 +8,6 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QMap>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QSharedPointer>
 #include <QTextBrowser>
@@ -242,24 +242,16 @@ void TabServer::joinRoomFinished(const Response &r,
         case Response::RespOk:
             break;
         case Response::RespNameNotFound:
-            if (setCurrent) {
-                QMessageBox::critical(this, tr("Error"),
-                                      tr("Failed to join the server room: it doesn't exist on the server."));
-            }
-            emit roomJoinFailed(roomId);
+            failRoomJoin(roomId, setCurrent, tr("Failed to join the server room: it doesn't exist on the server."));
             return;
         case Response::RespContextError:
             if (healedJoin) {
                 // The rejoin below was already answered and the server still rejects the join, so
                 // the stale-membership heal cannot help: surface the error. The guard was already
                 // released above so a later user-initiated join may try a fresh heal.
-                if (setCurrent) {
-                    QMessageBox::critical(
-                        this, tr("Error"),
-                        tr("The server thinks you are in the server room but your client is unable to display it. "
-                           "Try restarting your client."));
-                }
-                emit roomJoinFailed(roomId);
+                failRoomJoin(roomId, setCurrent,
+                             tr("The server thinks you are in the server room but your client is unable to display "
+                                "it. Try restarting your client."));
                 return;
             }
             // The server already had us registered in the room even though no tab was open,
@@ -272,24 +264,26 @@ void TabServer::joinRoomFinished(const Response &r,
             leaveAndRejoinRoom(roomId, setCurrent);
             return;
         case Response::RespUserLevelTooLow:
-            if (setCurrent) {
-                QMessageBox::critical(this, tr("Error"),
-                                      tr("You do not have the required permission to join this server room."));
-            }
-            emit roomJoinFailed(roomId);
+            failRoomJoin(roomId, setCurrent, tr("You do not have the required permission to join this server room."));
             return;
         default:
-            if (setCurrent) {
-                QMessageBox::critical(
-                    this, tr("Error"),
-                    tr("Failed to join the server room due to an unknown error: %1.").arg(r.response_code()));
-            }
-            emit roomJoinFailed(roomId);
+            failRoomJoin(roomId, setCurrent,
+                         tr("Failed to join the server room due to an unknown error: %1.").arg(r.response_code()));
             return;
     }
 
     const Response_JoinRoom &resp = r.GetExtension(Response_JoinRoom::ext);
     emit roomJoined(resp.room_info(), setCurrent);
+}
+
+void TabServer::failRoomJoin(int roomId, bool setCurrent, const QString &message)
+{
+    if (!setCurrent) {
+        emit roomJoinFailed(roomId);
+        return;
+    }
+    // A link waiting on this join reports its own failure: it follows this notice instead of stacking on it.
+    Dialogs::critical(this, tr("Error"), message, [this, roomId] { emit roomJoinFailed(roomId); });
 }
 
 void TabServer::leaveAndRejoinRoom(int roomId, bool setCurrent)

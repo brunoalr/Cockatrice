@@ -1,5 +1,7 @@
 #include "dlg_edit_avatar.h"
 
+#include "../utility/non_blocking_dialogs.h"
+
 #include <QBuffer>
 #include <QDebug>
 #include <QDialogButtonBox>
@@ -62,13 +64,18 @@ void DlgEditAvatar::actOk()
 
 void DlgEditAvatar::actBrowse()
 {
-    QString fileName =
-        QFileDialog::getOpenFileName(this, tr("Open Image"), QDir::homePath(), tr("Image Files (*.png *.jpg *.bmp)"));
-    if (fileName.isEmpty()) {
-        imageLabel->setText(tr("No image chosen."));
-        return;
-    }
+    auto *dialog = new QFileDialog(this, tr("Open Image"), QDir::homePath(), tr("Image Files (*.png *.jpg *.bmp)"));
+    dialog->setFileMode(QFileDialog::ExistingFile);
+    connect(dialog, &QFileDialog::fileSelected, this, &DlgEditAvatar::loadImage);
+    Dialogs::open(dialog, [this](int result) {
+        if (result != QDialog::Accepted) {
+            imageLabel->setText(tr("No image chosen."));
+        }
+    });
+}
 
+void DlgEditAvatar::loadImage(const QString &fileName)
+{
     QImageReader imgReader;
     imgReader.setDecideFormatFromContent(true);
     // Honour the EXIF orientation phone cameras write; otherwise portrait

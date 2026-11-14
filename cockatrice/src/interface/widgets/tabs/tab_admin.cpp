@@ -1,5 +1,6 @@
 #include "tab_admin.h"
 
+#include "../utility/non_blocking_dialogs.h"
 #include "libcockatrice/protocol/pb/response.pb.h"
 
 #include <QDialogButtonBox>
@@ -8,7 +9,6 @@
 #include <QIntValidator>
 #include <QLabel>
 #include <QLineEdit>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QVBoxLayout>
@@ -21,6 +21,7 @@
 #include <libcockatrice/protocol/pending_command.h>
 #include <libcockatrice/utility/string_limits.h>
 #include <limits.h>
+#include <memory>
 #include <string>
 
 class CommandContainer;
@@ -162,14 +163,18 @@ void TabAdmin::actUpdateServerMessage()
 
 void TabAdmin::actShutdownServer()
 {
-    ShutdownDialog dlg;
-    if (dlg.exec()) {
-        Command_ShutdownServer cmd;
-        cmd.set_reason(dlg.getReason().toStdString());
-        cmd.set_minutes(dlg.getMinutes());
+    auto dlg = std::make_unique<ShutdownDialog>();
+    const ShutdownDialog *dialog = dlg.get();
+    Dialogs::open(dlg.release(), Dialogs::whileAlive(this, [this, dialog](int result) {
+                      if (result != QDialog::Accepted) {
+                          return;
+                      }
+                      Command_ShutdownServer cmd;
+                      cmd.set_reason(dialog->getReason().toStdString());
+                      cmd.set_minutes(dialog->getMinutes());
 
-        client->sendCommand(AbstractClient::prepareAdminCommand(cmd));
-    }
+                      client->sendCommand(AbstractClient::prepareAdminCommand(cmd));
+                  }));
 }
 
 void TabAdmin::actReloadConfig()
@@ -217,13 +222,13 @@ void TabAdmin::grantReplayAccessProcessResponse(const Response &response)
     switch (response.response_code()) {
         case Response::RespOk:
             client->replayAddedEventReceived(*event);
-            QMessageBox::information(this, tr("Success"), tr("Replay access granted"));
+            Dialogs::information(this, tr("Success"), tr("Replay access granted"));
             break;
         case Response::RespContextError:
-            QMessageBox::critical(this, tr("Error"), tr("Unable to grant replay access. Replay ID invalid"));
+            Dialogs::critical(this, tr("Error"), tr("Unable to grant replay access. Replay ID invalid"));
             break;
         default:
-            QMessageBox::critical(this, tr("Error"), tr("Unable to grant replay access. Internal error"));
+            Dialogs::critical(this, tr("Error"), tr("Unable to grant replay access. Internal error"));
             break;
     }
 }
@@ -232,16 +237,16 @@ void TabAdmin::activateUserProcessResponse(const Response &response)
 {
     switch (response.response_code()) {
         case Response::RespActivationAccepted:
-            QMessageBox::information(this, tr("Success"), tr("User successfully activated"));
+            Dialogs::information(this, tr("Success"), tr("User successfully activated"));
             break;
         case Response::RespNameNotFound:
-            QMessageBox::critical(this, tr("Error"), tr("Unable to activate user. Username invalid"));
+            Dialogs::critical(this, tr("Error"), tr("Unable to activate user. Username invalid"));
             break;
         case Response::RespActivationFailed:
-            QMessageBox::critical(this, tr("Error"), tr("Unable to activate user. User already active"));
+            Dialogs::critical(this, tr("Error"), tr("Unable to activate user. User already active"));
             break;
         default:
-            QMessageBox::critical(this, tr("Error"), tr("Unable to activate user. Internal error"));
+            Dialogs::critical(this, tr("Error"), tr("Unable to activate user. Internal error"));
             break;
     }
 }

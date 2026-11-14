@@ -1,6 +1,7 @@
 #include "tab_logs.h"
 
 #include "../interface/widgets/utility/custom_line_edit.h"
+#include "../interface/widgets/utility/non_blocking_dialogs.h"
 #include "libcockatrice/protocol/pb/response.pb.h"
 #include "libcockatrice/protocol/pb/serverinfo_chat_message.pb.h"
 
@@ -10,7 +11,6 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QList>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QScrollBar>
@@ -104,7 +104,7 @@ void TabLog::getClicked()
     }
 
     if (pastDays->isChecked() && pastXDays->value() == 0) {
-        QMessageBox::critical(this, tr("Error"), tr("You have to select a valid number of days to locate."));
+        Dialogs::critical(this, tr("Error"), tr("You have to select a valid number of days to locate."));
         return;
     }
 
@@ -413,14 +413,14 @@ void TabLog::viewLogHistory_processResponse(const Response &resp)
     getButton->setEnabled(true);
 
     if (resp.response_code() != Response::RespOk) {
-        QMessageBox::critical(static_cast<QWidget *>(parent()), tr("Message History"),
-                              tr("Failed to collect message history information."));
+        Dialogs::critical(static_cast<QWidget *>(parent()), tr("Message History"),
+                          tr("Failed to collect message history information."));
         return;
     }
 
     if (isFirstPage && response.log_message_size() == 0) {
-        QMessageBox::information(static_cast<QWidget *>(parent()), tr("Message History"),
-                                 tr("There are no messages for the selected filters."));
+        Dialogs::information(static_cast<QWidget *>(parent()), tr("Message History"),
+                             tr("There are no messages for the selected filters."));
         hasMoreResults = false;
         return;
     }

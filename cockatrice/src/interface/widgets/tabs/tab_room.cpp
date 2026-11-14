@@ -15,6 +15,7 @@
 #include "../server/user/user_list_proxy.h"
 #include "../utility/completer_utils.h"
 #include "../utility/line_edit_completer.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "card/card_completer_proxy_model.h"
 #include "card/card_search_model.h"
 #include "card_database_display_model.h"
@@ -581,9 +582,9 @@ void TabRoom::actClearChat()
 
 void TabRoom::actOpenChatSettings()
 {
-    DlgSettings settings(this);
-    settings.setTab(DlgSettings::MessagesPage);
-    settings.exec();
+    auto *settings = new DlgSettings(this);
+    settings->setTab(DlgSettings::MessagesPage);
+    Dialogs::open(settings, {});
 }
 
 void TabRoom::actCompleterChanged()

@@ -30,6 +30,7 @@ private slots:
     void applyChatLogFont();
 
 private:
+    void submit(const QString &description);
     static QString categoryLabel(const QString &key);
     static QString categoryToolTip(const QString &key);
 
