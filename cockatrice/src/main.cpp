@@ -477,6 +477,11 @@ int main(int argc, char *argv[])
         paths.setCardDatabasePath(inMemoryCacheRoot + "/cards.xml");
         paths.setTokenDatabasePath(inMemoryCacheRoot + "/tokens.xml");
     }
+    // A set with no saved options keeps its printings, and is adopted as the snapshot is swapped in, before any
+    // model or card reads it: a first visit then needs no second parse.
+    SettingsCache::instance().cardDatabase().setUnsavedSetsEnabled(true);
+    QObject::connect(CardDatabaseManager::getInstance(), &CardDatabase::cardDatabaseReset,
+                     CardDatabaseManager::getInstance(), &CardDatabase::adoptLoadedSets);
 #else
     // Front-load the card database before constructing the main window. The
     // binary-cache read is cheap when uncontended (~1s); doing it here -- while no

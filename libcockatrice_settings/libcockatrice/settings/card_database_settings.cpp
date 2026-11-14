@@ -41,6 +41,12 @@ void CardDatabaseSettings::setIsKnown(QString shortName, bool isknown)
     setOptionsCache[shortName].isKnown = isknown;
 }
 
+void CardDatabaseSettings::setUnsavedSetsEnabled(bool enabled)
+{
+    QMutexLocker lock(&setOptionsMutex);
+    unsavedSetOptions.enabled = enabled;
+}
+
 void CardDatabaseSettings::ensureSetOptionsLoaded() const
 {
     if (setOptionsLoaded) {
@@ -64,28 +70,28 @@ unsigned int CardDatabaseSettings::getSortKey(QString shortName) const
 {
     QMutexLocker lock(&setOptionsMutex);
     ensureSetOptionsLoaded();
-    return setOptionsCache.value(shortName).sortKey;
+    return setOptionsCache.value(shortName, unsavedSetOptions).sortKey;
 }
 
 bool CardDatabaseSettings::isEnabled(QString shortName) const
 {
     QMutexLocker lock(&setOptionsMutex);
     ensureSetOptionsLoaded();
-    return setOptionsCache.value(shortName).enabled;
+    return setOptionsCache.value(shortName, unsavedSetOptions).enabled;
 }
 
 bool CardDatabaseSettings::isKnown(QString shortName) const
 {
     QMutexLocker lock(&setOptionsMutex);
     ensureSetOptionsLoaded();
-    return setOptionsCache.value(shortName).isKnown;
+    return setOptionsCache.value(shortName, unsavedSetOptions).isKnown;
 }
 
 ICardSetPriorityController::SetOptions CardDatabaseSettings::getSetOptions(QString shortName) const
 {
     QMutexLocker lock(&setOptionsMutex);
     ensureSetOptionsLoaded();
-    return setOptionsCache.value(shortName);
+    return setOptionsCache.value(shortName, unsavedSetOptions);
 }
 
 QStringList CardDatabaseSettings::getEnabledSetNames() const
