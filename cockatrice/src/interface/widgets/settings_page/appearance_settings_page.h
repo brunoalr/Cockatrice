@@ -22,6 +22,7 @@ private slots:
     void openThemeLocation();
     void editPalette();
     void updateHomeTabSettingsVisibility();
+    void showThemeConfig();
     void updateStyleWarning();
     void styleComboChanged(int index);
     void showShortcutsChanged(QT_STATE_CHANGED_T enabled);
