@@ -235,6 +235,12 @@ self_test() {
   echo 'not json' >"$served/garbled/versions.json"
   refuses "a site over a live site with a garbled versions.json" "$work/app-b" "$work/database" "$work/x3" "$url/garbled"
   refuses "a site over an unreachable live site" "$work/app-b" "$work/database" "$work/x4" "http://127.0.0.1:9"
+  local status=0
+  bash "$script" "$work/app" "$work/database" "$work/x8" "" >"$out" 2>&1 || status=$?
+  if [[ $status != 3 ]] || [[ -e $work/x8 ]]; then
+    echo "self-test FAILED: an empty previous site URL ended with $status, expected the usage and 3"
+    return 1
+  fi
 
   cp -R "$work/app" "$work/app-incomplete"
   rm "$work/app-incomplete/qtloader.js"
@@ -260,7 +266,7 @@ case "${1:-}" in
     self_test
     ;;
   *)
-    if [[ $# != 3 && $# != 4 ]] || [[ $1 == -* ]]; then
+    if [[ $# != 3 && $# != 4 ]] || [[ $1 == -* ]] || [[ $# == 4 && -z $4 ]]; then
       echo "usage: $0 <app-dir> <database-dir> <site-dir> [<previous-site-url>] | --self-test" >&2
       exit 3
     fi
