@@ -4,6 +4,7 @@
 #include "../../../client/settings/shortcuts_settings.h"
 #include "../../deck_loader/card_node_function.h"
 #include "../../deck_loader/deck_loader.h"
+#include "../utility/non_blocking_dialogs.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -12,7 +13,6 @@
 #include <QFlags>
 #include <QHBoxLayout>
 #include <QKeyEvent>
-#include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QTextStream>
@@ -137,7 +137,7 @@ void DlgLoadDeckFromClipboard::actOK()
     if (loadIntoDeck(deckList)) {
         accept();
     } else {
-        QMessageBox::critical(this, tr("Error"), tr("Invalid deck list."));
+        Dialogs::critical(this, tr("Error"), tr("Invalid deck list."));
     }
 }
 
@@ -180,6 +180,6 @@ void DlgEditDeckInClipboard::actOK()
     if (loadIntoDeck(deckList)) {
         accept();
     } else {
-        QMessageBox::critical(this, tr("Error"), tr("Invalid deck list."));
+        Dialogs::critical(this, tr("Error"), tr("Invalid deck list."));
     }
 }

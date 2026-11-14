@@ -792,9 +792,12 @@ if(WITH_CLIENT)
     NAME
     deck_dialogs_test
     SOURCES
+    ${CLIENT_SRC}/client/network/parsers/deck_link_to_api_transformer.cpp
+    ${CLIENT_SRC}/interface/deck_loader/card_node_function.cpp
     ${CLIENT_SRC}/interface/widgets/deck_editor/deck_state_manager.cpp
     ${CLIENT_SRC}/interface/widgets/deck_editor/deck_zone_dialog.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_default_tags_editor.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_load_deck_from_website.cpp
     ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_dialog.cpp
     ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_item_widget.cpp
     ${SETTINGS_SOURCES}

@@ -49,6 +49,8 @@ namespace
 {
 using DialogTest::settle;
 
+const QString TappedOutDeck = QStringLiteral("https://tappedout.net/mtg-decks/some-deck/");
+
 QPushButton *buttonWithText(const QWidget *parent, const QString &text)
 {
     for (QPushButton *button : parent->findChildren<QPushButton *>()) {
@@ -85,6 +87,170 @@ protected:
         settle();
     }
 };
+
+class FakeReply : public QNetworkReply
+{
+public:
+    FakeReply(const QNetworkRequest &request, QObject *parent) : QNetworkReply(parent)
+    {
+        setRequest(request);
+        setUrl(request.url());
+        setOperation(QNetworkAccessManager::GetOperation);
+        open(QIODevice::ReadOnly);
+    }
+
+    void answer(const QByteArray &data)
+    {
+        body = data;
+        finish();
+    }
+
+    void fail(const QString &message)
+    {
+        setError(QNetworkReply::ConnectionRefusedError, message);
+        finish();
+    }
+
+    void abort() override
+    {
+        // The test decides when a reply finishes: there is no transfer to cancel.
+    }
+
+    qint64 bytesAvailable() const override
+    {
+        return body.size() - offset + QNetworkReply::bytesAvailable();
+    }
+
+protected:
+    qint64 readData(char *data, qint64 maxSize) override
+    {
+        const qint64 count = qMin(maxSize, body.size() - offset);
+        std::memcpy(data, body.constData() + offset, count);
+        offset += count;
+        return count;
+    }
+
+private:
+    QByteArray body;
+    qint64 offset = 0;
+
+    void finish()
+    {
+        setFinished(true);
+        emit finished();
+    }
+};
+
+class FakeNetwork : public QNetworkAccessManager
+{
+public:
+    QList<QPointer<FakeReply>> replies;
+
+protected:
+    QNetworkReply *createRequest(Operation, const QNetworkRequest &request, QIODevice *) override
+    {
+        auto *reply = new FakeReply(request, this);
+        replies.append(reply);
+        return reply;
+    }
+};
+
+class WebsiteImport : public DeckDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    FakeNetwork network;
+    QPointer<DlgLoadDeckFromWebsite> dialog;
+    QList<int> results;
+    QStringList importedCards;
+
+    void SetUp() override
+    {
+        QApplication::clipboard()->clear();
+        dialog = new DlgLoadDeckFromWebsite(window.get(), &network);
+        Dialogs::open(dialog.data(), [this](int result) {
+            results.append(result);
+            importedCards = dialog->getDeck().getCardList();
+        });
+        settle();
+    }
+
+    void requestDeck(const QString &url) const
+    {
+        dialog->findChild<QLineEdit *>()->setText(url);
+        okButton()->click();
+        settle();
+    }
+
+    QPushButton *okButton() const
+    {
+        return dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok);
+    }
+};
+
+TEST_F(WebsiteImport, AnUnsupportedAddressWarnsAndKeepsTheDialogOpen)
+{
+    requestDeck("https://example.com/decks/1");
+    clickInOnlyBox(QMessageBox::Ok);
+
+    ASSERT_FALSE(dialog.isNull());
+    EXPECT_TRUE(dialog->isVisible());
+    EXPECT_TRUE(results.isEmpty());
+    EXPECT_TRUE(network.replies.isEmpty());
+}
+
+TEST_F(WebsiteImport, WhileARequestRunsOkIsDisabledAndASecondAcceptStartsNothing)
+{
+    requestDeck(TappedOutDeck);
+    ASSERT_EQ(network.replies.size(), 1);
+    EXPECT_FALSE(okButton()->isEnabled());
+
+    dialog->accept();
+    settle();
+
+    EXPECT_EQ(network.replies.size(), 1);
+    EXPECT_TRUE(dialog->isVisible());
+    EXPECT_TRUE(results.isEmpty());
+}
+
+TEST_F(WebsiteImport, ANetworkErrorWarnsAndLeavesTheDialogUsable)
+{
+    requestDeck(TappedOutDeck);
+    ASSERT_EQ(network.replies.size(), 1);
+    network.replies.first()->fail("connection refused");
+    settle();
+
+    clickInOnlyBox(QMessageBox::Ok, "Network error: connection refused");
+    ASSERT_FALSE(dialog.isNull());
+    EXPECT_TRUE(dialog->isVisible());
+    EXPECT_TRUE(okButton()->isEnabled());
+    EXPECT_TRUE(results.isEmpty());
+}
+
+TEST_F(WebsiteImport, AnEmptyReplyWarnsAndLeavesTheDialogUsable)
+{
+    requestDeck(TappedOutDeck);
+    ASSERT_EQ(network.replies.size(), 1);
+    network.replies.first()->answer({});
+    settle();
+
+    clickInOnlyBox(QMessageBox::Ok, "Received empty deck data.");
+    ASSERT_FALSE(dialog.isNull());
+    EXPECT_TRUE(dialog->isVisible());
+    EXPECT_TRUE(okButton()->isEnabled());
+    EXPECT_TRUE(results.isEmpty());
+}
+
+TEST_F(WebsiteImport, AGoodReplyAcceptsTheDialogOnce)
+{
+    requestDeck(TappedOutDeck);
+    ASSERT_EQ(network.replies.size(), 1);
+    network.replies.first()->answer("1 Island\n");
+    settle();
+
+    EXPECT_EQ(results, QList<int>{QDialog::Accepted});
+    EXPECT_EQ(importedCards, QStringList{"Island"});
+    EXPECT_TRUE(openDialogs<QMessageBox>().isEmpty());
+}
 
 class ZonePrompts : public DeckDialogs // NOSONAR: TEST_F reads fixture members from a subclass
 {
