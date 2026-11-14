@@ -20,12 +20,17 @@ raw=https://raw.githubusercontent.com
 noto=$raw/notofonts/notofonts.github.io/92d2ea744479d3379927f1fb5f8b0945dd0349b7/fonts
 names=() urls=() sums=() licence_urls=() licence_sums=() notices=()
 
-# <name on the site> <font> <its SHA-256> <licence text> <its SHA-256> [<copyright notice the licence text lacks>]
+# <name on the site> <font> <its SHA-256> <licence text> <its SHA-256>
 font() {
-  names+=("$1") urls+=("$2") sums+=("$3") licence_urls+=("$4") licence_sums+=("$5") notices+=("${6:-}")
+  names+=("$1") urls+=("$2") sums+=("$3") licence_urls+=("$4") licence_sums+=("$5") notices+=("")
 }
 
-adobe_notice="Copyright © 2014-2021 Adobe (http://www.adobe.com/)." # NOSONAR: the font's own copyright line
+# <copyright notice that the licence text of the font declared last lacks>
+notice() {
+  local text=$1
+  notices[${#notices[@]} - 1]=$text
+}
+
 font NotoSansThai-Regular.ttf "$noto/NotoSansThai/unhinted/ttf/NotoSansThai-Regular.ttf" \
   d4303fe9c63ebb72759ca8b6d2040c8ae81689f7d08d7b91c656154382b49313 \
   "$raw/notofonts/thai/f8b482c158650260bba5d5edba9da3e8bb7185b4/OFL.txt" \
@@ -41,8 +46,8 @@ font NotoEmoji.ttf "$raw/google/fonts/b979dba422e445492b0eb9951ac52ee0b4d648c3/o
 font NotoSansCJK-Regular.ttc "$raw/notofonts/noto-cjk/a99a4354c68964f6bfac488d01010b1fb6d9178a/Sans/OTC/NotoSansCJK-Regular.ttc" \
   b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a \
   "$raw/notofonts/noto-cjk/a99a4354c68964f6bfac488d01010b1fb6d9178a/Sans/LICENSE" \
-  6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2 \
-  "$adobe_notice"
+  6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2
+notice "Copyright © 2014-2021 Adobe (http://www.adobe.com/)." # NOSONAR: the font's own copyright line
 
 sha256() {
   local file=$1
@@ -158,8 +163,8 @@ self_test() {
   fixture() {
     names=() urls=() sums=() licence_urls=() licence_sums=() notices=()
     font a.ttf "$url/a.ttf" "$(sha256 "$work/a.ttf")" "$url/a-licence.txt" "$(sha256 "$served/a-licence.txt")"
-    font b.ttc "$url/b.ttc" "${1:-$(sha256 "$served/b.ttc")}" "$url/b-licence.txt" "$(sha256 "$served/b-licence.txt")" \
-      'Copyright b'
+    font b.ttc "$url/b.ttc" "${1:-$(sha256 "$served/b.ttc")}" "$url/b-licence.txt" "$(sha256 "$served/b-licence.txt")"
+    notice 'Copyright b'
   }
   downloads() {
     local dir=$1
