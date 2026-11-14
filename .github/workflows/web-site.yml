@@ -17,41 +17,43 @@ jobs:
     timeout-minutes: 5
     outputs:
       run-id: ${{ steps.app.outputs.run-id }}
-      sha: ${{ steps.app.outputs.sha }}
 
     steps:
-      - name: "Find the WebAssembly build of the last successful push to master"
+      - name: "Find the WebAssembly build of the newest push to master"
         id: app
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          run=$(gh run list -R "$GITHUB_REPOSITORY" -w desktop-build.yml -b master -e push -s success -L 1 \
-            --json databaseId,headSha --jq '.[] | "\(.databaseId) \(.headSha)"')
-          if [[ -z $run ]]; then
-            echo "::error::No Build Desktop run for a push to master has succeeded, so there is no application for the site"
+          if [[ $GITHUB_REF != refs/heads/master ]]; then
+            echo "::error::The site is built from master: start this workflow there, not on $GITHUB_REF"
             exit 1
           fi
-          read -r id sha <<<"$run"
+          # Pushes that change no built file start no run, so the newest run is the build of what master holds
+          run=$(gh run list -R "$GITHUB_REPOSITORY" -w desktop-build.yml -b master -e push -L 1 \
+            --json databaseId,status,conclusion --jq '.[] | "\(.databaseId) \(.status) \(.conclusion)"')
+          if [[ -z $run ]]; then
+            echo "::error::There is no Build Desktop run for a push to master, so there is no application for the site"
+            exit 1
+          fi
+          read -r id status conclusion <<<"$run"
           url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$id"
-          newest=$(gh run list -R "$GITHUB_REPOSITORY" -w desktop-build.yml -b master -e push -L 1 \
-            --json databaseId --jq '.[].databaseId')
-          if [[ $newest != "$id" ]]; then
-            echo "::warning::The newest Build Desktop run for a push to master, $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$newest, has not succeeded: the site uses the older $url"
+          if [[ $status != completed || $conclusion != success ]]; then
+            echo "::error::$url, the newest Build Desktop run for a push to master, has not succeeded ($status $conclusion)"
+            exit 1
           fi
           artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/artifacts?name=Cockatrice-wasm" \
             --jq '.artifacts[0] // empty | "\(.expired) \(.expires_at)"')
           if [[ -z $artifact ]]; then
-            echo "::error::$url, the last successful Build Desktop run for a push to master, has no artifact Cockatrice-wasm"
+            echo "::error::$url, the newest Build Desktop run for a push to master, has no artifact Cockatrice-wasm"
             exit 1
           fi
           read -r expired expires_at <<<"$artifact"
           if [[ $expired == true ]]; then
-            echo "::error::The artifact Cockatrice-wasm of $url, the last successful Build Desktop run for a push to master, expired on $expires_at"
+            echo "::error::The artifact Cockatrice-wasm of $url, the newest Build Desktop run for a push to master, expired on $expires_at"
             exit 1
           fi
-          echo "Cockatrice-wasm of $url, commit $sha"
+          echo "Cockatrice-wasm of $url"
           echo "run-id=$id" >>"$GITHUB_OUTPUT"
-          echo "sha=$sha" >>"$GITHUB_OUTPUT"
 
   card-database:
     name: Card database
@@ -63,11 +65,9 @@ jobs:
       NAME: Debian13
 
     steps:
-      # Oracle, the page and the application it loads must come from the same commit
       - name: "Checkout"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.app.outputs.sha }}
           persist-credentials: false
 
       - name: "Build Debian 13 Docker image"
@@ -103,7 +103,6 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.app.outputs.sha }}
           persist-credentials: false
 
       - name: "Download the WebAssembly build"
