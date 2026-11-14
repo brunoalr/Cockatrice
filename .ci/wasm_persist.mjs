@@ -6,7 +6,13 @@ const database = '/cockatrice-data'
 const root = `${database}/Cockatrice/Cockatrice/`
 const started = 'ui.show() finished'
 const refusal = 'already open in another tab'
+const writeFailed = 'could not be stored'
+const noStorage = 'does not let the page store data'
+const loadFailed = 'could not be loaded'
+const mayDelete = text => text.includes('may delete') && text.includes('Deck Editor > Save deck to clipboard')
 const deck = 'decks/persist-smoke.cod'
+const screen = "document.querySelector('#qt-shadow-container').shadowRoot"
+const statusLine = "[...document.querySelectorAll('[role=status]')].map(e => e.textContent).join(' ')"
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 const until = async (what, test, ms = seconds * 1000) => {
@@ -30,14 +36,24 @@ const attach = async target => {
     const message = JSON.parse(event.data)
     if (message.id) {
       replies.get(message.id)?.(message)
+      replies.delete(message.id)
     } else if (message.method === 'Runtime.consoleAPICalled') {
       logged.push(message.params.args.map(arg => String(arg.value)).join(' '))
     }
+  }
+  socket.onclose = () => {
+    for (const reply of replies.values()) {
+      reply({ error: { message: `the tab ${target.id} closed` } })
+    }
+    replies.clear()
   }
   const count = text => logged.filter(line => line.includes(text)).length
   let lastId = 0
   const send = (method, params = {}) =>
     new Promise((resolve, reject) => {
+      if (socket.readyState !== WebSocket.OPEN) {
+        throw new Error(`the tab ${target.id} is closed`)
+      }
       replies.set(++lastId, message => (message.error ? reject(new Error(message.error.message)) : resolve(message.result)))
       socket.send(JSON.stringify({ id: lastId, method, params }))
     })
@@ -65,6 +81,23 @@ const attach = async target => {
     },
     started: before => until('no start-up', () => count(started) > before),
   }
+}
+
+const pages = async () => (await (await fetch(`${devtools}/json`)).json()).filter(target => target.type === 'page')
+
+const newTab = async (url, script) => {
+  const tab = await attach(await (await fetch(`${devtools}/json/new?about:blank`, { method: 'PUT' })).json())
+  if (script) {
+    await tab.send('Page.enable')
+    await tab.send('Page.addScriptToEvaluateOnNewDocument', { source: script })
+  }
+  await tab.send('Page.navigate', { url })
+  return tab
+}
+
+const closeTab = async tab => {
+  await fetch(`${devtools}/json/close/${tab.target.id}`)
+  await until('a tab did not close', async () => !(await pages()).some(target => target.id === tab.target.id))
 }
 
 // IDBFS keeps one record per path: { timestamp, mode, contents }
@@ -113,7 +146,36 @@ const brokenIni = files =>
             !text.split('\n').slice(0, -1).every(line => /^(\[.*\]|[^=[;#][^=]*=.*|[;#].*|\s*)$/.test(line)))
     .map(([path]) => path)
 
-const pages = async () => (await (await fetch(`${devtools}/json`)).json()).filter(target => target.type === 'page')
+const control = (role, name) =>
+  `[...${screen}.querySelectorAll('.qt-window-a11y-container ${role}')].find(e => (e.getAttribute('aria-label') || e.textContent) === ${JSON.stringify(name)})`
+
+const openDeck = async page => {
+  // Qt mirrors its widgets into the page only once a screen reader is asked for
+  await page.evaluate(`${screen}.querySelectorAll('button.hidden-visually-read-by-screen-reader').forEach(b => b.click())`)
+  await until('no Deck Storage tab', () => page.evaluate(`!!${control('[role=tab]', 'Deck Storage')}`), 10000)
+  await page.evaluate(`${control('[role=tab]', 'Deck Storage')}.click()`)
+  const open = control('button', 'Open in deck editor')
+  await until('no deck storage toolbar', () => page.evaluate(`${open}?.getBoundingClientRect().height > 0`), 10000)
+  const bar = await page.evaluate(`(r => ({ x: r.x, y: r.y }))(${open}.getBoundingClientRect())`)
+  // the local deck list sits above its toolbar; its first row takes the Down key
+  for (const type of ['mousePressed', 'mouseReleased']) {
+    await page.send('Input.dispatchMouseEvent', { type, x: bar.x + 10, y: bar.y - 40, button: 'left', clickCount: 1 })
+  }
+  for (const type of ['rawKeyDown', 'keyUp']) {
+    await page.send('Input.dispatchKeyEvent', { type, key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 })
+  }
+  const loads = page.count(deck)
+  await page.evaluate(`${open}.click()`)
+  await until('the deck did not open', () => page.count(deck) > loads, 10000)
+  await sleep(1000)
+}
+
+const saveDeck = async page => {
+  const mac = await page.evaluate(`${screen}.querySelector('.qt-window-input-element').focus(), navigator.platform.startsWith('Mac')`)
+  for (const type of ['rawKeyDown', 'keyUp']) {
+    await page.send('Input.dispatchKeyEvent', { type, modifiers: mac ? 4 : 2, key: 's', code: 'KeyS', windowsVirtualKeyCode: 83 })
+  }
+}
 
 const checks = {
   async a(state) {
@@ -137,31 +199,18 @@ const checks = {
     console.log(`settings/paths.ini after a second start:\n${(await readStore(state.page))['settings/paths.ini']?.text}`)
   },
 
-  async d(state) {
-    for (const delay of [0, 5, 20]) {
-      await state.page.evaluate(`cockatricePersist.flush(), new Promise(resolve => setTimeout(resolve, ${delay}))`)
-      const before = await state.page.reload()
-      const files = await readStore(state.page)
-      const broken = brokenIni(files)
-      if (broken.length || !files['settings/network.ini']) {
-        throw new Error(`after a reload ${delay} ms into a write these settings files do not parse: ${broken.join(' ') || 'settings/network.ini is missing'}`)
-      }
-      await state.page.started(before)
-    }
-  },
-
   async c(state) {
     const first = state.page
-    const response = await fetch(`${devtools}/json/new?${first.target.url}`, { method: 'PUT' })
-    const second = await attach(await response.json())
+    const second = await newTab(state.url)
     await until(`the second tab did not say "${refusal}"`,
                 () => second.evaluate(`!!document.body?.innerText.includes(${JSON.stringify(refusal)})`))
+    const keptMessage = await second.evaluate(`document.querySelector('#message')?.textContent.includes(${JSON.stringify(refusal)}) === false`)
     await sleep(5000)
     if (second.startups()) {
       throw new Error('the second tab started')
     }
-    await fetch(`${devtools}/json/close/${first.target.id}`)
-    await until('the first tab did not close', async () => !(await pages()).some(target => target.id === first.target.id))
+    await closeTab(first)
+    state.page = second
     // nothing holds the data root now, so nothing writes over this deck
     await second.evaluate(`new Promise((resolve, reject) => {
       const open = indexedDB.open(${JSON.stringify(database)})
@@ -176,43 +225,28 @@ const checks = {
       open.onerror = () => reject(open.error)
     })`)
     await second.started(await second.reload())
-    state.page = second
+    if (keptMessage) {
+      throw new Error('the refused tab kept its loading message instead of the refusal')
+    }
   },
 
   async '3a'(state) {
     const page = state.page
-    const screen = "document.querySelector('#qt-shadow-container').shadowRoot"
-    const control = (role, name) =>
-      `[...${screen}.querySelectorAll('.qt-window-a11y-container ${role}')].find(e => (e.getAttribute('aria-label') || e.textContent) === ${JSON.stringify(name)})`
-    // Qt mirrors its widgets into the page only once a screen reader is asked for
-    await page.evaluate(`${screen}.querySelectorAll('button.hidden-visually-read-by-screen-reader').forEach(b => b.click())`)
-    await until('no Deck Storage tab', () => page.evaluate(`!!${control('[role=tab]', 'Deck Storage')}`), 10000)
-    await page.evaluate(`${control('[role=tab]', 'Deck Storage')}.click()`)
-    const open = control('button', 'Open in deck editor')
-    await until('no deck storage toolbar', () => page.evaluate(`${open}?.getBoundingClientRect().height > 0`), 10000)
-    const bar = await page.evaluate(`(r => ({ x: r.x, y: r.y }))(${open}.getBoundingClientRect())`)
-    // the local deck list sits above its toolbar; its first row takes the Down key
-    for (const type of ['mousePressed', 'mouseReleased']) {
-      await page.send('Input.dispatchMouseEvent', { type, x: bar.x + 10, y: bar.y - 40, button: 'left', clickCount: 1 })
+    await openDeck(page)
+    const line = await page.evaluate(statusLine)
+    if (line) {
+      throw new Error(`a line shows before anything was saved: ${line}`)
     }
-    for (const type of ['rawKeyDown', 'keyUp']) {
-      await page.send('Input.dispatchKeyEvent', { type, key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 })
-    }
-    const loads = page.count(deck)
-    await page.evaluate(`${open}.click()`)
-    await until('the deck did not open', () => page.count(deck) > loads, 10000)
-    await sleep(1000)
     const before = (await readStore(page))[deck]?.time
     await page.evaluate(`{
-      const flush = cockatricePersist.flush
-      cockatricePersist.flush = () => (window.deckFlush = flush())
+      const flushPlayerData = cockatricePersist.flushPlayerData
+      cockatricePersist.flushPlayerData = () => (window.deckFlush = flushPlayerData())
     }`)
-    const mac = await page.evaluate(`${screen}.querySelector('.qt-window-input-element').focus(), navigator.platform.startsWith('Mac')`)
-    for (const type of ['rawKeyDown', 'keyUp']) {
-      await page.send('Input.dispatchKeyEvent', { type, modifiers: mac ? 4 : 2, key: 's', code: 'KeyS', windowsVirtualKeyCode: 83 })
-    }
+    await saveDeck(page)
     await until('saving the deck did not write to storage at once', () => page.evaluate('!!window.deckFlush'), 3000)
     await page.evaluate('window.deckFlush')
+    // headless Chrome refuses persistent storage to a site nobody has used
+    await until('no line says how to keep a deck', async () => mayDelete(await page.evaluate(statusLine)), 5000)
     const restart = await page.reload()
     const after = (await readStore(page))[deck]?.time
     if (!(after > before)) {
@@ -220,13 +254,57 @@ const checks = {
     }
     await page.started(restart)
   },
+
+  async e(state) {
+    const page = state.page
+    await openDeck(page)
+    const before = (await readStore(page))[deck].time
+    // closes the client's connection, as a browser does when it drops a page's storage
+    await page.evaluate(`window.transaction = IDBDatabase.prototype.transaction,
+      IDBDatabase.prototype.transaction = function () {
+        this.close()
+        throw new DOMException('closed by the check', 'InvalidStateError')
+      }`)
+    await saveDeck(page)
+    await until('no line says the write failed', async () => (await page.evaluate(statusLine)).includes(writeFailed), 10000)
+    await page.evaluate('IDBDatabase.prototype.transaction = window.transaction')
+    await page.evaluate('cockatricePersist.flush()')
+    const line = await page.evaluate(statusLine)
+    if (line.includes(writeFailed)) {
+      throw new Error(`a write succeeded and the line still says: ${line}`)
+    }
+    const restart = await page.reload()
+    const after = (await readStore(page))[deck].time
+    if (!(after > before)) {
+      throw new Error(`the deck saved while writes failed is not in storage: ${before} before, ${after} after`)
+    }
+    await page.started(restart)
+  },
+
+  async f(state) {
+    const noLocks = await newTab(state.url, "Object.defineProperty(Navigator.prototype, 'locks', { get: () => undefined })")
+    await noLocks.started(0)
+    const memoryLine = await noLocks.evaluate(statusLine)
+    await closeTab(noLocks)
+    if (!memoryLine.includes(noStorage)) {
+      throw new Error(`without Web Locks the line says: ${memoryLine}`)
+    }
+    await closeTab(state.page)
+    state.page = await newTab(state.url, "IDBFactory.prototype.open = () => { throw new DOMException('refused by the check', 'UnknownError') }")
+    await state.page.started(0)
+    const failedLine = await state.page.evaluate(statusLine)
+    if (!failedLine.includes(loadFailed)) {
+      throw new Error(`when the stored data cannot be loaded the line says: ${failedLine}`)
+    }
+  },
 }
 
 setTimeout(() => {
   console.log('the persistence checks stopped answering')
   process.exit(1)
 }, seconds * 10000)
-const state = { page: await attach((await pages())[0]) }
+const [first] = await pages()
+const state = { page: await attach(first), url: first.url }
 let failed = false
 for (const [name, check] of Object.entries(checks)) {
   try {

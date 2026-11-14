@@ -7,6 +7,6 @@
 void flushPlayerData()
 {
 #ifdef __EMSCRIPTEN__
-    MAIN_THREAD_ASYNC_EM_ASM(globalThis.cockatricePersist?.flush().catch(() => {}));
+    MAIN_THREAD_ASYNC_EM_ASM(globalThis.cockatricePersist?.flushPlayerData().catch(() => {}));
 #endif
 }
