@@ -2,6 +2,7 @@
 #include <QSettings>
 #include <QString>
 #include <QTemporaryDir>
+#include <QVariant>
 #include <libcockatrice/settings/servers_settings.h>
 
 namespace
@@ -219,6 +220,141 @@ TEST_F(ServersSettingsTest, OutOfRangeIndexReturnsNullopt)
     EXPECT_FALSE(settings.getServer(-1).has_value());
     EXPECT_FALSE(settings.getServer(0).has_value());
 }
+
+class PasswordStorageTest : public ServersSettingsTest, public ::testing::WithParamInterface<bool>
+{
+protected:
+    bool previous = ServersSettings::canStorePasswords();
+
+    void SetUp() override
+    {
+        ServersSettingsTest::SetUp();
+        ServersSettings::setPasswordStorageForTesting(GetParam());
+    }
+
+    void TearDown() override
+    {
+        ServersSettings::setPasswordStorageForTesting(previous);
+    }
+
+    QVariant storedField(const QString &field) const
+    {
+        return QSettings(settingsFile(), QSettings::IniFormat).value("server/server_details/servers/1/" + field);
+    }
+
+    QString allowed(const QString &password) const
+    {
+        return GetParam() ? password : QString();
+    }
+
+    void writeSavedLogin() const
+    {
+        QSettings file(settingsFile(), QSettings::IniFormat);
+        file.setValue("server/previousHostName", "Alpha");
+        file.setValue("server/autoConnect", 1);
+        file.beginGroup("server/server_details");
+        file.beginWriteArray("servers", 1);
+        file.setArrayIndex(0);
+        file.setValue("saveName", "Alpha");
+        file.setValue("server", "alpha.example");
+        file.setValue("port", "4748");
+        file.setValue("username", "alice");
+        file.setValue("password", "secret");
+        file.setValue("savePassword", true);
+        file.endArray();
+        file.endGroup();
+    }
+};
+
+TEST_P(PasswordStorageTest, AddingAServerStoresItsPasswordOnlyWhereAllowed)
+{
+    ServersSettings settings(settingsPath, nullptr);
+    settings.addNewServer("Alpha", "alpha.example", "4748", "alice", "secret", true);
+
+    EXPECT_EQ(storedField("password").toString(), allowed("secret"));
+    EXPECT_EQ(storedField("savePassword").toBool(), GetParam());
+    EXPECT_EQ(storedField("username").toString(), QString("alice"));
+}
+
+TEST_P(PasswordStorageTest, UpdatingAServerStoresItsPasswordOnlyWhereAllowed)
+{
+    ServersSettings settings(settingsPath, nullptr);
+    settings.addNewServer("Alpha", "alpha.example", "4748", "alice", QString(), false);
+
+    EXPECT_TRUE(settings.updateExistingServer("Alpha", "alpha.example", "4748", "alice", "secret", true));
+
+    EXPECT_EQ(storedField("password").toString(), allowed("secret"));
+    EXPECT_EQ(storedField("savePassword").toBool(), GetParam());
+}
+
+TEST_P(PasswordStorageTest, AVerifierIsStoredOnlyWhereAllowed)
+{
+    ServersSettings settings(settingsPath, nullptr);
+    settings.addNewServer("Alpha", "alpha.example", "4748", "alice", QString(), true);
+
+    settings.setServerPassword("Alpha", "$scrypt$made-up-verifier");
+
+    EXPECT_EQ(storedField("password").toString(), allowed("$scrypt$made-up-verifier"));
+}
+
+TEST_P(PasswordStorageTest, StoredCredentialsAreReportedOnlyWhereAllowed)
+{
+    ServersSettings settings(settingsPath, nullptr);
+    settings.addNewServer("Alpha", "alpha.example", "4748", "alice", "secret", true);
+    settings.setPrevioushostName("Alpha");
+
+    EXPECT_EQ(settings.hasCredentials("alpha.example", "4748"), GetParam());
+    EXPECT_EQ(settings.hasLoginData("alpha.example", "4748"), GetParam());
+    EXPECT_EQ(settings.getSavePassword(), GetParam());
+    EXPECT_EQ(settings.getPassword(), allowed("secret"));
+    EXPECT_EQ(settings.getServers().value(0).password, allowed("secret"));
+}
+
+TEST_P(PasswordStorageTest, APasswordAlreadyOnDiskIsReadAndKeptOnlyWhereAllowed)
+{
+    writeSavedLogin();
+
+    ServersSettings settings(settingsPath, nullptr);
+
+    EXPECT_EQ(settings.getPassword(), allowed("secret"));
+    EXPECT_EQ(settings.getSavePassword(), GetParam());
+    EXPECT_EQ(settings.hasLoginData("alpha.example", "4748"), GetParam());
+    EXPECT_EQ(settings.getServers().value(0).password, allowed("secret"));
+    EXPECT_EQ(settings.getServers().value(0).username, QString("alice"));
+    EXPECT_EQ(storedField("password").toString(), allowed("secret"));
+    EXPECT_EQ(storedField("username").toString(), QString("alice"));
+}
+
+TEST_P(PasswordStorageTest, AStoredAutoConnectCountsOnlyWhereAPasswordCanBeStored)
+{
+    writeSavedLogin();
+
+    ServersSettings settings(settingsPath, nullptr);
+
+    EXPECT_EQ(settings.getAutoConnect(), GetParam() ? 1 : 0);
+}
+
+TEST_P(PasswordStorageTest, AMigratedLegacyPasswordIsKeptOnlyWhereAllowed)
+{
+    {
+        QSettings settings(settingsFile(), QSettings::IniFormat);
+        settings.setValue("server/server_details/totalServers", 1);
+    }
+    writeLegacyServer(1, "Alpha", "alpha.example", "4748", "alice", "secret", true, "");
+
+    ServersSettings settings(settingsPath, nullptr);
+
+    EXPECT_EQ(storedField("password").toString(), allowed("secret"));
+    EXPECT_EQ(storedField("savePassword").toBool(), GetParam());
+    EXPECT_FALSE(QSettings(settingsFile(), QSettings::IniFormat).contains("server/server_details/password1"));
+}
+
+INSTANTIATE_TEST_SUITE_P(Storage,
+                         PasswordStorageTest,
+                         ::testing::Bool(),
+                         [](const ::testing::TestParamInfo<bool> &info) {
+                             return info.param ? "Allowed" : "NotAllowed";
+                         });
 } // namespace
 
 int main(int argc, char **argv)

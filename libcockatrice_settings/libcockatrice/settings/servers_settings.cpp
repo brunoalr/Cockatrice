@@ -18,6 +18,13 @@ constexpr auto SERVER_GROUP = "server";
 constexpr auto SERVER_DETAILS_GROUP = "server_details";
 constexpr auto SERVERS_ARRAY = "servers";
 
+#ifdef Q_OS_WASM
+// A browser keeps the settings where every page of the same origin can read them.
+bool passwordStorage = false;
+#else
+bool passwordStorage = true;
+#endif
+
 QString legacyKey(const char *field, int index)
 {
     return QStringLiteral("%1/%2%3")
@@ -40,8 +47,8 @@ QList<ServersSettings::ServerEntry> readServerArray(QSettings &settings)
         entry.host = settings.value("server").toString();
         entry.port = settings.value("port").toString();
         entry.username = settings.value("username").toString();
-        entry.password = settings.value("password").toString();
-        entry.savePassword = settings.value("savePassword").toBool();
+        entry.password = ServersSettings::canStorePasswords() ? settings.value("password").toString() : QString();
+        entry.savePassword = ServersSettings::canStorePasswords() && settings.value("savePassword").toBool();
         entry.site = settings.value("site").toString();
         servers.append(entry);
     }
@@ -90,8 +97,8 @@ void writeServerArray(QSettings &settings, const QList<ServersSettings::ServerEn
         settings.setValue("server", entry.host);
         settings.setValue("port", entry.port);
         settings.setValue("username", entry.username);
-        settings.setValue("password", entry.password);
-        settings.setValue("savePassword", entry.savePassword);
+        settings.setValue("password", ServersSettings::canStorePasswords() ? entry.password : QString());
+        settings.setValue("savePassword", ServersSettings::canStorePasswords() && entry.savePassword);
         settings.setValue("site", entry.site);
     }
     settings.endArray();
@@ -103,6 +110,20 @@ ServersSettings::ServersSettings(const QString &settingPath, QObject *parent)
     : SettingsManager(settingPath + "servers.ini", SERVER_GROUP, QString(), parent)
 {
     migrateLegacyServers();
+    if (!canStorePasswords()) {
+        // drops a password that an older build stored
+        storeServers(loadServers());
+    }
+}
+
+bool ServersSettings::canStorePasswords()
+{
+    return passwordStorage;
+}
+
+void ServersSettings::setPasswordStorageForTesting(bool allowed)
+{
+    passwordStorage = allowed;
 }
 
 QList<ServersSettings::ServerEntry> ServersSettings::getServers() const
@@ -219,7 +240,7 @@ void ServersSettings::setAutoConnect(int autoconnect)
 int ServersSettings::getAutoConnect() const
 {
     QVariant autoconnect = getValue("autoConnect");
-    return autoconnect == QVariant() ? 0 : autoconnect.toInt();
+    return autoconnect == QVariant() || !canStorePasswords() ? 0 : autoconnect.toInt();
 }
 
 void ServersSettings::setFPHostName(QString hostname)

@@ -28,6 +28,7 @@ const noStorage = 'does not let the page store data'
 const loadFailed = 'could not be loaded'
 const mayDelete = text => text.includes('may delete') && text.includes('Deck Editor > Save deck to clipboard')
 const deck = 'decks/persist-smoke.cod'
+const servers = 'settings/servers.ini'
 const playerData = ['settings/', 'decks/', 'replays/', 'filters/', 'themes/', 'customsets/']
 const notPlayerData = path =>
   ['settings/logs/', 'settings/sentry/'].some(dir => path.startsWith(dir)) ||
@@ -161,6 +162,19 @@ const clientId = async page => {
   return id
 }
 
+const plant = (page, path, text) =>
+  page.evaluate(`new Promise((resolve, reject) => {
+    const open = indexedDB.open(${JSON.stringify(database)})
+    open.onsuccess = () => {
+      const store = open.result.transaction('FILE_DATA', 'readwrite').objectStore('FILE_DATA')
+      const contents = new TextEncoder().encode(${JSON.stringify(text)})
+      store.put({ timestamp: new Date(1000), mode: 0o100644, contents }, ${JSON.stringify(root + path)})
+      store.transaction.oncomplete = () => (open.result.close(), resolve())
+      store.transaction.onerror = () => reject(store.transaction.error)
+    }
+    open.onerror = () => reject(open.error)
+  })`)
+
 const brokenIni = files =>
   Object.entries(files)
     .filter(([path]) => path.endsWith('.ini'))
@@ -234,18 +248,8 @@ const checks = {
     await closeTab(first)
     state.page = second
     // nothing holds the data root now, so nothing writes over this deck
-    await second.evaluate(`new Promise((resolve, reject) => {
-      const open = indexedDB.open(${JSON.stringify(database)})
-      open.onsuccess = () => {
-        const store = open.result.transaction('FILE_DATA', 'readwrite').objectStore('FILE_DATA')
-        const contents = new TextEncoder().encode('<?xml version="1.0" encoding="UTF-8"?>\\n<cockatrice_deck version="1">\\n' +
-          '    <deckname>persist smoke</deckname>\\n    <comments></comments>\\n</cockatrice_deck>\\n')
-        store.put({ timestamp: new Date(1000), mode: 0o100644, contents }, ${JSON.stringify(root + deck)})
-        store.transaction.oncomplete = () => (open.result.close(), resolve())
-        store.transaction.onerror = () => reject(store.transaction.error)
-      }
-      open.onerror = () => reject(open.error)
-    })`)
+    await plant(second, deck, '<?xml version="1.0" encoding="UTF-8"?>\n<cockatrice_deck version="1">\n' +
+      '    <deckname>persist smoke</deckname>\n    <comments></comments>\n</cockatrice_deck>\n')
     await second.started(await second.reload())
     if (keptMessage) {
       throw new Error('the refused tab kept its loading message instead of the refusal')
@@ -336,6 +340,30 @@ const checks = {
     }
     if (size >= 2 * 1024 * 1024) {
       throw new Error(`the stored files take ${size} bytes`)
+    }
+  },
+
+  async h(state) {
+    const first = state.page
+    const second = await newTab(state.url)
+    await until(`the second tab did not say "${refusal}"`,
+                () => second.evaluate(`!!document.body?.innerText.includes(${JSON.stringify(refusal)})`))
+    await closeTab(first)
+    state.page = second
+    const login = ['password=secret', 'port=4748', 'saveName=persist smoke', 'savePassword=true',
+                   'server=persist.example', 'site=', 'username=smoke']
+    await plant(second, servers, ['[server]', 'previousHostName=persist smoke',
+                                  ...login.map(line => `server_details\\servers\\1\\${line}`),
+                                  'server_details\\servers\\size=1', ''].join('\n'))
+    await second.started(await second.reload())
+    await second.evaluate('cockatricePersist.flush()')
+    const text = (await readStore(second))[servers]?.text ?? ''
+    console.log(`${servers} after a start with a saved password:\n${text}`)
+    if (!text.includes('persist.example')) {
+      throw new Error(`the server saved with a password is gone from ${servers}`)
+    }
+    if (/\\(password=\S|savePassword=true)/.test(text)) {
+      throw new Error(`${servers} still holds the saved password`)
     }
   },
 }
