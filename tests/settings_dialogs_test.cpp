@@ -317,6 +317,15 @@ protected:
     }
 };
 
+TEST_F(CardLanguagePrompt, YesIsTheDefaultAnswer)
+{
+    chooseAnotherLanguage();
+
+    const QMessageBox *box = onlyOpen<QMessageBox>();
+    ASSERT_NE(box, nullptr);
+    EXPECT_EQ(box->defaultButton(), box->button(QMessageBox::Yes));
+}
+
 TEST_F(CardLanguagePrompt, YesRunsOracle)
 {
     chooseAnotherLanguage();
