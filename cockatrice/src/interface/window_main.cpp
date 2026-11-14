@@ -130,6 +130,11 @@
 #include <qnamespace.h>
 #include <tuple>
 #include <utility>
+#ifdef Q_OS_WASM
+#include "../client/network/card_database_fetcher.h"
+
+#include <emscripten/val.h>
+#endif
 
 class LocalServerInterface;
 
@@ -723,7 +728,26 @@ void MainWindow::startupConfigCheck()
                                                          QStringLiteral("443"), QString(), QString(), false);
     }
     SettingsCache::instance().network().setClientVersion(VERSION_STRING);
-    CardDatabaseManager::getInstance()->checkUnknownSets();
+    const QUrl page(QString::fromStdString(emscripten::val::global("location")["href"].as<std::string>()));
+    auto *fetcher = new CardDatabaseFetcher(page, SettingsCache::instance().getCachePath(), this);
+    connect(fetcher, &CardDatabaseFetcher::fetched, this, &MainWindow::reloadCardDatabaseAndCheckSets);
+    connect(fetcher, &CardDatabaseFetcher::failed, this, [this, fetcher](const QString &what) {
+        auto *warning =
+            new QMessageBox(QMessageBox::Warning, tr("Card database"),
+                            tr("The card database could not be downloaded, so cards are missing.\n\n%1").arg(what),
+                            QMessageBox::Retry | QMessageBox::Close, this);
+        // Modeless and not focused: without cards a player can still connect and chat.
+        warning->setWindowModality(Qt::NonModal);
+        warning->setAttribute(Qt::WA_ShowWithoutActivating);
+        warning->setAttribute(Qt::WA_DeleteOnClose);
+        connect(warning, &QMessageBox::buttonClicked, fetcher, [warning, fetcher](QAbstractButton *button) {
+            if (warning->standardButton(button) == QMessageBox::Retry) {
+                fetcher->fetch();
+            }
+        });
+        warning->show();
+    });
+    fetcher->fetch();
     actCheckCommanderBracketDefinitionUpdates();
 #else
     AtRiskDataWarning::warnAboutDataPathsInProgramDir(this, [this] { continueStartupConfigCheck(); });
