@@ -41,7 +41,7 @@ public:
 
     [[nodiscard]] QString getTabText() const override;
     void retranslateUi() override;
-    bool closeRequest() override;
+    void closeRequest() override;
 
     [[nodiscard]] QString getUserName() const
     {
