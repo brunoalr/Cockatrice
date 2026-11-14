@@ -105,6 +105,7 @@ public:
     SettingsCache();
     QString getDataPath();
     QString getSettingsPath();
+    QString getSessionDataPath();
     [[nodiscard]] QString getCachePath() const;
     [[nodiscard]] QString getNetworkCachePath() const;
 

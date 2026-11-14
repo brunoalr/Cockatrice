@@ -96,6 +96,10 @@ DlgConnect::DlgConnect(QWidget *parent) : QDialog(parent)
 
     autoConnectCheckBox = new QCheckBox(tr("A&uto connect"));
     autoConnectCheckBox->setToolTip(tr("Automatically connect to the most recent login when Cockatrice opens"));
+    if (!ServersSettings::canStorePasswords()) {
+        savePasswordCheckBox->hide();
+        autoConnectCheckBox->hide();
+    }
 
     auto &servers = SettingsCache::instance().servers();
     if (servers.getSavePassword()) {
