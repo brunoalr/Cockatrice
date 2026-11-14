@@ -31,13 +31,9 @@ void show(QDialog *dialog, std::function<void(int result)> thenFinished)
                 Qt::QueuedConnection);
         },
         Qt::SingleShotConnection);
-    if (dialog->parentWidget()) {
-        dialog->open();
-    } else {
-        // open() would make a dialog without a parent modeless, where exec() blocks the application.
-        dialog->setWindowModality(Qt::ApplicationModal);
-        dialog->show();
-    }
+    // As exec() does. open() would block the parent window only, and makes the dialog a sheet on macOS.
+    dialog->setWindowModality(Qt::ApplicationModal);
+    dialog->show();
 }
 
 void notify(QWidget *parent,
