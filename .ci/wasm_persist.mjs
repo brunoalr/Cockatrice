@@ -345,6 +345,12 @@ const checks = {
     if (size >= 2 * 1024 * 1024) {
       throw new Error(`the stored files take ${size} bytes`)
     }
+    const intoStorage = (stored['settings/paths.ini']?.text ?? '').split('\n')
+      .filter(line => /^(pics|customPics|cardDatabase|tokenDatabase|spoilerDatabase)=/.test(line))
+      .filter(line => line.includes(`=${database}/`))
+    if (intoStorage.length) {
+      throw new Error(`settings/paths.ini points into the stored data: ${intoStorage.join(' ')}`)
+    }
   },
 
   async h(state) {
