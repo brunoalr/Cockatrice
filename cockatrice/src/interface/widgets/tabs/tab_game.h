@@ -208,7 +208,7 @@ public:
     ~TabGame() override;
     void retranslateUi() override;
     void updatePlayerListDockTitle();
-    bool closeRequest() override;
+    void closeRequest() override;
 
     [[nodiscard]] QString getTabText() const override;
 

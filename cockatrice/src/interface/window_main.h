@@ -29,6 +29,7 @@
 #include "../client/network/update/client/release_channel.h"
 #include "card_database_update/card_update_progress.h"
 #include "connection_controller/remote_connection_controller.h"
+#include "shutdown_chain.h"
 
 #include <QByteArray>
 #include <QDir>
@@ -42,6 +43,7 @@
 #include <QStringList>
 #include <QUrl>
 #include <QtGlobal>
+#include <functional>
 #include <libcockatrice/network/client/abstract/abstract_client.h>
 #include <qtmetamacros.h>
 
@@ -171,7 +173,10 @@ private:
     void showStartupTips();
     void createCardUpdateProcess(bool background = false);
     void exitCardDatabaseUpdate(bool doReload);
+    void confirmCancellingCardUpdate(const ShutdownChain::Answer &answer);
 #endif
+    void confirmShutdown(std::function<void(bool closed)> then);
+    void bringConfirmationForward();
     /**
      * @brief Reloads the card database on a worker thread and runs checkUnknownSets() once the finished
      *        snapshot has been swapped in.
@@ -215,16 +220,10 @@ private:
     LatencyStatusWidget *latencyStatus = nullptr; ///< status bar widget with live round-trip stats and history graph
     bool bHasActivated, askedForDbUpdater;
     /**
-     * How far a shutdown that was asked for has got. A close request that arrives while one is
-     * already asking the user something must not be accepted - see closeEvent().
+     * Asks the shutdown's questions; its state is how far a shutdown that was asked for has got.
+     * A close request that arrives while one is already asking must not be accepted - see closeEvent().
      */
-    enum class ShutdownState
-    {
-        Idle,       ///< no shutdown has been asked for
-        Confirming, ///< asking about a card database update, open games or an unsaved deck
-        Accepted,   ///< the close was accepted and the window is hiding
-    };
-    ShutdownState shutdownState = ShutdownState::Idle;
+    ShutdownChain shutdownChain;
     bool skipStartupAutoConnect = false;
     bool startupAutoConnectAttempted = false;
     bool firstRunWizardActive = false;
@@ -284,10 +283,10 @@ public:
 
     /**
      * @brief Closes the window so an update installer can replace the running binaries.
-     *        Returns true only if the shutdown actually ran (settings flushed, tabs shut down);
+     *        Tells @p then true once the shutdown actually ran (settings flushed, tabs shut down);
      *        false if the close was vetoed by the user or is already in progress.
      */
-    bool closeForUpdate();
+    void closeForUpdate(std::function<void(bool closed)> then);
 
     /**
      * @brief Closes this instance because the installer asked it to over its local socket.

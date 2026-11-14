@@ -172,9 +172,9 @@ public slots:
 
     /**
      * @brief Save the deck under a new name.
-     * @return true if successful, false otherwise.
+     * @param then Told whether the save succeeded.
      */
-    bool actSaveDeckAs() override;
+    void actSaveDeckAs(std::function<void(bool saved)> then = {}) override;
 
     /**
      * @brief Prompts for and creates a new custom deck zone.

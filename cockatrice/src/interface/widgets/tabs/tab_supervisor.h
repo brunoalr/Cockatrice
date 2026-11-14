@@ -8,6 +8,7 @@
 #ifndef TAB_SUPERVISOR_H
 #define TAB_SUPERVISOR_H
 
+#include "../../shutdown_chain.h"
 #include "../interface/widgets/server/game_link.h"
 #include "libcockatrice/card/card_info.h"
 
@@ -137,6 +138,7 @@ private:
     static QString sanitizeTabName(QString dirty);
     static QString sanitizeHtml(QString dirty);
     void resetTabsMenu();
+    void confirmLeavingGames(const ShutdownChain::Answer &answer);
     /** Shared join/spectate driver behind the report tab and the profile hover card. */
     void joinGameByIntent(int gameId, int roomId, const GameRoleInfo &roles);
 
@@ -189,7 +191,7 @@ public:
     void sendInviteToUser(const QString &userName, const QString &inviteText);
     [[nodiscard]] bool getAdminLocked() const;
     [[nodiscard]] bool canOverrideGameRestrictions() const;
-    void closeEvent(QCloseEvent *event) override;
+    QList<ShutdownChain::Step> closeSteps();
     bool switchToGameTabIfAlreadyExists(const int gameId);
     static void actShowPopup(const QString &message);
 signals:
