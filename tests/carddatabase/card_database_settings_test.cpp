@@ -90,8 +90,7 @@ private:
     QString root;
 };
 
-class CardDatabaseSettingsUnsavedSetsTest
-    : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
+class CardDatabaseSettingsUnsavedSetsTest : public ::testing::Test // NOSONAR: TEST_F reads fixture members
 {
 protected:
     void SetUp() override

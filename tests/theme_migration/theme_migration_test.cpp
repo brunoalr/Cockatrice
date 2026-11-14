@@ -1,3 +1,4 @@
+#include "../support/test_home.h"
 #include "interface/theme_manager.h"
 
 #include <QByteArray>
@@ -374,6 +375,10 @@ TEST_F(ThemeMigrationTest, StyleSheetIsEmptyWhenNeitherDirectoryHasOne)
 // the fallback then links the bare gtest library without gtest_main.
 int main(int argc, char **argv)
 {
+    const test_support::TestHome home;
+    if (!home.writesStayInside()) {
+        return 1;
+    }
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
