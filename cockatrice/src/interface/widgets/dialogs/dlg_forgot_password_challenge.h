@@ -41,7 +41,8 @@ private slots:
 
 private:
     QLabel *infoLabel, *hostLabel, *portLabel, *playernameLabel, *emailLabel;
-    QLineEdit *hostEdit, *portEdit, *playernameEdit, *emailEdit;
+    QLineEdit *hostEdit, *portEdit, *playernameEdit;
+    QLineEdit *emailEdit = new QLineEdit(this);
 };
 
 #endif

@@ -17,9 +17,7 @@
 class QVBoxLayout;
 class QWidget;
 
-DlgForgotPasswordReset::DlgForgotPasswordReset(QWidget *parent)
-    : QDialog(parent), tokenEdit(new QLineEdit()), newpasswordEdit(new QLineEdit()),
-      newpasswordverifyEdit(new QLineEdit())
+DlgForgotPasswordReset::DlgForgotPasswordReset(QWidget *parent) : QDialog(parent)
 {
     const auto [lastfphost, lastfpport, lastfpplayername] = lastForgotPasswordServer();
     rejectWithoutPasswordRequest(this, tr("Reset Password Warning"),
