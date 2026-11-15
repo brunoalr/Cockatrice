@@ -18,6 +18,7 @@ set(cockatrice_SOURCES
     src/client/network/update/client/release_channel.cpp
     src/client/network/update/card_spoiler/spoiler_background_updater.cpp
     src/client/network/update/card_spoiler/spoiler_file.cpp
+    src/client/network/web_relay.cpp
     src/client/crash/crash_reporter.cpp
     src/client/flush_player_data.cpp
     src/client/latency_graph_widget.cpp

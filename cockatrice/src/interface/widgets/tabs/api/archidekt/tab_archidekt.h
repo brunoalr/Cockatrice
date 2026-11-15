@@ -59,6 +59,8 @@ public:
     explicit TabArchidekt(TabSupervisor *_tabSupervisor);
     ~TabArchidekt() override;
 
+    static bool isReachable();
+
     /**
      * @brief Update all UI text to reflect the current language or translation
      *
