@@ -309,6 +309,65 @@ TEST_F(PathChoosers, TheSpoilerFileGoesIntoTheChosenDirectory)
 
     EXPECT_EQ(SettingsCache::instance().getSpoilerCardDatabasePath(), chosen.filePath("spoiler.xml"));
 }
+
+TEST_F(PathChoosers, TheDesktopReachesTheDevicesFolders)
+{
+    EXPECT_TRUE(SettingsCache::instance().canReachDeviceFolders());
+}
+
+// As in a browser tab, which reaches only its own storage.
+class UnreachableDeviceFolders : public SettingsDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    void SetUp() override
+    {
+        SettingsCache::instance().setDeviceFoldersReachableForTesting(false);
+    }
+
+    void TearDown() override
+    {
+        SettingsCache::instance().setDeviceFoldersReachableForTesting(true);
+    }
+
+    static QList<QPushButton *> choosers(const QWidget *page)
+    {
+        QList<QPushButton *> found;
+        for (QPushButton *button : page->findChildren<QPushButton *>()) {
+            if (button->text() == "...") {
+                found.append(button);
+            }
+        }
+        return found;
+    }
+};
+
+TEST_F(UnreachableDeviceFolders, TheGeneralPageShowsItsPathsWithoutChoosers)
+{
+    auto *page = addPage<GeneralSettingsPage>();
+
+    const QList<QPushButton *> buttons = choosers(page);
+    EXPECT_EQ(buttons.size(), 7);
+    for (const QPushButton *button : buttons) {
+        EXPECT_FALSE(button->isVisibleTo(page));
+    }
+    for (const QLineEdit *edit : page->findChildren<QLineEdit *>()) {
+        if (edit->text() == SettingsCache::instance().paths().getDeckPath()) {
+            EXPECT_TRUE(edit->isVisibleTo(page));
+            EXPECT_TRUE(edit->isReadOnly());
+        }
+    }
+    const auto resets = page->findChildren<QPushButton *>();
+    EXPECT_TRUE(std::ranges::none_of(resets, [](const QPushButton *b) { return b->text() == "Reset all paths"; }));
+}
+
+TEST_F(UnreachableDeviceFolders, TheSpoilerPathHasNoChooser)
+{
+    auto *page = addPage<DeckEditorSettingsPage>();
+
+    const QList<QPushButton *> buttons = choosers(page);
+    ASSERT_EQ(buttons.size(), 1);
+    EXPECT_FALSE(buttons.first()->isVisibleTo(page));
+}
 class CardLanguagePrompt : public SettingsDialogs // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:

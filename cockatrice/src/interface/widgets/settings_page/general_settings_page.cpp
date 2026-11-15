@@ -311,8 +311,8 @@ GeneralSettingsPage::GeneralSettingsPage()
     // Required init here to avoid crashing on Portable builds
     resetAllPathsButton = new QPushButton;
 
-    bool isPortable = settings.getIsPortableBuild();
-    if (isPortable) {
+    const bool pathsFixed = settings.getIsPortableBuild() || !settings.canReachDeviceFolders();
+    if (pathsFixed) {
         deckPathEdit->setEnabled(false);
         filtersPathEdit->setEnabled(false);
         replaysPathEdit->setEnabled(false);
@@ -322,6 +322,7 @@ GeneralSettingsPage::GeneralSettingsPage()
         tokenDatabasePathEdit->setEnabled(false);
 
         deckPathButton->setVisible(false);
+        filtersPathButton->setVisible(false);
         replaysPathButton->setVisible(false);
         picsPathButton->setVisible(false);
         cardDatabasePathButton->setVisible(false);
@@ -355,7 +356,7 @@ GeneralSettingsPage::GeneralSettingsPage()
     pathsGrid->addWidget(&tokenDatabasePathLabel, 6, 0);
     pathsGrid->addWidget(tokenDatabasePathEdit, 6, 1);
     pathsGrid->addWidget(tokenDatabasePathButton, 6, 2);
-    if (!isPortable) {
+    if (!pathsFixed) {
         pathsGrid->addWidget(resetAllPathsButton, 7, 0);
         pathsGrid->addWidget(allPathsResetLabel, 7, 1);
     }
