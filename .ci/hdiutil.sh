@@ -114,6 +114,10 @@ FAKE
       detached) rm "$state/mounted" "$state/attached" ;;
       detached-info-failing) rm "$state/mounted" "$state/attached" && touch "$state/info_fails" ;;
       info-timing-out) touch "$state/info_killed" ;;
+      attached-long-ago)
+        sed '2s/.*/2001-01-01 00:00:00/' "$state/tmp/hdiutil-attached-image" >"$state/record"
+        mv "$state/record" "$state/tmp/hdiutil-attached-image"
+        ;;
       *) ;;
     esac
     rm -f "$state/info_calls"
@@ -136,10 +140,21 @@ FAKE
   check "eject refused after the unmount" 3 0 mounted 0 no "couldn't eject"
   check "eject refused on every attempt" 99 0 mounted 16 yes "giving up"
   check "volume unmounted before the detach" 0 0 unmounted 0 no
-  check "image detached before the detach" 0 0 detached 0 no
+  check "image detached before the detach" 0 0 detached 0 no "detached by something else"
   check "image gone but hdiutil info failing" 0 0 detached-info-failing 1 no
   check "nothing attached" 0 0 never-attached 1 no
   check "hdiutil info timing out" 99 0 info-timing-out 1 yes "giving up" 1
+  check "the first log covers the time since the attach" 1 0 attached-long-ago 0 no "show --start 2001-01-01 00:00:00"
+
+  rm -rf "$state"
+  mkdir -p "$state/tmp"
+  wrapper attach "$state/temp.dmg" >/dev/null
+  rm "$state/mounted"
+  wrapper create -ov "$state/temp.dmg" >/dev/null
+  if [[ -f $state/attached || -e $state/other_image_detached ]]; then
+    echo "self-test FAILED: create left the image of a failed package step attached"
+    failed=1
+  fi
   rm -rf "$dir"
   if (( failed )); then
     return 1
@@ -235,20 +250,32 @@ diagnose() {
     [[ -n $device ]] && run_supervised lsof "$device" "$device"s* "$raw" "$raw"s*
     [[ -d $target ]] && run_supervised lsof "$target"
     ps -o pid,user,etime,comm -p "$(pgrep -d, -i 'diskimages|xprotect|mds|iconservices|finder|fseventsd|diskarbitration')"
-    run_supervised log show --start "$since" --style compact --predicate 'process == "diskarbitrationd"'
+    run_supervised log show --start "${attached_at:-$since}" --style compact --predicate \
+      'process IN {"diskarbitrationd", "hdiutil", "diskutil"} OR eventMessage CONTAINS[c] "unmount" OR eventMessage CONTAINS[c] "eject"' |
+      tail -n 400
   } >>"$log" 2>&1
+  attached_at=
 }
 
 timeouts=0
 image=
 device=
+# A volume unmounted behind CPack shows in the system log from the attach on, not from the detach.
+attached_at=$(sed -n 2p "$attached_record" 2>/dev/null)
 if [[ $subcommand == detach ]]; then
   target=${!#}
   lookup mount "$target"
   image=${found#*$'\t'}
   device=${found%%$'\t'*}
-  [[ -n $image ]] || image=$(cat "$attached_record" 2>/dev/null)
+  [[ -n $image ]] || image=$(head -n 1 "$attached_record" 2>/dev/null)
   note "detaching $target: image ${image:-unknown}, device ${device:-unknown}"
+elif [[ $subcommand == create && $(head -n 1 "$attached_record" 2>/dev/null) == "${!#}" ]]; then
+  # A failed package step can leave its image attached, and the next one creates that file again.
+  if lookup image "${!#}" && [[ -n $found ]]; then
+    note "detaching the image an earlier run left attached: $found"
+    run_supervised hdiutil detach -force "${found%%$'\t'*}" >>"$log" 2>&1
+  fi
+  rm -f "$attached_record"
 fi
 
 attempt=0
@@ -264,8 +291,8 @@ while (( attempt < attempts )); do
       cmd=(hdiutil detach -force "${@:2}")
     fi
   fi
-  note "attempt $attempt/$attempts: ${cmd[*]}"
   since=$(date '+%Y-%m-%d %H:%M:%S')
+  note "attempt $attempt/$attempts: ${cmd[*]}"
   output=$(run_supervised "${cmd[@]}" 2>>"$log")
   rc=$?
   [[ -z $output ]] || printf '%s\n' "$output" | tee -a "$log"
@@ -273,7 +300,7 @@ while (( attempt < attempts )); do
   if (( rc == 0 )); then
     if [[ $subcommand == attach ]] &&
       lookup device "$(awk '/^\/dev\/disk/ { print $1; exit }' <<<"$output")" && [[ -n $found ]]; then
-      printf '%s\n' "${found#*$'\t'}" >"$attached_record"
+      printf '%s\n%s\n' "${found#*$'\t'}" "$since" >"$attached_record"
     elif [[ $subcommand == attach || $subcommand == detach ]]; then
       rm -f "$attached_record"
     fi
@@ -292,6 +319,10 @@ while (( attempt < attempts )); do
     if [[ -n $image ]] && lookup image "$image"; then
       if [[ -z $found ]]; then
         note "$image is no longer attached"
+        if (( attempt == 1 )); then
+          echo "::warning::the disk image was detached by something else before CPack asked" >>"$log"
+          diagnose
+        fi
         rm -f "$attached_record"
         exit 0
       fi
