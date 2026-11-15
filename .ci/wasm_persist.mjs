@@ -197,16 +197,21 @@ const openDeck = async page => {
   const open = control('button', 'Open in deck editor')
   await until('no deck storage toolbar', () => page.evaluate(`${open}?.getBoundingClientRect().height > 0`), 10000)
   const bar = await page.evaluate(`(r => ({ x: r.x, y: r.y }))(${open}.getBoundingClientRect())`)
-  // the local deck list sits above its toolbar; its first row takes the Down key
-  for (const type of ['mousePressed', 'mouseReleased']) {
-    await page.send('Input.dispatchMouseEvent', { type, x: bar.x + 10, y: bar.y - 40, button: 'left', clickCount: 1 })
-  }
-  for (const type of ['rawKeyDown', 'keyUp']) {
-    await page.send('Input.dispatchKeyEvent', { type, key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 })
-  }
-  const loads = page.count(deck)
-  await page.evaluate(`${open}.click()`)
-  await until('the deck did not open', () => page.count(deck) > loads, 10000)
+  // after a start the client loads every deck by itself, and until its list is filled a click selects no deck
+  const opened = `${deck}" with userRequest: true`
+  const loads = page.count(opened)
+  await until('the deck did not open', async () => {
+    // the local deck list sits above its toolbar; its first row takes the Down key
+    for (const type of ['mousePressed', 'mouseReleased']) {
+      await page.send('Input.dispatchMouseEvent', { type, x: bar.x + 10, y: bar.y - 40, button: 'left', clickCount: 1 })
+    }
+    for (const type of ['rawKeyDown', 'keyUp']) {
+      await page.send('Input.dispatchKeyEvent', { type, key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 })
+    }
+    await page.evaluate(`${open}.click()`)
+    await sleep(750)
+    return page.count(opened) > loads
+  }, 15000)
   await sleep(1000)
 }
 
@@ -289,12 +294,21 @@ const checks = {
     await openDeck(page)
     const before = (await readStore(page))[deck].time
     // closes the client's connection, as a browser does when it drops a page's storage
-    await page.evaluate(`window.transaction = IDBDatabase.prototype.transaction,
+    await page.evaluate(`{
+      const flushPlayerData = cockatricePersist.flushPlayerData
+      cockatricePersist.flushPlayerData = () => (window.deckFlush = flushPlayerData())
+      window.transaction = IDBDatabase.prototype.transaction
       IDBDatabase.prototype.transaction = function () {
         this.close()
         throw new DOMException('closed by the check', 'InvalidStateError')
-      }`)
+      }
+    }`)
     await saveDeck(page)
+    // the page's 5 s timer can fail first and show the line before the client has written the deck
+    await until('saving the deck did not write to storage at once', () => page.evaluate('!!window.deckFlush'), 10000)
+    if (await page.evaluate('window.deckFlush.then(() => true, () => false)')) {
+      throw new Error('the deck was stored although writes fail')
+    }
     await until('no line says the write failed', async () => (await page.evaluate(statusLine)).includes(writeFailed), 10000)
     await page.evaluate('IDBDatabase.prototype.transaction = window.transaction')
     await page.evaluate('cockatricePersist.flush()')
