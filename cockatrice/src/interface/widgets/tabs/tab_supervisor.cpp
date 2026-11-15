@@ -496,10 +496,9 @@ void TabSupervisor::resetTabsMenu()
     tabsMenu->addAction(aTabDeckEditor);
     tabsMenu->addAction(aTabVisualDeckEditor);
     tabsMenu->addAction(aTabEdhRec);
-#ifndef Q_OS_WASM
-    // Archidekt admits only http://localhost:3000, so a page cannot read it.
-    tabsMenu->addAction(aTabArchidekt);
-#endif
+    if (TabArchidekt::isReachable()) {
+        tabsMenu->addAction(aTabArchidekt);
+    }
     tabsMenu->addSeparator();
     tabsMenu->addAction(aTabHome);
     tabsMenu->addAction(aTabVisualDeckStorage);

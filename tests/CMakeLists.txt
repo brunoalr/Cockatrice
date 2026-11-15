@@ -222,6 +222,15 @@ cockatrice_add_test(
   ${CMAKE_SOURCE_DIR}/cockatrice/src
   ${CMAKE_SOURCE_DIR}/libcockatrice_network
 )
+cockatrice_add_test(
+  NAME
+  web_relay_test
+  SOURCES
+  ${CMAKE_SOURCE_DIR}/cockatrice/src/client/network/web_relay.cpp
+  web_relay_test.cpp
+  INCLUDE_DIRS
+  ${CMAKE_SOURCE_DIR}/cockatrice/src
+)
 # The installer's holder probe is Windows-only, but the wording it produces and the
 # question which programs are the payload's own are plain C++ and are what a stuck user
 # has to act on, so they are tested everywhere.
@@ -813,6 +822,7 @@ if(WITH_CLIENT)
     deck_dialogs_test
     SOURCES
     ${CLIENT_SRC}/client/network/parsers/deck_link_to_api_transformer.cpp
+    ${CLIENT_SRC}/client/network/web_relay.cpp
     ${CLIENT_SRC}/interface/deck_loader/card_node_function.cpp
     ${CLIENT_SRC}/interface/key_signals.cpp
     ${CLIENT_SRC}/interface/pixel_map_generator.cpp

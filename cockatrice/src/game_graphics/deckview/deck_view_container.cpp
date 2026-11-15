@@ -191,12 +191,7 @@ void DeckViewContainer::switchToDeckSelectView()
     setVisibility(loadLocalButton, true);
     setVisibility(loadRemoteButton, !parentGame->getGame()->getGameState()->getIsLocalGame());
     setVisibility(loadFromClipboardButton, true);
-#ifdef Q_OS_WASM
-    // No deck site admits a request from a page on another origin.
-    setVisibility(loadFromWebsiteButton, false);
-#else
-    setVisibility(loadFromWebsiteButton, true);
-#endif
+    setVisibility(loadFromWebsiteButton, DlgLoadDeckFromWebsite::isAvailable());
     setVisibility(unloadDeckButton, false);
     setVisibility(readyStartButton, false);
     setVisibility(sideboardLockButton, false);
