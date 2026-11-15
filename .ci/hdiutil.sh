@@ -96,34 +96,36 @@ FAKE
   # check <case> <eject refusals> <unmount refusals> <state before the detach> <status> <image left attached>
   #   [<log pattern> [<most hdiutil info calls>]]
   check() {
-    local name=$1 rc attached=no attach_out=
+    local name=$1 ejects=$2 unmounts=$3 before=$4 want_status=$5 want_attached=$6 pattern=${7:-} most_info=${8:-}
+    local rc attached=no attach_out=
     rm -rf "$state"
     mkdir -p "$state/tmp"
-    if [[ $4 != never-attached ]]; then
+    if [[ $before != never-attached ]]; then
       attach_out=$(wrapper attach "$state/temp.dmg")
       if [[ $attach_out != *$'\t'/Volumes/CkFlakeSelfTest ]]; then
         echo "self-test FAILED: $name: attach printed '$attach_out', CPack reads the mount point from it"
         failed=1
       fi
     fi
-    echo "$2" >"$state/eject_refusals"
-    echo "$3" >"$state/unmount_refusals"
-    case $4 in
+    echo "$ejects" >"$state/eject_refusals"
+    echo "$unmounts" >"$state/unmount_refusals"
+    case $before in
       unmounted) rm "$state/mounted" ;;
       detached) rm "$state/mounted" "$state/attached" ;;
       detached-info-failing) rm "$state/mounted" "$state/attached" && touch "$state/info_fails" ;;
       info-timing-out) touch "$state/info_killed" ;;
+      *) ;;
     esac
     rm -f "$state/info_calls"
     wrapper detach /Volumes/CkFlakeSelfTest >/dev/null
     rc=$?
     [[ -f $state/attached ]] && attached=yes
-    if [[ $rc != "$5" || $attached != "$6" || -e $state/other_image_detached ]] ||
-      { [[ -n ${7:-} ]] && ! grep -q "$7" "$state/log"; } ||
-      { [[ -n ${8:-} ]] && (( $(cat "$state/info_calls" 2>/dev/null || echo 0) > $8 )); }; then
-      echo "self-test FAILED: $name: status $rc, image left attached: $attached (expected $5 and $6${7:+, log line: $7})"
+    if [[ $rc != "$want_status" || $attached != "$want_attached" || -e $state/other_image_detached ]] ||
+      { [[ -n $pattern ]] && ! grep -q "$pattern" "$state/log"; } ||
+      { [[ -n $most_info ]] && (( $(cat "$state/info_calls" 2>/dev/null || echo 0) > most_info )); }; then
+      echo "self-test FAILED: $name: status $rc, image left attached: $attached (expected $want_status and $want_attached${pattern:+, log line: $pattern})"
       [[ ! -e $state/other_image_detached ]] || echo "  | another image was detached"
-      [[ -z ${8:-} ]] || echo "  | hdiutil info calls: $(cat "$state/info_calls" 2>/dev/null || echo 0), at most $8 expected"
+      [[ -z $most_info ]] || echo "  | hdiutil info calls: $(cat "$state/info_calls" 2>/dev/null || echo 0), at most $most_info expected"
       sed 's/^/  | /' "$state/log" 2>/dev/null
       failed=1
     fi
@@ -191,18 +193,18 @@ force_detach_stale_mount() {
   return 0
 }
 
-# Prints "<whole disk><tab><image path>" of the image whose $1 (image, device or mount) is $2.
+# Prints "<whole disk><tab><image path>" of the image whose <image, device or mount> is <value>.
 # Returns 2 if hdiutil info fails, 3 if it timed out.
 find_image() {
-  local info status
-  [[ -n $2 ]] || return 0
+  local key=$1 want=$2 info status
+  [[ -n $want ]] || return 0
   # A DiskImages helper wedged enough to time a call out can hang hdiutil info as well.
   (( timeouts == 0 )) || return 2
   info=$(run_supervised hdiutil info 2>>"$log")
   status=$?
   (( status != 137 )) || return 3
   (( status == 0 )) && [[ -n $info ]] || return 2
-  awk -F '\t' -v key="$1" -v want="$2" '
+  awk -F '\t' -v key="$key" -v want="$want" '
     /^image-path/ { sub(/^image-path *: /, ""); image = $0; device = ""; next }
     /^\/dev\// {
       if (device == "") device = $1
@@ -223,9 +225,13 @@ lookup() {
 }
 
 diagnose() {
-  local raw=${device/disk/rdisk} timeout_seconds=60
+  local raw=${device/disk/rdisk}
+  local timeout_seconds=60 # NOSONAR: run_supervised reads it
   {
-    (( attempt > 1 || timeouts > 0 )) || run_supervised hdiutil info
+    if (( attempt == 1 && timeouts == 0 )); then
+      run_supervised hdiutil info
+      (( $? != 137 )) || (( timeouts++ ))
+    fi
     [[ -n $device ]] && run_supervised lsof "$device" "$device"s* "$raw" "$raw"s*
     [[ -d $target ]] && run_supervised lsof "$target"
     ps -o pid,user,etime,comm -p "$(pgrep -d, -i 'diskimages|xprotect|mds|iconservices|finder|fseventsd|diskarbitration')"
