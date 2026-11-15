@@ -814,6 +814,12 @@ if [[ ${MAKE_PACKAGE:-} == "1" ]]; then
   cpack --version
   package_status=0
   cmake --build . --target package --config "$BUILDTYPE" || package_status=$?
+  # The disk image steps fail now and then on the macOS runners, and CPack repeats none of them.
+  if [[ $package_status -ne 0 && $RUNNER_OS == macOS ]]; then
+    echo "::warning::the package step failed with status $package_status, running it once more"
+    package_status=0
+    cmake --build . --target package --config "$BUILDTYPE" || package_status=$?
+  fi
   echo "::endgroup::"
   if [[ -f ${HDIUTIL_LOG:-} ]]; then
     echo "::group::hdiutil calls"
