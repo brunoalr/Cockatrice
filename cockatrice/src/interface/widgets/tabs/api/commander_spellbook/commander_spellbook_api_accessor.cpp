@@ -1,5 +1,6 @@
 #include "commander_spellbook_api_accessor.h"
 
+#include "../../../../../client/network/web_relay.h"
 #include "api_response/commander_spellbook_deck_request.h"
 #include "api_response/commander_spellbook_estimate_bracket_result.h"
 
@@ -25,6 +26,11 @@ CommanderSpellbookApiAccessor &CommanderSpellbookApiAccessor::instance()
     return instance;
 }
 
+bool CommanderSpellbookApiAccessor::isReachable()
+{
+    return WebRelay::reaches(ESTIMATE_BRACKET_URL);
+}
+
 CommanderSpellbookApiAccessor::CommanderSpellbookApiAccessor(QObject *parent)
     : QObject(parent), network(NetworkManagerFactory::create(this))
 {
@@ -42,9 +48,12 @@ CommanderSpellbookApiAccessor::RequestId CommanderSpellbookApiAccessor::estimate
     QJsonDocument doc(deckRequest.toJson());
     QByteArray body = doc.toJson(QJsonDocument::Compact);
 
-    QNetworkRequest req(ESTIMATE_BRACKET_URL);
+    QNetworkRequest req(WebRelay::route(ESTIMATE_BRACKET_URL));
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+#ifndef Q_OS_WASM
+    // A browser preflights a named User-Agent, and the relay answers a preflight for Content-Type only.
     req.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
+#endif
 
     QNetworkReply *reply = network->post(req, body);
 

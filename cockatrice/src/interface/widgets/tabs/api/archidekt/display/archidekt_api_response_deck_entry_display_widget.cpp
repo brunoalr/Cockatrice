@@ -1,5 +1,6 @@
 #include "archidekt_api_response_deck_entry_display_widget.h"
 
+#include "../../../../../../client/network/web_relay.h"
 #include "../../../../../card_picture_loader/card_picture_loader.h"
 #include "../../../../general/display/background_plate_widget.h"
 #include "../../../../general/display/charts/bars/color_bar.h"
@@ -102,8 +103,11 @@ ArchidektApiResponseDeckEntryDisplayWidget::ArchidektApiResponseDeckEntryDisplay
 
     imageUrl = response.getFeatured().isEmpty() ? QUrl(ARCHIDEKT_DEFAULT_IMAGE) : QUrl(response.getFeatured());
 
-    QNetworkRequest req(imageUrl);
+    QNetworkRequest req(WebRelay::route(imageUrl));
+#ifndef Q_OS_WASM
+    // A browser preflights a named User-Agent, and the relay answers a preflight for Content-Type only.
     req.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
+#endif
     QNetworkReply *reply = imageNetworkManager->get(req);
 
     // tag the reply with "this" so we know it belongs to us later

@@ -4,6 +4,7 @@
 #include "../../../../theme_icon.h"
 #include "../../../utility/non_blocking_dialogs.h"
 #include "commander_bracket_service.h"
+#include "commander_spellbook_api_accessor.h"
 #include "libcockatrice/deck_list/deck_list.h"
 
 #include <QAbstractButton>
@@ -285,10 +286,9 @@ void CommanderBracketWidget::onEstimateBracketError(quint64 id, QObject *request
 
 void CommanderBracketWidget::maybeAutoEstimateBracket()
 {
-#ifdef Q_OS_WASM
-    // Commander Spellbook admits no request from a page on another origin: the widget stays hidden, unprompted.
-    return;
-#endif
+    if (!CommanderSpellbookApiAccessor::isReachable()) {
+        return;
+    }
     if (prompting) {
         return;
     }
