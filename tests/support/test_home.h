@@ -23,8 +23,10 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QString>
+#include <QStringList>
 #include <QTemporaryDir>
 #include <QtGlobal>
+#include <algorithm>
 
 namespace test_support
 {
@@ -48,17 +50,20 @@ public:
     {
 #ifndef Q_OS_WIN
         // Not on Windows: its known folders follow no environment variable, so they cannot be moved for a test.
-        for (const QString &path :
-             {QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation),
-              QStandardPaths::writableLocation(QStandardPaths::CacheLocation),
-              QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation), QSettings().fileName()}) {
-            if (!dir.isValid() || !path.startsWith(dir.path() + QLatin1Char('/'))) {
-                qCritical() << "the test would write to" << path << "outside the temporary home: refusing to run";
-                return false;
+        const QStringList paths = {QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation),
+                                   QStandardPaths::writableLocation(QStandardPaths::CacheLocation),
+                                   QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation),
+                                   QSettings().fileName()};
+        return std::ranges::all_of(paths, [this](const QString &path) {
+            if (dir.isValid() && path.startsWith(dir.path() + QLatin1Char('/'))) {
+                return true;
             }
-        }
-#endif
+            qCritical() << "the test would write to" << path << "outside the temporary home: refusing to run";
+            return false;
+        });
+#else
         return true;
+#endif
     }
 
 private:
