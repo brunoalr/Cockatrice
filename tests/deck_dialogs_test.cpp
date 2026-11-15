@@ -26,6 +26,7 @@
 #include "interface/widgets/dialogs/dlg_convert_deck_to_cod_format.h"
 #include "interface/widgets/dialogs/dlg_default_tags_editor.h"
 #include "interface/widgets/dialogs/dlg_edit_tokens.h"
+#include "interface/widgets/dialogs/dlg_load_deck.h"
 #include "interface/widgets/dialogs/dlg_load_deck_from_website.h"
 #include "interface/widgets/dialogs/override_printing_warning.h"
 #include "interface/widgets/tabs/api/commander_spellbook/commander_bracket_widget.h"
@@ -42,13 +43,16 @@
 #include <QFile>
 #include <QInputDialog>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QPointer>
 #include <QPushButton>
 #include <QTemporaryDir>
+#include <QTest>
 #include <QTreeView>
 #include <cstring>
 #include <gtest/gtest.h>
@@ -906,6 +910,12 @@ protected:
         settle();
     }
 
+    void chooseDeck()
+    {
+        DlgLoadDeck::choose(window.get(), [this](const QString &fileName) { record(fileName); });
+        settle();
+    }
+
     void answerName(const QString &name) const
     {
         auto *prompt = onlyOpen<QInputDialog>();
@@ -922,6 +932,36 @@ protected:
         ASSERT_TRUE(file.open(QIODevice::WriteOnly));
     }
 
+    void addDeck(const QString &relativePath, const QString &name) const
+    {
+        ASSERT_TRUE(decks.mkpath(QFileInfo(relativePath).path()));
+        DeckList deck;
+        deck.setName(name);
+        ASSERT_TRUE(DeckLoader::saveToFile(deck, decks.filePath(relativePath), DeckFileFormat::Cockatrice));
+    }
+
+    QListWidget *deckList() const
+    {
+        const auto *chooser = onlyOpen<QDialog>();
+        return chooser ? chooser->findChild<QListWidget *>() : nullptr;
+    }
+
+    static QStringList shownDecks(const QListWidget *list)
+    {
+        QStringList shown;
+        for (int row = 0; row < list->count(); ++row) {
+            if (!list->item(row)->isHidden()) {
+                shown.append(list->item(row)->text());
+            }
+        }
+        return shown;
+    }
+
+    QPushButton *okButton() const
+    {
+        const auto *chooser = onlyOpen<QDialog>();
+        return chooser ? chooser->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok) : nullptr;
+    }
 };
 
 TEST_F(DecksInStorage, SaveAsAsksForANameAndTheDeckIsWrittenIntoTheDecksFolder)
@@ -1051,6 +1091,127 @@ TEST_F(DecksInStorage, WhereDeviceFoldersAreReachableAFileDialogChoosesWhereToSa
     DialogTest::answerFileDialog(onlyOpen<QFileDialog>(), {});
     EXPECT_EQ(answers, 2);
     EXPECT_TRUE(answered.isEmpty());
+}
+
+TEST_F(DecksInStorage, LoadListsTheDeckFilesOfTheFolderByRelativePath)
+{
+    addFile("b.cod");
+    addFile("A.txt");
+    addFile("e.dec");
+    addFile("notes.pdf");
+    addFile("sub/c.dek");
+    addFile("sub/deep/d.mwDeck");
+
+    chooseDeck();
+    EXPECT_TRUE(openDialogs<QFileDialog>().isEmpty());
+    const QListWidget *list = deckList();
+    ASSERT_NE(list, nullptr);
+    EXPECT_EQ(shownDecks(list), (QStringList{"A.txt", "b.cod", "e.dec", "sub/c.dek", "sub/deep/d.mwDeck"}));
+}
+
+TEST_F(DecksInStorage, DoubleClickLoadsTheDeck)
+{
+    addDeck("red/Burn.cod", "Burn");
+    addDeck("Zoo.cod", "Zoo");
+    chooseDeck();
+    QListWidget *list = deckList();
+    ASSERT_NE(list, nullptr);
+    const QListWidgetItem *item = list->findItems("red/Burn.cod", Qt::MatchExactly).value(0);
+    ASSERT_NE(item, nullptr);
+
+    const QPoint at = list->visualItemRect(item).center();
+    QTest::mouseClick(list->viewport(), Qt::LeftButton, {}, at);
+    // QTest's own double click does not reach an item view's double click handler.
+    QMouseEvent doubleClick(QEvent::MouseButtonDblClick, at, list->viewport()->mapToGlobal(at), Qt::LeftButton,
+                            Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(list->viewport(), &doubleClick);
+    settle();
+    EXPECT_EQ(answers, 1);
+    EXPECT_EQ(answered, decks.filePath("red/Burn.cod"));
+    EXPECT_TRUE(openDialogs<QDialog>().isEmpty());
+
+    const auto loaded = DeckLoader::loadFromFile(answered, DeckFileFormat::getFormatFromName(answered));
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->deckList.getName(), "Burn");
+}
+
+TEST_F(DecksInStorage, OkLoadsTheSelectedDeck)
+{
+    addDeck("Burn.cod", "Burn");
+    addDeck("Zoo.cod", "Zoo");
+    chooseDeck();
+    QListWidget *list = deckList();
+    ASSERT_NE(list, nullptr);
+    list->setCurrentItem(list->findItems("Zoo.cod", Qt::MatchExactly).value(0));
+    okButton()->click();
+    settle();
+
+    EXPECT_EQ(answers, 1);
+    EXPECT_EQ(answered, decks.filePath("Zoo.cod"));
+}
+
+TEST_F(DecksInStorage, TheFilterShowsOnlyMatchingDecks)
+{
+    addFile("Burn.cod");
+    addFile("red/Sligh.cod");
+    addFile("Zoo.cod");
+    chooseDeck();
+    QListWidget *list = deckList();
+    ASSERT_NE(list, nullptr);
+    auto *filter = list->parentWidget()->findChild<QLineEdit *>();
+    ASSERT_NE(filter, nullptr);
+
+    QTest::keyClicks(filter, "RED");
+    EXPECT_EQ(shownDecks(list), QStringList{"red/Sligh.cod"});
+    ASSERT_NE(list->currentItem(), nullptr);
+    EXPECT_EQ(list->currentItem()->text(), "red/Sligh.cod");
+    EXPECT_TRUE(okButton()->isEnabled());
+
+    filter->setText("Nothing");
+    EXPECT_TRUE(shownDecks(list).isEmpty());
+    EXPECT_FALSE(okButton()->isEnabled());
+
+    filter->clear();
+    EXPECT_EQ(shownDecks(list).size(), 3);
+    EXPECT_TRUE(okButton()->isEnabled());
+}
+
+TEST_F(DecksInStorage, CancelLoadsNothing)
+{
+    addFile("Burn.cod");
+    chooseDeck();
+    auto *chooser = onlyOpen<QDialog>();
+    ASSERT_NE(chooser, nullptr);
+    chooser->reject();
+    settle();
+
+    EXPECT_EQ(answers, 0);
+    EXPECT_TRUE(openDialogs<QDialog>().isEmpty());
+}
+
+TEST_F(DecksInStorage, AnEmptyFolderSaysHowToGetADeckIn)
+{
+    addFile("notes.pdf");
+    chooseDeck();
+
+    const auto *box = onlyOpen<QMessageBox>();
+    ASSERT_NE(box, nullptr);
+    EXPECT_TRUE(box->text().startsWith("No deck is saved in this browser yet."));
+    clickInOnlyBox(QMessageBox::Ok);
+    EXPECT_EQ(answers, 0);
+}
+
+TEST_F(DecksInStorage, WhereDeviceFoldersAreReachableAFileDialogChoosesTheDeckToLoad)
+{
+    SettingsCache::instance().setDeviceFoldersReachableForTesting(true);
+    addFile("Zoo.cod");
+
+    chooseDeck();
+    QFileDialog *load = onlyOpen<DlgLoadDeck>();
+    ASSERT_NE(load, nullptr);
+    DialogTest::answerFileDialog(load, decks.filePath("Zoo.cod"));
+    EXPECT_EQ(answers, 1);
+    EXPECT_EQ(QFileInfo(answered).fileName(), "Zoo.cod");
 }
 } // namespace
 

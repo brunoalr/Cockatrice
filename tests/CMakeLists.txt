@@ -841,6 +841,7 @@ if(WITH_CLIENT)
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_convert_deck_to_cod_format.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_default_tags_editor.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_tokens.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_load_deck.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_load_deck_from_website.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/override_printing_warning.cpp
     ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/api_response/card_in_deck_request.cpp

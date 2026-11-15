@@ -248,12 +248,8 @@ void AbstractTabDeckEditor::actLoadDeck()
             return;
         }
 
-        auto *dialog = new DlgLoadDeck(this);
-        Dialogs::open(dialog, [this, dialog, deckOpenLocation](int result) {
-            if (result == QDialog::Accepted) {
-                openDeckFromFile(dialog->selectedFiles().at(0), deckOpenLocation);
-            }
-        });
+        DlgLoadDeck::choose(
+            this, [this, deckOpenLocation](const QString &fileName) { openDeckFromFile(fileName, deckOpenLocation); });
     });
 }
 
