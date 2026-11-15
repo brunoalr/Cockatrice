@@ -60,6 +60,28 @@ private:
     QDialog *dialog;
 };
 
+// The browser activates a window before its widgets are visible, and Qt then gives the focus to the widget after
+// the one the dialog chose. A QInputDialog chooses only as it is shown, so the choice is read at the activation.
+class FocusAtActivation : public QObject
+{
+public:
+    explicit FocusAtActivation(QDialog *dialog) : chosen(dialog->focusWidget())
+    {
+        dialog->installEventFilter(this);
+    }
+
+    QPointer<QWidget> chosen;
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (event->type() == QEvent::WindowActivate) {
+            chosen = static_cast<QWidget *>(watched)->focusWidget();
+        }
+        return false;
+    }
+};
+
 // finished() is emitted from inside the dialog's own close handling: a callback that destroys the parent
 // there frees the dialog under Qt, and a QMessageBox has not recorded its escape button yet.
 void show(QDialog *dialog, std::function<void(int result)> thenFinished)
@@ -97,12 +119,10 @@ void show(QDialog *dialog, std::function<void(int result)> thenFinished)
     // A file dialog must be that sheet: macOS defers an application-modal native one to an exec() that never comes.
     const bool isFileDialog = qobject_cast<QFileDialog *>(dialog) != nullptr;
     dialog->setWindowModality(isFileDialog ? Qt::WindowModal : Qt::ApplicationModal);
-    // The browser activates the window before its widgets are visible, and Qt then gives the focus to the
-    // widget after the one the dialog chose.
-    const QPointer<QWidget> chosen = dialog->focusWidget();
+    FocusAtActivation focus(dialog);
     dialog->show();
-    if (chosen) {
-        chosen->setFocus();
+    if (focus.chosen) {
+        focus.chosen->setFocus();
     }
 }
 
@@ -274,6 +294,10 @@ void getColor(const QColor &initial,
               QColorDialog::ColorDialogOptions options)
 {
     auto *dialog = new QColorDialog(parent);
+#ifdef Q_OS_WASM
+    // A page cannot read the screen: the picked colour would be meaningless.
+    options |= QColorDialog::NoEyeDropperButton;
+#endif
     dialog->setOptions(options);
     if (!title.isEmpty()) {
         dialog->setWindowTitle(title);

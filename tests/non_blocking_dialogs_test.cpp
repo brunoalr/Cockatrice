@@ -21,6 +21,7 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QColorDialog>
+#include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QLineEdit>
@@ -129,6 +130,35 @@ TEST_F(NonBlockingDialogs, ADialogOpensWithTheFocusItChose)
     settle();
 
     EXPECT_EQ(dialog->focusWidget(), dialog->first);
+}
+
+// As the browser does for any dialog shown, here for one that chooses its focus only as it is shown.
+class ActivatedBeforeVisible : public QObject
+{
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        auto *dialog = qobject_cast<QInputDialog *>(watched);
+        if (dialog && event->type() == QEvent::Show) {
+            QEvent activate(QEvent::WindowActivate);
+            QCoreApplication::sendEvent(dialog, &activate);
+            dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->setFocus();
+        }
+        return false;
+    }
+};
+
+TEST_F(NonBlockingDialogs, AnInputDialogOpensWithTheFocusInItsField)
+{
+    ActivatedBeforeVisible browser;
+    qApp->installEventFilter(&browser);
+
+    Dialogs::getText(parent.get(), "Title", "Label", "", {});
+    settle();
+
+    QInputDialog *dialog = onlyInputDialog();
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_EQ(dialog->focusWidget(), dialog->findChild<QLineEdit *>());
 }
 
 TEST_F(NonBlockingDialogs, ADialogWithAParentBlocksTheWholeApplication)
