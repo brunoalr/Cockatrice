@@ -57,12 +57,11 @@ QUrl WebRelay::route(const QUrl &url)
 #endif
 }
 
-bool WebRelay::reaches(const QUrl &url)
+bool WebRelay::reaches([[maybe_unused]] const QUrl &url)
 {
 #ifdef Q_OS_WASM
     return !pageRelay().isEmpty() && detail::isRelayed(url);
 #else
-    Q_UNUSED(url);
     return true;
 #endif
 }

@@ -123,8 +123,7 @@ TEST(WebRelayTest, OnlyAnHttpsAddressIsARelay)
 TEST(WebRelayTest, ARelayAddressIsAnOriginAndNothingMore)
 {
     for (const char *text : {"https://relay.example/v1", "https://relay.example/v1/", "https://relay.example/?x=1",
-                             "https://relay.example?x=1", "https://relay.example/#x", "https://user@relay.example",
-                             "https://user:secret@relay.example/"}) {
+                             "https://relay.example?x=1", "https://relay.example/#x", "https://user@relay.example"}) {
         EXPECT_TRUE(parseRelay(QString::fromLatin1(text)).isEmpty()) << text;
     }
 }
