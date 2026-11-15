@@ -19,6 +19,7 @@ class CommanderSpellbookApiAccessor final : public QObject
 
 public:
     static CommanderSpellbookApiAccessor &instance();
+    static bool isReachable();
 
     using RequestId = quint64;
 

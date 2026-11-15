@@ -63,6 +63,7 @@
 #include <libcockatrice/settings/deck_editor_settings.h>
 #include <libcockatrice/settings/visual_deck_storage_settings.h>
 #include <optional>
+#include <version_string.h>
 
 ThemeManager *themeManager = nullptr; // NOSONAR: the client declares it extern and assigns it
 RNG_Abstract *rng = nullptr;          // NOSONAR: the client declares it extern and assigns it
@@ -261,6 +262,10 @@ TEST_F(WebsiteImport, WhileARequestRunsOkIsDisabledAndASecondAcceptStartsNothing
     requestDeck(TappedOutDeck);
     ASSERT_EQ(network.replies.size(), 1);
     EXPECT_FALSE(okButton()->isEnabled());
+    const QNetworkRequest request = network.replies.first()->request();
+    EXPECT_EQ(request.url().toString().toStdString(), "https://tappedout.net/mtg-decks/some-deck/?fmt=txt");
+    EXPECT_EQ(request.header(QNetworkRequest::UserAgentHeader).toString(),
+              QStringLiteral("Cockatrice %1").arg(VERSION_STRING));
 
     dialog->accept();
     settle();

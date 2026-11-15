@@ -3,6 +3,7 @@
 #include "../../../client/settings/cache_settings.h"
 #include "../../../client/settings/shortcuts_settings.h"
 #include "../deck_editor/deck_editor_filter_dock_widget.h"
+#include "../dialogs/dlg_load_deck_from_website.h"
 #include "../tabs/abstract_tab_deck_editor.h"
 
 #include <QAction>
@@ -114,10 +115,9 @@ DeckEditorMenu::DeckEditorMenu(AbstractTabDeckEditor *parent) : QMenu(parent), d
     addMenu(saveDeckToClipboardMenu);
     addSeparator();
     addAction(aPrintDeck);
-#ifndef Q_OS_WASM
-    // No deck site admits a request from a page on another origin.
-    addAction(aLoadDeckFromWebsite);
-#endif
+    if (DlgLoadDeckFromWebsite::isAvailable()) {
+        addAction(aLoadDeckFromWebsite);
+    }
     addMenu(analyzeDeckMenu);
     addSeparator();
     addAction(deckEditor->filterDockWidget->aClearFilterOne);

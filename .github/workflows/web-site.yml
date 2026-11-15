@@ -189,6 +189,7 @@ jobs:
         env:
           PUBLISH: ${{ (inputs.publish || github.event_name == 'workflow_run') }}
           WEB_SITE_URL: ${{ vars.WEB_SITE_URL }}
+          WEB_SITE_RELAY_URL: ${{ vars.WEB_RELAY_URL }}
           WEB_SITE_SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}/tree/${{ needs.app.outputs.sha }}
         run: |
           if [[ $PUBLISH == true && -z $WEB_SITE_URL ]]; then
