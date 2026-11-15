@@ -134,6 +134,7 @@
 #ifdef Q_OS_WASM
 #include "../client/network/card_database_fetcher.h"
 #include "../client/network/fallback_font_fetcher.h"
+#include "widgets/tabs/api/commander_spellbook/commander_spellbook_api_accessor.h"
 
 #include <emscripten/val.h>
 #endif
@@ -799,6 +800,9 @@ void MainWindow::startupConfigCheck()
     connect(fetcher, &CardDatabaseFetcher::fetched, fonts, &FallbackFontFetcher::fetch);
     connect(fetcher, &CardDatabaseFetcher::failed, fonts, &FallbackFontFetcher::fetch);
     fetcher->fetch();
+    if (CommanderSpellbookApiAccessor::isReachable()) {
+        actCheckCommanderBracketDefinitionUpdates();
+    }
 #else
     AtRiskDataWarning::warnAboutDataPathsInProgramDir(this, [this] { continueStartupConfigCheck(); });
 #endif
