@@ -18,6 +18,7 @@
 #include "client/settings/cache_settings.h"
 #include "dialog_test_support.h"
 #include "interface/card_picture_loader/card_picture_loader.h"
+#include "interface/deck_loader/deck_loader.h"
 #include "interface/theme_manager.h"
 #include "interface/widgets/deck_editor/card_database_view.h"
 #include "interface/widgets/deck_editor/deck_state_manager.h"
@@ -28,6 +29,7 @@
 #include "interface/widgets/dialogs/dlg_load_deck_from_website.h"
 #include "interface/widgets/dialogs/override_printing_warning.h"
 #include "interface/widgets/tabs/api/commander_spellbook/commander_bracket_widget.h"
+#include "interface/widgets/tabs/deck_save_prompt.h"
 #include "interface/widgets/utility/non_blocking_dialogs.h"
 #include "interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_dialog.h"
 
@@ -54,6 +56,7 @@
 #include <libcockatrice/card/database/card_database.h>
 #include <libcockatrice/card/database/card_database_manager.h>
 #include <libcockatrice/card/database/card_database_querier.h>
+#include <libcockatrice/deck_list/deck_file_format.h>
 #include <libcockatrice/deck_list/tree/inner_deck_list_node.h>
 #include <libcockatrice/models/database/card_database_display_model.h>
 #include <libcockatrice/models/database/card_database_model.h>
@@ -61,6 +64,7 @@
 #include <libcockatrice/rng/rng_abstract.h>
 #include <libcockatrice/settings/cards_display_settings.h>
 #include <libcockatrice/settings/deck_editor_settings.h>
+#include <libcockatrice/settings/paths_settings.h>
 #include <libcockatrice/settings/visual_deck_storage_settings.h>
 #include <optional>
 #include <version_string.h>
@@ -868,6 +872,185 @@ TEST_F(BracketPrompt, ADeckEditorClosedWhileAskingHandsTheQuestionOn)
     const QDialog *prompt = onlyOpen<QDialog>();
     ASSERT_NE(prompt, nullptr);
     EXPECT_EQ(prompt->parent(), second);
+}
+
+// As in a browser tab, which reaches only its own storage.
+class DecksInStorage : public DeckDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    QDir decks{SettingsCache::instance().paths().getDeckPath()};
+    int answers = 0;
+    QString answered;
+
+    void SetUp() override
+    {
+        SettingsCache::instance().setDeviceFoldersReachableForTesting(false);
+        ASSERT_TRUE(decks.removeRecursively());
+        ASSERT_TRUE(decks.mkpath("."));
+    }
+
+    void TearDown() override
+    {
+        SettingsCache::instance().setDeviceFoldersReachableForTesting(true);
+    }
+
+    void record(const QString &fileName)
+    {
+        ++answers;
+        answered = fileName;
+    }
+
+    void askToSave(const QString &deckName)
+    {
+        DeckSavePrompt::chooseFile(window.get(), deckName, [this](const QString &fileName) { record(fileName); });
+        settle();
+    }
+
+    void answerName(const QString &name) const
+    {
+        auto *prompt = onlyOpen<QInputDialog>();
+        ASSERT_NE(prompt, nullptr);
+        prompt->setTextValue(name);
+        prompt->accept();
+        settle();
+    }
+
+    void addFile(const QString &relativePath) const
+    {
+        ASSERT_TRUE(decks.mkpath(QFileInfo(relativePath).path()));
+        QFile file(decks.filePath(relativePath));
+        ASSERT_TRUE(file.open(QIODevice::WriteOnly));
+    }
+
+};
+
+TEST_F(DecksInStorage, SaveAsAsksForANameAndTheDeckIsWrittenIntoTheDecksFolder)
+{
+    askToSave("Burn");
+    EXPECT_TRUE(openDialogs<QFileDialog>().isEmpty());
+    const auto *prompt = onlyOpen<QInputDialog>();
+    ASSERT_NE(prompt, nullptr);
+    EXPECT_EQ(prompt->textValue(), "Burn");
+
+    answerName("Burn");
+    EXPECT_EQ(answers, 1);
+    EXPECT_EQ(answered, decks.filePath("Burn.cod"));
+
+    DeckList deck;
+    deck.setName("Burn");
+    ASSERT_TRUE(DeckLoader::saveToFile(deck, answered, DeckFileFormat::getFormatFromName(answered)));
+    EXPECT_EQ(decks.entryList(QDir::Files), QStringList{"Burn.cod"});
+}
+
+TEST_F(DecksInStorage, ANamelessDeckIsOfferedADefaultName)
+{
+    askToSave("");
+    const auto *prompt = onlyOpen<QInputDialog>();
+    ASSERT_NE(prompt, nullptr);
+    EXPECT_EQ(prompt->textValue(), "Untitled deck");
+}
+
+TEST_F(DecksInStorage, UnsafeNamesBecomeSafeFileNames)
+{
+    const QList<std::pair<QString, QString>> cases = {
+        {"  Burn  ", "Burn.cod"},
+        {"../Burn", "Burn.cod"},
+        {"a/b\\c:d*e?f\"g<h>i|j", "abcdefghij.cod"},
+        {".hidden", "hidden.cod"},
+        {QStringLiteral("Bu\u0001rn"), "Burn.cod"},
+        {"Burn.", "Burn.cod"},
+        {"Burn v1.2", "Burn v1.2.cod"},
+        {"Burn.txt", "Burn.txt"},
+        {"Burn.DEK", "Burn.DEK"},
+        {"", "Untitled deck.cod"},
+        {" / ", "Untitled deck.cod"},
+    };
+    for (const auto &[typed, expected] : cases) {
+        answers = 0;
+        askToSave("Burn");
+        answerName(typed);
+        EXPECT_EQ(answers, 1) << typed.toStdString();
+        EXPECT_EQ(answered, decks.filePath(expected)) << typed.toStdString();
+    }
+}
+
+TEST_F(DecksInStorage, AnExistingFileIsReplacedOnlyAfterYes)
+{
+    addFile("Burn.cod");
+    askToSave("Burn");
+    answerName("Burn");
+    EXPECT_EQ(answers, 0);
+
+    const auto *box = onlyOpen<QMessageBox>();
+    ASSERT_NE(box, nullptr);
+    EXPECT_EQ(box->defaultButton(), box->button(QMessageBox::No));
+    clickInOnlyBox(QMessageBox::Yes, "A deck file named \"Burn.cod\" already exists. Replace it?");
+    EXPECT_EQ(answers, 1);
+    EXPECT_EQ(answered, decks.filePath("Burn.cod"));
+}
+
+TEST_F(DecksInStorage, NoToReplacingAsksForTheNameAgain)
+{
+    addFile("Burn.cod");
+    askToSave("Burn");
+    answerName("Burn");
+    clickInOnlyBox(QMessageBox::No);
+    EXPECT_EQ(answers, 0);
+
+    const auto *prompt = onlyOpen<QInputDialog>();
+    ASSERT_NE(prompt, nullptr);
+    EXPECT_EQ(prompt->textValue(), "Burn");
+    answerName("Burn 2");
+    EXPECT_EQ(answers, 1);
+    EXPECT_EQ(answered, decks.filePath("Burn 2.cod"));
+}
+
+TEST_F(DecksInStorage, CancellingTheNameReportsNoFileOnce)
+{
+    askToSave("Burn");
+    auto *prompt = onlyOpen<QInputDialog>();
+    ASSERT_NE(prompt, nullptr);
+    prompt->reject();
+    settle();
+
+    EXPECT_EQ(answers, 1);
+    EXPECT_TRUE(answered.isEmpty());
+    EXPECT_TRUE(openDialogs<QDialog>().isEmpty());
+}
+
+TEST_F(DecksInStorage, CancellingAfterRefusingToReplaceReportsNoFileOnce)
+{
+    addFile("Burn.cod");
+    askToSave("Burn");
+    answerName("Burn");
+    clickInOnlyBox(QMessageBox::No);
+    auto *prompt = onlyOpen<QInputDialog>();
+    ASSERT_NE(prompt, nullptr);
+    prompt->reject();
+    settle();
+
+    EXPECT_EQ(answers, 1);
+    EXPECT_TRUE(answered.isEmpty());
+}
+
+TEST_F(DecksInStorage, WhereDeviceFoldersAreReachableAFileDialogChoosesWhereToSave)
+{
+    SettingsCache::instance().setDeviceFoldersReachableForTesting(true);
+
+    askToSave("Burn");
+    EXPECT_TRUE(openDialogs<QInputDialog>().isEmpty());
+    QFileDialog *save = onlyOpen<QFileDialog>();
+    ASSERT_NE(save, nullptr);
+    EXPECT_EQ(save->acceptMode(), QFileDialog::AcceptSave);
+    EXPECT_EQ(QFileInfo(save->directory().path()).canonicalFilePath(), QFileInfo(decks.path()).canonicalFilePath());
+    DialogTest::answerFileDialog(save, decks.filePath("Burn.cod"));
+    EXPECT_EQ(answers, 1);
+    EXPECT_EQ(QFileInfo(answered).fileName(), "Burn.cod");
+
+    askToSave("Burn");
+    DialogTest::answerFileDialog(onlyOpen<QFileDialog>(), {});
+    EXPECT_EQ(answers, 2);
+    EXPECT_TRUE(answered.isEmpty());
 }
 } // namespace
 

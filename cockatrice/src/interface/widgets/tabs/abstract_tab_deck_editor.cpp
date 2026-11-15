@@ -31,6 +31,7 @@
 #include "../printing_selector/printing_selector.h"
 #include "../utility/non_blocking_dialogs.h"
 #include "../utility/visibility_change_listener.h"
+#include "deck_save_prompt.h"
 #include "libcockatrice/card/database/card_database_querier.h"
 #include "libcockatrice/card/printing/exact_card.h"
 #include "libcockatrice/deck_list/deck_list.h"
@@ -41,7 +42,6 @@
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QDockWidget>
-#include <QFileDialog>
 #include <QFlags>
 #include <QList>
 #include <QMainWindow>
@@ -60,7 +60,6 @@
 #include <libcockatrice/protocol/pb/response.pb.h>
 #include <libcockatrice/protocol/pending_command.h>
 #include <libcockatrice/settings/deck_editor_settings.h>
-#include <libcockatrice/settings/paths_settings.h>
 #include <libcockatrice/settings/recents_settings.h>
 #include <libcockatrice/utility/string_limits.h>
 #include <optional>
@@ -352,21 +351,15 @@ void AbstractTabDeckEditor::actSaveDeckAs(std::function<void(bool saved)> then)
         reportSaved(then, false);
         return;
     }
-    auto *dialog = new QFileDialog(this, tr("Save deck"));
-    dialog->setDirectory(SettingsCache::instance().paths().getDeckPath());
-    dialog->setAcceptMode(QFileDialog::AcceptSave);
-    dialog->setDefaultSuffix("cod");
-    dialog->setNameFilters(DeckLoader::FILE_NAME_FILTERS);
-    dialog->selectFile(deckStateManager->getDeckList().getName().trimmed());
-
-    Dialogs::open(dialog, [this, dialog, then = std::move(then)](int result) {
-        if (result == QDialog::Accepted) {
-            // The deck as it is now: on macOS the menu bar stays usable under the save sheet.
-            saveDeckToFile(deckStateManager->getDeckList(), dialog->selectedFiles().at(0), then);
-        } else {
-            reportSaved(then, false);
-        }
-    });
+    DeckSavePrompt::chooseFile(this, deckStateManager->getDeckList().getName().trimmed(),
+                               [this, then = std::move(then)](const QString &fileName) {
+                                   if (fileName.isEmpty()) {
+                                       reportSaved(then, false);
+                                       return;
+                                   }
+                                   // The deck as it is now: on macOS the menu bar stays usable under the save sheet.
+                                   saveDeckToFile(deckStateManager->getDeckList(), fileName, then);
+                               });
 }
 
 void AbstractTabDeckEditor::saveDeckToFile(const DeckList &deckList,
