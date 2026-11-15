@@ -19,11 +19,10 @@
 #include "gtest/gtest.h"
 #include <QCoreApplication>
 #include <QDate>
-#include <QEventLoop>
 #include <QHash>
 #include <QMap>
+#include <QSignalSpy>
 #include <QString>
-#include <QTimer>
 #include <memory>
 
 namespace
@@ -36,14 +35,6 @@ const QCoreApplication &application()
     static char *argv[] = {executable, nullptr};
     static const QCoreApplication app(argc, argv);
     return app;
-}
-
-/// Lets the rebuild timer fire, as it would in the running client.
-void waitForRebuild()
-{
-    QEventLoop loop;
-    QTimer::singleShot(100, &loop, &QEventLoop::quit);
-    loop.exec();
 }
 
 class CardDatabaseVisualDisplayModelTest : public ::testing::Test
@@ -169,10 +160,11 @@ TEST_F(CardDatabaseVisualDisplayModelTest, RestoresOneRowPerCardWhenTheSetTermsC
 TEST_F(CardDatabaseVisualDisplayModelTest, RebuildsByItselfWhenTheProxyGainsARow)
 {
     const int rowsBefore = visualModel->rowCount();
+    QSignalSpy rebuilt(visualModel.get(), &CardDatabaseVisualDisplayModel::modelReset);
 
     db->addCard(makeCard("Late", {{"TST", 1}}));
-    waitForRebuild();
 
+    ASSERT_TRUE(!rebuilt.isEmpty() || rebuilt.wait(5000));
     EXPECT_EQ(rowsBefore + 1, visualModel->rowCount());
 }
 
