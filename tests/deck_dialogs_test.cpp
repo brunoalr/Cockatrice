@@ -51,6 +51,7 @@
 #include <QNetworkReply>
 #include <QPointer>
 #include <QPushButton>
+#include <QSettings>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTreeView>
@@ -68,6 +69,7 @@
 #include <libcockatrice/rng/rng_abstract.h>
 #include <libcockatrice/settings/cards_display_settings.h>
 #include <libcockatrice/settings/deck_editor_settings.h>
+#include <libcockatrice/settings/layouts_settings.h>
 #include <libcockatrice/settings/paths_settings.h>
 #include <libcockatrice/settings/visual_deck_storage_settings.h>
 #include <optional>
@@ -1212,6 +1214,55 @@ TEST_F(DecksInStorage, WhereDeviceFoldersAreReachableAFileDialogChoosesTheDeckTo
     DialogTest::answerFileDialog(load, decks.filePath("Zoo.cod"));
     EXPECT_EQ(answers, 1);
     EXPECT_EQ(QFileInfo(answered).fileName(), "Zoo.cod");
+}
+
+class AnalyticsLayout : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    static QString inLayoutsFile()
+    {
+        const QSettings file(SettingsCache::instance().getSettingsPath() + "layouts.ini", QSettings::IniFormat);
+        return file.value("deckAnalytics/layout").toString();
+    }
+
+    void SetUp() override
+    {
+        QSettings().remove("deckAnalytics");
+        QSettings(SettingsCache::instance().getSettingsPath() + "layouts.ini", QSettings::IniFormat)
+            .remove("deckAnalytics");
+    }
+
+    void TearDown() override
+    {
+        QSettings().remove("deckAnalytics");
+    }
+};
+
+TEST_F(AnalyticsLayout, ASavedLayoutGoesToAFileInTheSettingsFolder)
+{
+    SettingsCache::instance().layouts().setDeckAnalyticsLayout("[1]");
+
+    EXPECT_EQ(inLayoutsFile(), "[1]");
+    EXPECT_FALSE(QSettings().contains("deckAnalytics/layout"));
+    EXPECT_EQ(SettingsCache::instance().layouts().getDeckAnalyticsLayout(), "[1]");
+}
+
+TEST_F(AnalyticsLayout, ALayoutOnlyInTheNativeStoreIsCopiedOnceThenReadFromTheFile)
+{
+    QSettings().setValue("deckAnalytics/layout", "[old]");
+
+    EXPECT_EQ(SettingsCache::instance().layouts().getDeckAnalyticsLayout(), "[old]");
+    EXPECT_EQ(inLayoutsFile(), "[old]");
+
+    QSettings().setValue("deckAnalytics/layout", "[changed]");
+    EXPECT_EQ(SettingsCache::instance().layouts().getDeckAnalyticsLayout(), "[old]");
+}
+
+TEST_F(AnalyticsLayout, WithoutAnyLayoutNothingIsWritten)
+{
+    EXPECT_TRUE(SettingsCache::instance().layouts().getDeckAnalyticsLayout().isEmpty());
+    const QSettings file(SettingsCache::instance().getSettingsPath() + "layouts.ini", QSettings::IniFormat);
+    EXPECT_FALSE(file.contains("deckAnalytics/layout"));
 }
 } // namespace
 

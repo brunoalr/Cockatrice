@@ -1,5 +1,6 @@
 #include "deck_analytics_widget.h"
 
+#include "../../../client/settings/cache_settings.h"
 #include "../general/layout_containers/flow_widget.h"
 #include "../utility/non_blocking_dialogs.h"
 #include "abstract_analytics_panel_widget.h"
@@ -20,9 +21,9 @@
 #include <QJsonValueRef>
 #include <QPushButton>
 #include <QScrollArea>
-#include <QSettings>
 #include <QVBoxLayout>
 #include <QVariant>
+#include <libcockatrice/settings/layouts_settings.h>
 #include <libcockatrice/utility/qt_utils.h>
 #include <qnamespace.h>
 
@@ -173,8 +174,8 @@ void DeckAnalyticsWidget::saveLayout()
         arr.append(entry);
     }
 
-    QSettings s;
-    s.setValue("deckAnalytics/layout", QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact)));
+    SettingsCache::instance().layouts().setDeckAnalyticsLayout(
+        QString::fromUtf8(QJsonDocument(arr).toJson(QJsonDocument::Compact)));
 }
 
 void DeckAnalyticsWidget::loadLayout()
@@ -212,8 +213,7 @@ void DeckAnalyticsWidget::addDefaultPanels()
 
 bool DeckAnalyticsWidget::loadLayoutInternal()
 {
-    QSettings s;
-    QString layoutData = s.value("deckAnalytics/layout").toString();
+    QString layoutData = SettingsCache::instance().layouts().getDeckAnalyticsLayout();
     if (layoutData.isEmpty()) {
         return false;
     }
