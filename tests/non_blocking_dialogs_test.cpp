@@ -24,8 +24,13 @@
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QLineEdit>
+#include <QMenu>
+#include <QMenuBar>
 #include <QPointer>
 #include <QPushButton>
+#include <QTest>
+#include <QToolBar>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <gtest/gtest.h>
@@ -914,6 +919,114 @@ TEST_F(NonBlockingDialogs, WhileAliveFitsTheMessageBoxOverload)
     settle();
 
     EXPECT_EQ(clicked, keep);
+}
+
+// Qt shows these when a menu bar or a tool bar outside a main window is narrower than its entries.
+class OverflowButtons : public NonBlockingDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    void SetUp() override
+    {
+        parent->setGeometry(100, 100, 60, 60);
+    }
+
+    QToolButton *shownOverflowButton(const char *name) const
+    {
+        parent->show();
+        settle();
+        auto *button = parent->findChild<QToolButton *>(name);
+        if (!button || !button->isVisible() || !button->menu()) {
+            ADD_FAILURE() << "Qt showed no " << name;
+            return nullptr;
+        }
+        Dialogs::popUpToolButtonMenus(button);
+        return button;
+    }
+
+    // Through the window, as the platform delivers it: a press outside an open popup reaches the popup first.
+    static void click(QWidget *widget, QPoint at = {})
+    {
+        QWidget *window = widget->window();
+        const QPoint point = at.isNull() ? widget->rect().center() : at;
+        QTest::mouseClick(window->windowHandle(), Qt::LeftButton, {}, widget->mapTo(window, point));
+        settle();
+    }
+
+    static void expectAClickOpensItsMenuAndASecondClickClosesIt(QToolButton *button)
+    {
+        click(button);
+        EXPECT_TRUE(button->menu()->isVisible());
+
+        click(button);
+        EXPECT_FALSE(button->menu()->isVisible());
+    }
+
+    QToolBar *narrowToolBar() const
+    {
+        auto *toolBar = new QToolBar(parent.get());
+        for (const QString &text : {"First", "Second", "Third", "Fourth"}) {
+            toolBar->addAction(text);
+        }
+        toolBar->setGeometry(0, 0, 60, 30);
+        return toolBar;
+    }
+};
+
+TEST_F(OverflowButtons, TheMenuBarsOpensItsMenuWithoutANestedLoop)
+{
+    auto *menuBar = new QMenuBar(parent.get());
+    for (const QString &title : {"First", "Second", "Third", "Fourth"}) {
+        menuBar->addMenu(title)->addAction("Entry");
+    }
+    menuBar->setGeometry(0, 0, 60, 30);
+
+    QToolButton *button = shownOverflowButton("qt_menubar_ext_button");
+    ASSERT_NE(button, nullptr);
+    expectAClickOpensItsMenuAndASecondClickClosesIt(button);
+}
+
+TEST_F(OverflowButtons, AToolBarsOpensItsMenuWithoutANestedLoop)
+{
+    narrowToolBar();
+
+    QToolButton *button = shownOverflowButton("qt_toolbar_ext_button");
+    ASSERT_NE(button, nullptr);
+    expectAClickOpensItsMenuAndASecondClickClosesIt(button);
+}
+
+TEST_F(OverflowButtons, AnEntryChosenFromAToolBarsMenuRunsItsAction)
+{
+    QToolBar *toolBar = narrowToolBar();
+    QAction *fourth = toolBar->actions().constLast();
+    bool triggered = false;
+    QObject::connect(fourth, &QAction::triggered, [&triggered] { triggered = true; });
+
+    QToolButton *button = shownOverflowButton("qt_toolbar_ext_button");
+    ASSERT_NE(button, nullptr);
+    click(button);
+    QMenu *menu = button->menu();
+    ASSERT_TRUE(menu->isVisible());
+    click(menu, menu->actionGeometry(fourth).center());
+
+    EXPECT_TRUE(triggered);
+    EXPECT_FALSE(menu->isVisible());
+}
+
+TEST_F(OverflowButtons, AButtonThatShowsItsMenuOnClickIsLeftAlone)
+{
+    auto *button = new QToolButton(parent.get());
+    auto *menu = new QMenu(parent.get());
+    menu->addAction("Entry");
+    Dialogs::showMenuOnClick(button, menu);
+    Dialogs::popUpToolButtonMenus(button);
+    parent->show();
+    settle();
+
+    click(button);
+    EXPECT_TRUE(menu->isVisible());
+
+    click(button);
+    EXPECT_FALSE(menu->isVisible());
 }
 } // namespace
 

@@ -22,8 +22,10 @@
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QPointer>
 #include <QScreen>
+#include <QToolButton>
 
 namespace Dialogs
 {
@@ -134,6 +136,40 @@ QInputDialog *inputDialog(QWidget *parent, const QString &title, const QString &
     dialog->setLabelText(label);
     return dialog;
 }
+
+void popUpUnder(QAbstractButton *button, QMenu *menu)
+{
+    // The press that closes the menu on its button would otherwise reach the button and open it again.
+    menu->setNoReplayFor(button);
+    const QSize size = menu->sizeHint();
+    const QRect area = button->screen()->availableGeometry();
+    const bool fitsBelow =
+        button->mapToGlobal(QPoint(0, button->height())).y() + size.height() <= area.y() + area.height();
+    const int x = button->isRightToLeft() ? button->width() - size.width() : 0;
+    menu->popup(button->mapToGlobal(QPoint(x, fitsBelow ? button->height() : -size.height())));
+}
+
+// Taking the press keeps the button from showing the menu itself.
+class ToolButtonMenuPopper : public QObject
+{
+public:
+    using QObject::QObject;
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (event->type() != QEvent::MouseButtonPress && event->type() != QEvent::MouseButtonDblClick) {
+            return false;
+        }
+        auto *button = qobject_cast<QToolButton *>(watched);
+        if (!button || !button->isEnabled() || button->popupMode() != QToolButton::InstantPopup || !button->menu() ||
+            static_cast<QMouseEvent *>(event)->button() != Qt::LeftButton) {
+            return false;
+        }
+        popUpUnder(button, button->menu());
+        return true;
+    }
+};
 } // namespace
 
 void information(QWidget *parent, const QString &title, const QString &text, std::function<void()> thenClosed)
@@ -257,16 +293,12 @@ void open(QMessageBox *box, std::function<void(QAbstractButton *clicked)> thenCl
 
 void showMenuOnClick(QAbstractButton *button, QMenu *menu)
 {
-    // The press that closes the menu on its button would otherwise reach the button and open it again.
-    menu->setNoReplayFor(button);
-    QObject::connect(button, &QAbstractButton::clicked, menu, [button, menu] {
-        const QSize size = menu->sizeHint();
-        const QRect area = button->screen()->availableGeometry();
-        const bool fitsBelow =
-            button->mapToGlobal(QPoint(0, button->height())).y() + size.height() <= area.y() + area.height();
-        const int x = button->isRightToLeft() ? button->width() - size.width() : 0;
-        menu->popup(button->mapToGlobal(QPoint(x, fitsBelow ? button->height() : -size.height())));
-    });
+    QObject::connect(button, &QAbstractButton::clicked, menu, [button, menu] { popUpUnder(button, menu); });
+}
+
+void popUpToolButtonMenus(QObject *scope)
+{
+    scope->installEventFilter(new ToolButtonMenuPopper(scope));
 }
 
 void detail::openThen(QDialog *dialog, std::function<void(int result)> thenFinished)
