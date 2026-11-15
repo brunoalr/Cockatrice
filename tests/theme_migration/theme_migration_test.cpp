@@ -376,9 +376,9 @@ TEST_F(ThemeMigrationTest, StyleSheetIsEmptyWhenNeitherDirectoryHasOne)
 int main(int argc, char **argv)
 {
     const test_support::TestHome home;
+    ::testing::InitGoogleTest(&argc, argv);
     if (!home.writesStayInside()) {
         return 1;
     }
-    ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
