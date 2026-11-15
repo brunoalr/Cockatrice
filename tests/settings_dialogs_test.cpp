@@ -328,7 +328,7 @@ TEST_F(PathChoosers, TheDesktopReachesTheDevicesFolders)
 
 TEST_F(PathChoosers, TheDesktopShowsEveryChooser)
 {
-    auto *general = addPage<GeneralSettingsPage>();
+    const auto *general = addPage<GeneralSettingsPage>();
     const QList<QPushButton *> buttons = choosers(general);
     EXPECT_EQ(buttons.size(), 7);
     for (const QPushButton *button : buttons) {
@@ -337,7 +337,7 @@ TEST_F(PathChoosers, TheDesktopShowsEveryChooser)
     const auto all = general->findChildren<QPushButton *>();
     EXPECT_TRUE(std::ranges::any_of(all, [](const QPushButton *b) { return b->text() == "Reset all paths"; }));
 
-    auto *deckEditor = addPage<DeckEditorSettingsPage>();
+    const auto *deckEditor = addPage<DeckEditorSettingsPage>();
     const QList<QPushButton *> spoiler = choosers(deckEditor);
     ASSERT_EQ(spoiler.size(), 1);
     EXPECT_TRUE(spoiler.first()->isVisibleTo(deckEditor));
@@ -360,7 +360,7 @@ protected:
 
 TEST_F(UnreachableDeviceFolders, TheGeneralPageShowsItsPathsWithoutChoosers)
 {
-    auto *page = addPage<GeneralSettingsPage>();
+    const auto *page = addPage<GeneralSettingsPage>();
 
     const QList<QPushButton *> buttons = choosers(page);
     EXPECT_EQ(buttons.size(), 7);
@@ -379,7 +379,7 @@ TEST_F(UnreachableDeviceFolders, TheGeneralPageShowsItsPathsWithoutChoosers)
 
 TEST_F(UnreachableDeviceFolders, TheSpoilerPathHasNoChooser)
 {
-    auto *page = addPage<DeckEditorSettingsPage>();
+    const auto *page = addPage<DeckEditorSettingsPage>();
 
     const QList<QPushButton *> buttons = choosers(page);
     ASSERT_EQ(buttons.size(), 1);

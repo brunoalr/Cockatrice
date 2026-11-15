@@ -138,8 +138,7 @@ class ActivatedBeforeVisible : public QObject
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override
     {
-        auto *dialog = qobject_cast<QInputDialog *>(watched);
-        if (dialog && event->type() == QEvent::Show) {
+        if (auto *dialog = qobject_cast<QInputDialog *>(watched); dialog && event->type() == QEvent::Show) {
             QEvent activate(QEvent::WindowActivate);
             QCoreApplication::sendEvent(dialog, &activate);
             dialog->findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Ok)->setFocus();
@@ -994,7 +993,7 @@ protected:
     QToolBar *narrowToolBar() const
     {
         auto *toolBar = new QToolBar(parent.get());
-        for (const QString &text : {"First", "Second", "Third", "Fourth"}) {
+        for (const char *text : {"First", "Second", "Third", "Fourth"}) {
             toolBar->addAction(text);
         }
         toolBar->setGeometry(0, 0, 60, 30);
@@ -1005,7 +1004,7 @@ protected:
 TEST_F(OverflowButtons, TheMenuBarsOpensItsMenuWithoutANestedLoop)
 {
     auto *menuBar = new QMenuBar(parent.get());
-    for (const QString &title : {"First", "Second", "Third", "Fourth"}) {
+    for (const char *title : {"First", "Second", "Third", "Fourth"}) {
         menuBar->addMenu(title)->addAction("Entry");
     }
     menuBar->setGeometry(0, 0, 60, 30);
