@@ -1,5 +1,6 @@
 #include "visual_deck_storage_model.h"
 
+#include "../../../client/flush_player_data.h"
 #include "../../deck_loader/deck_loader.h"
 #include "../cards/additional_info/deck_color_identity.h"
 #include "libcockatrice/deck_list/deck_list.h"
@@ -443,6 +444,7 @@ bool VisualDeckStorageModel::renameFile(int row, const QString &newBaseName)
     if (!QFile::rename(info.filePath(), newFilePath)) {
         return false;
     }
+    flushPlayerData();
 
     const QString oldFilePath = data.filePath;
     data.deck.lastLoadInfo.fileName = newFilePath;
@@ -464,6 +466,7 @@ bool VisualDeckStorageModel::deleteFile(int row)
     if (!QFile::remove(QFileInfo(filePath).filePath())) {
         return false;
     }
+    flushPlayerData();
 
     beginRemoveRows(QModelIndex(), row, row);
     rowByFilePath.remove(filePath);

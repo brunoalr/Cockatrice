@@ -1,5 +1,6 @@
 #include "visual_database_display_filter_save_load_widget.h"
 
+#include "../../../client/flush_player_data.h"
 #include "../../../client/settings/cache_settings.h"
 #include "../general/layout_containers/flow_widget.h"
 #include "filter_tree_model.h"
@@ -94,6 +95,7 @@ void VisualDatabaseDisplayFilterSaveLoadWidget::saveFilter()
     if (file.open(QIODevice::WriteOnly)) {
         file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
         file.close();
+        flushPlayerData();
     }
 
     filenameInput->clear();

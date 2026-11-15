@@ -1,5 +1,6 @@
 #include "visual_database_filter_display_widget.h"
 
+#include "../../../client/flush_player_data.h"
 #include "../../../client/settings/cache_settings.h"
 #include "../utility/non_blocking_dialogs.h"
 
@@ -78,6 +79,7 @@ void FilterDisplayWidget::deleteFilter()
             QString filePath = SettingsCache::instance().paths().getFiltersPath() + QDir::separator() + filterFilename;
             QFile file(filePath);
             if (file.remove()) {
+                flushPlayerData();
                 emit filterDeleted(filterFilename);
                 deleteLater();
             } else {

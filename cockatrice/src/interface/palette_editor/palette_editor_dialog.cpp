@@ -1,5 +1,6 @@
 #include "palette_editor_dialog.h"
 
+#include "../../client/flush_player_data.h"
 #include "../theme_config.h"
 #include "../theme_manager.h"
 #include "../widgets/utility/non_blocking_dialogs.h"
@@ -386,6 +387,7 @@ void PaletteEditorDialog::onSave()
         fontsDirty = false;
     }
 
+    flushPlayerData();
     themeManager->reloadCurrentTheme();
     accept();
 }
@@ -439,6 +441,7 @@ void PaletteEditorDialog::onRevertToDefault()
     // fonts.toml so the theme falls back to its shipped default, then reflect
     // the resolved fonts in the editor.
     QFile::remove(QDir(saveDir).absoluteFilePath(FontConfig::fileName()));
+    flushPlayerData();
 
     // Reload the live theme so the font revert takes effect immediately.
     themeManager->reloadCurrentTheme();

@@ -1,5 +1,6 @@
 #include "tab_deck_storage.h"
 
+#include "../../../client/flush_player_data.h"
 #include "../../../client/settings/cache_settings.h"
 #include "../../deck_loader/deck_loader.h"
 #include "../../theme_icon.h"
@@ -408,6 +409,7 @@ void TabDeckStorage::renameLocalFiles(QList<QFileInfo> files)
             Dialogs::critical(this, tr("Error"), tr("Rename failed"), [this, files] { renameLocalFiles(files); });
             return;
         }
+        flushPlayerData();
         renameLocalFiles(files);
     });
 }
@@ -534,6 +536,7 @@ void TabDeckStorage::actNewLocalFolder()
                      [this, parentFolder = QPersistentModelIndex(dirIndex)](const QString &folderName) {
                          if (!folderName.isEmpty()) {
                              localDirModel->mkdir(parentFolder, folderName);
+                             flushPlayerData();
                          }
                      });
 }
@@ -559,6 +562,7 @@ void TabDeckStorage::actDeleteLocalDeck()
                              localDirModel->remove(file);
                          }
                      }
+                     flushPlayerData();
                  });
 }
 
