@@ -30,7 +30,7 @@
 #include <libcockatrice/rng/rng_abstract.h>
 #include <memory>
 
-RNG_Abstract *rng = nullptr; // referenced by the server_remote library
+RNG_Abstract *rng = nullptr; // NOSONAR: the server_remote library declares it extern and assigns it
 
 namespace
 {
