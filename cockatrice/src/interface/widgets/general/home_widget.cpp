@@ -9,6 +9,7 @@
 #include "../../window_main.h"
 #include "../cards/art_crop_attribution.h"
 #include "../cards/card_info_picture_art_crop_widget.h"
+#include "../tabs/api/archidekt/tab_archidekt.h"
 #include "abstract_client.h"
 #include "background_sources.h"
 #include "home_styled_button.h"
@@ -348,10 +349,9 @@ QGroupBox *HomeWidget::createButtons()
     archidektButton->setObjectName("homeBrowseArchidektButton");
     connect(archidektButton, &QPushButton::clicked, tabSupervisor, &TabSupervisor::addArchidektTab);
     boxLayout->addWidget(archidektButton);
-#ifdef Q_OS_WASM
-    // Archidekt admits only http://localhost:3000, so a page cannot read it.
-    archidektButton->hide();
-#endif
+    if (!TabArchidekt::isReachable()) {
+        archidektButton->hide();
+    }
     replayButton = new HomeStyledButton(QString(), gradientColors);
     replayButton->setObjectName("homeViewReplaysButton");
     connect(replayButton, &QPushButton::clicked, tabSupervisor, [this] { tabSupervisor->actTabReplays(true); });

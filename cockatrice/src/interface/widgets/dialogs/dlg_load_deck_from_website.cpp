@@ -1,5 +1,6 @@
 #include "dlg_load_deck_from_website.h"
 
+#include "../../../client/network/web_relay.h"
 #include "../../deck_loader/card_node_function.h"
 #include "../utility/non_blocking_dialogs.h"
 #include "parsers/deck_link_to_api_transformer.h"
@@ -34,7 +35,11 @@
 
 class QWidget;
 
+#ifdef Q_OS_WASM
+static const QStringList SUPPORTED_PROVIDERS = {"Archidekt", "ManaBox"};
+#else
 static const QStringList SUPPORTED_PROVIDERS = {"Archidekt", "Deckstats", "ManaBox", "Moxfield", "TappedOut"};
+#endif
 DlgLoadDeckFromWebsite::DlgLoadDeckFromWebsite(QWidget *parent, QNetworkAccessManager *networkManager)
     : QDialog(parent), nam(networkManager ? networkManager : NetworkManagerFactory::create(this))
 {
@@ -65,6 +70,11 @@ DlgLoadDeckFromWebsite::DlgLoadDeckFromWebsite(QWidget *parent, QNetworkAccessMa
     retranslateUi();
 }
 
+bool DlgLoadDeckFromWebsite::isAvailable()
+{
+    return WebRelay::reaches(QUrl(QStringLiteral("https://archidekt.com/api/decks/")));
+}
+
 void DlgLoadDeckFromWebsite::retranslateUi()
 {
     instructionLabel->setText(tr("Paste a link to a decklist site here to import it.") + "\n" +
@@ -74,7 +84,7 @@ void DlgLoadDeckFromWebsite::retranslateUi()
 bool DlgLoadDeckFromWebsite::testValidUrl()
 {
     ParsedDeckInfo info;
-    return DeckLinkToApiTransformer::parseDeckUrl(urlEdit->text(), info);
+    return DeckLinkToApiTransformer::parseDeckUrl(urlEdit->text(), info) && WebRelay::reaches(QUrl(info.fullUrl));
 }
 
 void DlgLoadDeckFromWebsite::warn(const QString &message)
@@ -93,6 +103,14 @@ void DlgLoadDeckFromWebsite::accept()
     if (DeckLinkToApiTransformer::parseDeckUrl(urlEdit->text(), info)) {
         qCInfo(DlgLoadDeckFromWebsiteLog) << info.baseUrl << info.deckID << info.fullUrl;
 
+        if (!WebRelay::reaches(QUrl(info.fullUrl))) {
+            warn(tr("The web version of Cockatrice cannot load decks from this site: it does not let a web page "
+                    "read its answers.\nCopy the deck list from the site and use \"Load deck from clipboard\" "
+                    "instead.") +
+                 "\n" + tr("Supported services: %1").arg(SUPPORTED_PROVIDERS.join(", ")));
+            return;
+        }
+
         if (!createParserForProvider(info.provider) && info.provider != DeckProvider::Deckstats &&
             info.provider != DeckProvider::TappedOut) {
             qCWarning(DlgLoadDeckFromWebsiteLog) << "No parser found for provider";
@@ -101,8 +119,11 @@ void DlgLoadDeckFromWebsite::accept()
             return;
         }
 
-        QNetworkRequest request(QUrl(info.fullUrl));
+        QNetworkRequest request(WebRelay::route(QUrl(info.fullUrl)));
+#ifndef Q_OS_WASM
+        // A browser preflights a named User-Agent, and the relay answers a preflight for Content-Type only.
         request.setHeader(QNetworkRequest::UserAgentHeader, QString("Cockatrice %1").arg(VERSION_STRING));
+#endif
         QNetworkReply *reply = nam->get(request);
         okButton->setEnabled(false);
         connect(reply, &QNetworkReply::finished, this,
@@ -110,6 +131,12 @@ void DlgLoadDeckFromWebsite::accept()
 
     } else {
         qCInfo(DlgLoadDeckFromWebsiteLog) << "URL not recognized";
+#ifdef Q_OS_WASM
+        warn(tr("The provided URL is not recognized as a valid deck URL.\n"
+                "Valid deck URLs look like this:\n\n"
+                "https://archidekt.com/decks/9999999\n"
+                "https://manabox.app/decks/XYZxxa-YZ99Yyyx_yzXzzz"));
+#else
         warn(tr("The provided URL is not recognized as a valid deck URL.\n"
                 "Valid deck URLs look like this:\n\n"
                 "https://archidekt.com/decks/9999999\n"
@@ -117,6 +144,7 @@ void DlgLoadDeckFromWebsite::accept()
                 "https://moxfield.com/decks/XYZxx-XYZ99Yyy-xyzXzzz\n"
                 "https://manabox.app/decks/XYZxxa-YZ99Yyyx_yzXzzz\n"
                 "https://tappedout.net/mtg-decks/your-deck-name/"));
+#endif
     }
 }
 
