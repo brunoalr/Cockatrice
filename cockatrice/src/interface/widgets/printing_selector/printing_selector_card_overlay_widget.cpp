@@ -304,8 +304,8 @@ void PrintingSelectorCardOverlayWidget::leaveEvent(QEvent *event)
  * @brief Creates and shows the card-overlay context menu.
  *
  * The menu includes the card art preference (Pin/Unpin Printing), the Image Overrides
- * submenu (Load Custom Image, Clear Custom Image, and one entry per alternate printing with a
- * live preview), and the Show Related cards submenu.
+ * submenu (Load Custom Image except in the web build, Clear Custom Image, and one entry per
+ * alternate printing with a live preview), and the Show Related cards submenu.
  *
  * @param point The local position the menu should pop at.
  */

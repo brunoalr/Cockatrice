@@ -310,9 +310,37 @@ TEST_F(PathChoosers, TheSpoilerFileGoesIntoTheChosenDirectory)
     EXPECT_EQ(SettingsCache::instance().getSpoilerCardDatabasePath(), chosen.filePath("spoiler.xml"));
 }
 
+QList<QPushButton *> choosers(const QWidget *page)
+{
+    QList<QPushButton *> found;
+    for (QPushButton *button : page->findChildren<QPushButton *>()) {
+        if (button->text() == "...") {
+            found.append(button);
+        }
+    }
+    return found;
+}
+
 TEST_F(PathChoosers, TheDesktopReachesTheDevicesFolders)
 {
     EXPECT_TRUE(SettingsCache::instance().canReachDeviceFolders());
+}
+
+TEST_F(PathChoosers, TheDesktopShowsEveryChooser)
+{
+    auto *general = addPage<GeneralSettingsPage>();
+    const QList<QPushButton *> buttons = choosers(general);
+    EXPECT_EQ(buttons.size(), 7);
+    for (const QPushButton *button : buttons) {
+        EXPECT_TRUE(button->isVisibleTo(general));
+    }
+    const auto all = general->findChildren<QPushButton *>();
+    EXPECT_TRUE(std::ranges::any_of(all, [](const QPushButton *b) { return b->text() == "Reset all paths"; }));
+
+    auto *deckEditor = addPage<DeckEditorSettingsPage>();
+    const QList<QPushButton *> spoiler = choosers(deckEditor);
+    ASSERT_EQ(spoiler.size(), 1);
+    EXPECT_TRUE(spoiler.first()->isVisibleTo(deckEditor));
 }
 
 // As in a browser tab, which reaches only its own storage.
@@ -327,17 +355,6 @@ protected:
     void TearDown() override
     {
         SettingsCache::instance().setDeviceFoldersReachableForTesting(true);
-    }
-
-    static QList<QPushButton *> choosers(const QWidget *page)
-    {
-        QList<QPushButton *> found;
-        for (QPushButton *button : page->findChildren<QPushButton *>()) {
-            if (button->text() == "...") {
-                found.append(button);
-            }
-        }
-        return found;
     }
 };
 

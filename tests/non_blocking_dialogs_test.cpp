@@ -1024,6 +1024,23 @@ TEST_F(OverflowButtons, AToolBarsOpensItsMenuWithoutANestedLoop)
     expectAClickOpensItsMenuAndASecondClickClosesIt(button);
 }
 
+// The click that closes the menu makes a quick next one a double click, which Qt also turns into a press.
+TEST_F(OverflowButtons, AQuickClickAfterTheMenuClosedOpensItWithoutANestedLoop)
+{
+    narrowToolBar();
+
+    QToolButton *button = shownOverflowButton("qt_toolbar_ext_button");
+    ASSERT_NE(button, nullptr);
+    click(button);
+    ASSERT_TRUE(button->menu()->isVisible());
+
+    QWidget *window = button->window();
+    QTest::mouseDClick(window->windowHandle(), Qt::LeftButton, {}, button->mapTo(window, button->rect().center()));
+    settle();
+
+    EXPECT_TRUE(button->menu()->isVisible());
+}
+
 TEST_F(OverflowButtons, AnEntryChosenFromAToolBarsMenuRunsItsAction)
 {
     QToolBar *toolBar = narrowToolBar();
