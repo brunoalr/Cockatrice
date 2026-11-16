@@ -19,7 +19,7 @@ if (!ENVIRONMENT_IS_PTHREAD) {
   // IDBFS names its database after the mount point, and IndexedDB is shared by every page of the origin
   const mount = '/cockatrice-data';
   const dataRoot = `${mount}/Cockatrice/Cockatrice/`;
-  const keepCopy = 'To keep a copy of a deck, use Deck Editor > Save deck to clipboard and paste it outside the browser.';
+  const keepCopy = 'To keep a copy of a deck outside the browser, use Deck Editor > Export to device.';
   const noStorage = `This browser does not let the page store data: decks and settings last only until the page closes. ${keepCopy}`;
   const loadFailed = 'The decks and settings stored in this browser could not be loaded: ' +
                      `this session starts without them and is not saved. ${keepCopy}`;

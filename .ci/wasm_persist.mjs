@@ -26,7 +26,7 @@ const refusal = 'already open in another tab'
 const writeFailed = 'could not be stored'
 const noStorage = 'does not let the page store data'
 const loadFailed = 'could not be loaded'
-const mayDelete = text => text.includes('may delete') && text.includes('Deck Editor > Save deck to clipboard')
+const mayDelete = text => text.includes('may delete') && text.includes('Deck Editor > Export to device')
 const deck = 'decks/persist-smoke.cod'
 const deckFile = '<?xml version="1.0" encoding="UTF-8"?>\n<cockatrice_deck version="1">\n' +
   '    <deckname>persist smoke</deckname>\n    <comments></comments>\n</cockatrice_deck>\n'
