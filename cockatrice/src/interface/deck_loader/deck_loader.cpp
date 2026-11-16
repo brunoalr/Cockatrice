@@ -559,6 +559,7 @@ bool DeckLoader::convertToCockatriceFormat(LoadedDeck &deck)
         .fileName = newFileName,
         .fileFormat = DeckFileFormat::Cockatrice,
     };
+    flushPlayerData();
 
     return true;
 }

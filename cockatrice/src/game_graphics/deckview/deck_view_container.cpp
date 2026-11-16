@@ -287,12 +287,7 @@ void DeckViewContainer::unloadDeck()
 
 void DeckViewContainer::loadLocalDeck()
 {
-    auto *dialog = new DlgLoadDeck(this);
-    Dialogs::open(dialog, [this, dialog](int result) {
-        if (result == QDialog::Accepted) {
-            loadDeckFromFile(dialog->selectedFiles().at(0));
-        }
-    });
+    DlgLoadDeck::choose(this, [this](const QString &fileName) { loadDeckFromFile(fileName); });
 }
 
 void DeckViewContainer::loadDeckFromFile(const QString &filePath)

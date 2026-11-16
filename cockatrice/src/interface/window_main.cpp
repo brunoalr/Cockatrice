@@ -19,6 +19,7 @@
  ***************************************************************************/
 #include "window_main.h"
 
+#include "../client/flush_player_data.h"
 #include "../client/latency_status_widget.h"
 #include "../client/network/update/client/client_update_checker.h"
 #include "../client/settings/cache_settings.h"
@@ -1827,6 +1828,7 @@ void MainWindow::actAddCustomSet()
     }
 
     if (res) {
+        flushPlayerData();
         Dialogs::information(
             this, tr("Load sets/cards"),
             tr("The new sets/cards have been added successfully.\nCockatrice will now reload the card database."),
