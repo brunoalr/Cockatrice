@@ -611,7 +611,10 @@ void MainWindow::createMenus()
     cockatriceMenu->addSeparator();
 
     cockatriceMenu->addAction(aSettings);
+#ifndef Q_OS_WASM
+    // Quitting leaves a browser tab on a blank page.
     cockatriceMenu->addAction(aExit);
+#endif
 
     dbMenu = menuBar()->addMenu(QString());
     dbMenu->setObjectName("dbMenu");

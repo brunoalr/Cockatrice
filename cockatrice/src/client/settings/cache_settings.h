@@ -92,6 +92,12 @@ private:
     QList<ReleaseChannel *> releaseChannels;
     bool shutdownHookInstalled = false;
     bool isPortableBuild;
+#ifdef Q_OS_WASM
+    // A browser tab reaches only its own storage.
+    bool deviceFoldersReachable = false;
+#else
+    bool deviceFoldersReachable = true;
+#endif
 
     // Connects the aboutToQuit handler that deletes the release channels while
     // the application object is still alive; a no-op before it exists.
@@ -167,6 +173,15 @@ public:
     [[nodiscard]] bool getIsPortableBuild() const
     {
         return isPortableBuild;
+    }
+
+    [[nodiscard]] bool canReachDeviceFolders() const
+    {
+        return deviceFoldersReachable;
+    }
+    void setDeviceFoldersReachableForTesting(bool reachable)
+    {
+        deviceFoldersReachable = reachable;
     }
 
     static SettingsCache &instance();
