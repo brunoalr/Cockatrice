@@ -1009,6 +1009,11 @@ TEST_F(DecksInStorage, UnsafeNamesBecomeSafeFileNames)
         {QStringLiteral("\u00A0\u00A0"), "Untitled deck.cod"},
         {QStringLiteral("\u3000Burn\u3000"), "Burn.cod"},
         {QStringLiteral("\u2028"), "Untitled deck.cod"},
+        {"      .cod", "Untitled deck.cod"},
+        {".cod", "Untitled deck.cod"},
+        {" .txt", "Untitled deck.txt"},
+        {". .DEK", "Untitled deck.DEK"},
+        {"Burn. .cod", "Burn.cod"},
     };
     for (const auto &[typed, expected] : cases) {
         answers = 0;
@@ -1383,6 +1388,7 @@ TEST_F(DecksOnTheDevice, ASafeNameEndsInTheFirstExtensionUnlessItHasOneOfThem)
     EXPECT_EQ(DeviceFiles::safeFileName("Game: 12", "Replay", replays), "Game 12.cor");
     EXPECT_EQ(DeviceFiles::safeFileName("Burn.cod", "Replay", replays), "Burn.cod.cor");
     EXPECT_EQ(DeviceFiles::safeFileName("..", "Replay", replays), "Replay.cor");
+    EXPECT_EQ(DeviceFiles::safeFileName(" .cor", "Replay", replays), "Replay.cor");
 }
 
 TEST_F(DecksOnTheDevice, ExportingAStoredFileSendsItsBytesAsTheyAre)
