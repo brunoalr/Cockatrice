@@ -1354,6 +1354,15 @@ TEST_F(DecksOnTheDevice, ExportSendsTheDeckInTheFormatOfItsFileName)
     EXPECT_EQ(picker.saved, expected);
 }
 
+TEST_F(DecksOnTheDevice, ASafeNameEndsInTheFirstExtensionUnlessItHasOneOfThem)
+{
+    const QStringList replays = {"*.cor"};
+    EXPECT_EQ(DeviceFiles::safeFileName("Game 12.cor", "Replay", replays), "Game 12.cor");
+    EXPECT_EQ(DeviceFiles::safeFileName("Game: 12", "Replay", replays), "Game 12.cor");
+    EXPECT_EQ(DeviceFiles::safeFileName("Burn.cod", "Replay", replays), "Burn.cod.cor");
+    EXPECT_EQ(DeviceFiles::safeFileName("..", "Replay", replays), "Replay.cor");
+}
+
 TEST_F(DecksOnTheDevice, ExportingAStoredFileSendsItsBytesAsTheyAre)
 {
     addDeck("red/Burn.cod", "Burn");

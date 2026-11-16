@@ -42,7 +42,7 @@ private:
     QGroupBox *leftGroupBox, *rightGroupBox;
 
     QAction *aOpenLocalReplay, *aRenameLocal, *aNewLocalFolder, *aDeleteLocalReplay;
-    QAction *aOpenReplaysFolder;
+    QAction *aOpenReplaysFolder, *aImportReplay, *aExportReplay;
     QAction *aOpenRemoteReplay, *aDownload, *aKeep, *aDeleteRemoteReplay, *aGetReplayCode;
     QAction *aSubmitReplayCode;
 
@@ -50,6 +50,7 @@ private:
     QGroupBox *createRightLayout();
 
     void setRemoteEnabled(bool enabled);
+    QString singleSelectedLocalFile() const;
 
     void downloadNodeAtIndex(const QModelIndex &curLeft, const QModelIndex &curRight);
 
@@ -64,6 +65,8 @@ private slots:
     void actDeleteLocalReplay();
 
     void actOpenReplaysFolder();
+    void actImportReplay();
+    void actExportReplay();
 
     void actRemoteDoubleClick(const QModelIndex &curLeft);
     void actOpenRemoteReplay();
