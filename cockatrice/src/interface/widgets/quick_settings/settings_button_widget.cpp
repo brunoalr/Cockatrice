@@ -1,6 +1,7 @@
 #include "settings_button_widget.h"
 
 #include "../../theme_icon.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "settings_popup_widget.h"
 
 #include <QApplication>
@@ -15,7 +16,6 @@
 #include <QSizePolicy>
 #include <QStringLiteral>
 #include <QToolButton>
-#include <QWindow>
 #include <libcockatrice/utility/qt_utils.h>
 #include <qnamespace.h>
 
@@ -110,9 +110,7 @@ void SettingsButtonWidget::togglePopup()
         }
 
         popup->move(x, y);
-        // Without a parent the popup does not know its window, which a dialog asked from it belongs to.
-        popup->winId();
-        popup->windowHandle()->setTransientParent(window()->windowHandle());
+        Dialogs::rememberOpener(popup, this);
         popup->show();
         popup->setFocus();
         button->setChecked(true);
