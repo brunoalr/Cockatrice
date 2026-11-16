@@ -596,7 +596,10 @@ void MainWindow::createMenus()
     dbMenu->addAction(aOpenCustomFolder);
     dbMenu->addAction(aOpenCustomsetsFolder);
 #endif
-    dbMenu->addAction(aAddCustomSet);
+    // In a browser nothing removes a stored set, and every import adds a copy that loads at each start.
+    if (SettingsCache::instance().canReachDeviceFolders()) {
+        dbMenu->addAction(aAddCustomSet);
+    }
     dbMenu->addSeparator();
     dbMenu->addAction(aReloadCardDatabase);
 
