@@ -31,7 +31,7 @@ private slots:
     void actBrowse();
 
 private:
-    void loadImage(const QString &fileName);
+    void loadImage(const QString &fileName, const QByteArray &bytes);
 
     static constexpr int MAX_AVATAR_DIMENSION = 1024;
     QImage image;

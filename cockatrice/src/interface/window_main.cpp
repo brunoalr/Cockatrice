@@ -59,6 +59,7 @@
 #include "widgets/server/handle_public_servers.h"
 #include "widgets/settings_page/abstract_settings_page.h"
 #include "widgets/tabs/api/commander_spellbook/handle_commander_brackets.h"
+#include "widgets/utility/device_files.h"
 #include "widgets/utility/non_blocking_dialogs.h"
 #ifdef WITH_GUI_TEST
 #include "../game_graphics/pq_cockatrice_event_player.h"
@@ -94,6 +95,7 @@
 #include <QPixmap>
 #include <QPixmapCache>
 #include <QPushButton>
+#include <QSaveFile>
 #include <QSharedPointer>
 #include <QSize>
 #include <QStatusBar>
@@ -585,11 +587,11 @@ void MainWindow::createMenus()
     dbMenu->addAction(aEditTokens);
     dbMenu->addSeparator();
 #ifndef Q_OS_WASM
-    // A tab has no file manager to show a folder in, and the file picker of the last entry hangs a page.
+    // A tab has no file manager to show a folder in.
     dbMenu->addAction(aOpenCustomFolder);
     dbMenu->addAction(aOpenCustomsetsFolder);
-    dbMenu->addAction(aAddCustomSet);
 #endif
+    dbMenu->addAction(aAddCustomSet);
     dbMenu->addSeparator();
     dbMenu->addAction(aReloadCardDatabase);
 
@@ -1786,19 +1788,12 @@ void MainWindow::actOpenCustomsetsFolder()
 
 void MainWindow::actAddCustomSet()
 {
-    QFileDialog dialog(this, tr("Load sets/cards"), QDir::homePath());
-    dialog.setNameFilters(MainWindow::fileNameFilters);
-    if (!dialog.exec()) {
-        return;
-    }
+    DeviceFiles::open(this, MainWindow::fileNameFilters.join(";;"),
+                      [this](const QString &fileName, const QByteArray &bytes) { addCustomSet(fileName, bytes); });
+}
 
-    QString fullFilePath = dialog.selectedFiles().at(0);
-
-    if (!QFile::exists(fullFilePath)) {
-        Dialogs::warning(this, tr("Load sets/cards"), tr("Selected file cannot be found."));
-        return;
-    }
-
+void MainWindow::addCustomSet(const QString &fullFilePath, const QByteArray &bytes)
+{
     if (QFileInfo(fullFilePath).suffix() != "xml") // fileName = *.xml
     {
         Dialogs::warning(this, tr("Load sets/cards"), tr("You can only import XML databases at this time."));
@@ -1808,7 +1803,7 @@ void MainWindow::actAddCustomSet()
     QDir dir = SettingsCache::instance().getCustomCardDatabasePath();
     int nextPrefix = getNextCustomSetPrefix(dir);
 
-    bool res;
+    QString target;
 
     QString fileName = QFileInfo(fullFilePath).fileName();
     if (fileName.compare("spoiler.xml", Qt::CaseInsensitive) == 0) {
@@ -1817,15 +1812,13 @@ void MainWindow::actAddCustomSet()
          * then we'll want to overwrite the old version
          * and replace it with the new one
          */
-        if (QFile::exists(dir.absolutePath() + "/spoiler.xml")) {
-            QFile::remove(dir.absolutePath() + "/spoiler.xml");
-        }
-
-        res = QFile::copy(fullFilePath, dir.absolutePath() + "/spoiler.xml");
+        target = dir.absolutePath() + "/spoiler.xml";
     } else {
-        res = QFile::copy(fullFilePath, dir.absolutePath() + "/" + (nextPrefix > 9 ? "" : "0") +
-                                            QString::number(nextPrefix) + "." + fileName);
+        target = dir.absolutePath() + "/" + (nextPrefix > 9 ? "" : "0") + QString::number(nextPrefix) + "." + fileName;
     }
+
+    QSaveFile file(target);
+    const bool res = file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size() && file.commit();
 
     if (res) {
         flushPlayerData();

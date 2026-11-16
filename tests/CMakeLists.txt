@@ -938,6 +938,7 @@ if(WITH_CLIENT)
     SOURCES
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_avatar.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_report_user.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/device_files.cpp
     ${CLIENT_SRC}/interface/widgets/utility/report_utils.cpp
     ${CLIENT_SRC}/interface/pixel_map_generator.cpp
     ${CLIENT_SRC}/interface/theme_config.cpp
