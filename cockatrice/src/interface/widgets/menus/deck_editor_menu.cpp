@@ -114,7 +114,10 @@ DeckEditorMenu::DeckEditorMenu(AbstractTabDeckEditor *parent) : QMenu(parent), d
     addMenu(editDeckInClipboardMenu);
     addMenu(saveDeckToClipboardMenu);
     addSeparator();
+#ifndef Q_OS_WASM
+    // The preview's Print and Page setup buttons run a nested event loop, which ends a page.
     addAction(aPrintDeck);
+#endif
     if (DlgLoadDeckFromWebsite::isAvailable()) {
         addAction(aLoadDeckFromWebsite);
     }
