@@ -2,6 +2,7 @@
 
 #include "libcockatrice/settings/settings_manager.h"
 
+#include <QSettings>
 #include <QVariant>
 
 class QObject;
@@ -9,6 +10,7 @@ class QObject;
 const static QString STATE_PROP = "state";
 const static QString GEOMETRY_PROP = "geometry";
 const static QString SIZE_PROP = "widgetSize";
+const static QString LAYOUT_PROP = "layout";
 
 const static QString GROUP_MAIN_WINDOW = "mainWindow";
 const static QString GROUP_DECK_EDITOR = "deckEditor";
@@ -18,6 +20,7 @@ const static QString GROUP_SETS_DIALOG = "setsDialog";
 const static QString GROUP_TOKEN_DIALOG = "tokenDialog";
 const static QString GROUP_GAME_PLAY_AREA = "gamePlayArea";
 const static QString GROUP_REPLAY_PLAY_AREA = "replayPlayArea";
+const static QString GROUP_DECK_ANALYTICS = "deckAnalytics";
 
 LayoutsSettings::LayoutsSettings(const QString &settingPath, QObject *parent)
     : SettingsManager(settingPath + "layouts.ini", QString(), QString(), parent)
@@ -152,4 +155,22 @@ QByteArray LayoutsSettings::getReplayPlayAreaLayoutState() const
 QByteArray LayoutsSettings::getReplayPlayAreaGeometry() const
 {
     return getValue(GEOMETRY_PROP, GROUP_REPLAY_PLAY_AREA).toByteArray();
+}
+
+void LayoutsSettings::setDeckAnalyticsLayout(const QString &value)
+{
+    setValue(value, LAYOUT_PROP, GROUP_DECK_ANALYTICS);
+}
+
+QString LayoutsSettings::getDeckAnalyticsLayout() const
+{
+    const QString key = GROUP_DECK_ANALYTICS + "/" + LAYOUT_PROP;
+    QSettings file = getSettings();
+    if (!file.contains(key)) {
+        // Earlier versions kept the layout in the platform's own store, outside the settings folder.
+        if (const QSettings native; native.contains(key)) {
+            file.setValue(key, native.value(key));
+        }
+    }
+    return file.value(key).toString();
 }
