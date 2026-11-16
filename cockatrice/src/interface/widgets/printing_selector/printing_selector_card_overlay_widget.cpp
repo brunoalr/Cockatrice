@@ -518,7 +518,7 @@ void PrintingSelectorCardOverlayWidget::initializePinBadge()
  */
 void PrintingSelectorCardOverlayWidget::loadCustomImage()
 {
-    DeviceFiles::open(this, tr("Images (*.png *.jpg *.jpeg *.webp)"), [this](const QString &, const QByteArray &bytes) {
+    const auto install = [this](const QString &, const QByteArray &bytes) {
         QPixmap pixmap;
         if (!pixmap.loadFromData(bytes)) {
             // No silent paths: a file that cannot be read answers visibly instead of a no-op.
@@ -530,7 +530,8 @@ void PrintingSelectorCardOverlayWidget::loadCustomImage()
 
         QPixmapCache::clear();
         rootCard.emitPixmapUpdated();
-    });
+    };
+    DeviceFiles::open(this, tr("Select Card Image"), QString(), tr("Images (*.png *.jpg *.jpeg *.webp)"), install);
 }
 
 /**

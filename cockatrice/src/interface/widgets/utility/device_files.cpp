@@ -18,6 +18,7 @@
 #include "device_files.h"
 
 #include "../../../client/flush_player_data.h"
+#include "../../../client/settings/cache_settings.h"
 #include "non_blocking_dialogs.h"
 
 #include <QCoreApplication>
@@ -43,11 +44,28 @@ Replacements &replacements()
 }
 } // namespace
 
-void DeviceFiles::open(QObject *context, const QString &nameFilter, const Opened &thenPicked)
+void DeviceFiles::open(QWidget *parent,
+                       const QString &caption,
+                       const QString &startFolder,
+                       const QString &nameFilter,
+                       const Opened &thenPicked)
 {
+    if (SettingsCache::instance().canReachDeviceFolders()) {
+        auto *dialog = new QFileDialog(parent, caption, startFolder, nameFilter);
+        dialog->setFileMode(QFileDialog::ExistingFile);
+        Dialogs::open(dialog, [dialog, thenPicked](int result) {
+            if (result != QDialog::Accepted) {
+                return;
+            }
+            const QString fileName = dialog->selectedFiles().at(0);
+            QFile file(fileName);
+            thenPicked(fileName, file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray());
+        });
+        return;
+    }
     // A browser reports a cancel as an empty name; the picker cannot be closed when its asker goes.
-    const Opened picked = [guard = QPointer<QObject>(context), thenPicked](const QString &fileName,
-                                                                           const QByteArray &bytes) {
+    const Opened picked = [guard = QPointer<QObject>(parent), thenPicked](const QString &fileName,
+                                                                          const QByteArray &bytes) {
         if (guard && !fileName.isEmpty()) {
             thenPicked(fileName, bytes);
         }

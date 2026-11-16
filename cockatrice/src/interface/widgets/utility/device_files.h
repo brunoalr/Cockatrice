@@ -23,7 +23,6 @@
 #include <QStringList>
 #include <functional>
 
-class QObject;
 class QWidget;
 
 namespace DeviceFiles
@@ -32,7 +31,13 @@ using Opened = std::function<void(const QString &fileName, const QByteArray &byt
 using Open = std::function<void(const QString &nameFilter, const Opened &then)>;
 using Save = std::function<void(const QByteArray &bytes, const QString &fileNameHint)>;
 
-void open(QObject *context, const QString &nameFilter, const Opened &thenPicked);
+// Where device folders are reachable, a file dialog; elsewhere the browser's picker, which takes the filter only.
+// Bytes that are empty mean the file could not be read.
+void open(QWidget *parent,
+          const QString &caption,
+          const QString &startFolder,
+          const QString &nameFilter,
+          const Opened &thenPicked);
 void save(const QByteArray &bytes, const QString &fileNameHint);
 
 void replaceForTesting(Open open, Save save);

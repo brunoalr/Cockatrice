@@ -253,7 +253,8 @@ void MainWindow::startLocalGame(const LocalGameOptions &options)
 void MainWindow::actWatchReplay()
 {
     if (!SettingsCache::instance().canReachDeviceFolders()) {
-        DeviceFiles::open(this, QObject::tr("Cockatrice replays (*.cor)"),
+        DeviceFiles::open(this, tr("Load replay"), SettingsCache::instance().paths().getReplaysPath(),
+                          QObject::tr("Cockatrice replays (*.cor)"),
                           [this](const QString &, const QByteArray &bytes) { watchReplay(bytes); });
         return;
     }
@@ -1795,7 +1796,7 @@ void MainWindow::actOpenCustomsetsFolder()
 
 void MainWindow::actAddCustomSet()
 {
-    DeviceFiles::open(this, MainWindow::fileNameFilters.join(";;"),
+    DeviceFiles::open(this, tr("Load sets/cards"), QDir::homePath(), MainWindow::fileNameFilters.join(";;"),
                       [this](const QString &fileName, const QByteArray &bytes) { addCustomSet(fileName, bytes); });
 }
 
