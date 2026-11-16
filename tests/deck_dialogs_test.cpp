@@ -999,7 +999,7 @@ TEST_F(DecksInStorage, UnsafeNamesBecomeSafeFileNames)
     const QList<std::pair<QString, QString>> cases = {
         {"  Burn  ", "Burn.cod"},
         {"../Burn", "Burn.cod"},
-        {"a/b\\c:d*e?f\"g<h>i|j", "abcdefghij.cod"},
+        {R"(a/b\c:d*e?f"g<h>i|j)", "abcdefghij.cod"},
         {".hidden", "hidden.cod"},
         {QStringLiteral("Bu\u0001rn"), "Burn.cod"},
         {"Burn.", "Burn.cod"},
@@ -1028,7 +1028,8 @@ TEST_F(DecksInStorage, UnsafeNamesBecomeSafeFileNames)
 
 TEST_F(DecksInStorage, ALongNameIsCutToTheLengthAFileSystemTakes)
 {
-    const QString face = QString::fromUtf8("\xF0\x9F\x98\x80");
+    constexpr char32_t grinningFace = 0x1F600;
+    const QString face = QString::fromUcs4(&grinningFace, 1);
     const QList<std::pair<QString, QString>> cases = {
         {QString(300, 'B'), QString(251, 'B') + ".cod"},
         {QString(300, 'B') + ".txt", QString(251, 'B') + ".txt"},

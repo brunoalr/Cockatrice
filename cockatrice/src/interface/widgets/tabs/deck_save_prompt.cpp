@@ -62,25 +62,31 @@ void DeckSavePrompt::askForName(QWidget *parent,
             then({});
             return;
         }
-        const QString answer = prompt->textValue();
-        const QString fileName =
-            DeviceFiles::safeFileName(answer, tr("Untitled deck"), DeckLoader::ACCEPTED_FILE_EXTENSIONS);
-        const QString path = QDir(SettingsCache::instance().paths().getDeckPath()).filePath(fileName);
-        if (!QFileInfo::exists(path)) {
-            then(path);
-            return;
-        }
-        Dialogs::confirm(
-            parent, tr("Save deck"), tr("A deck file named \"%1\" already exists. Replace it?").arg(fileName),
-            [parent, answer, path, then](bool replace) {
-                if (replace) {
-                    then(path);
-                } else {
-                    askForName(parent, answer, then);
-                }
-            },
-            QMessageBox::No);
+        useName(parent, prompt->textValue(), then);
     });
+}
+
+void DeckSavePrompt::useName(QWidget *parent,
+                             const QString &answer,
+                             const std::function<void(const QString &fileName)> &then)
+{
+    const QString fileName =
+        DeviceFiles::safeFileName(answer, tr("Untitled deck"), DeckLoader::ACCEPTED_FILE_EXTENSIONS);
+    const QString path = QDir(SettingsCache::instance().paths().getDeckPath()).filePath(fileName);
+    if (!QFileInfo::exists(path)) {
+        then(path);
+        return;
+    }
+    Dialogs::confirm(
+        parent, tr("Save deck"), tr("A deck file named \"%1\" already exists. Replace it?").arg(fileName),
+        [parent, answer, path, then](bool replace) {
+            if (replace) {
+                then(path);
+            } else {
+                askForName(parent, answer, then);
+            }
+        },
+        QMessageBox::No);
 }
 
 void DeckSavePrompt::importFromDevice(QWidget *parent, std::function<void(const QString &path)> thenImported)

@@ -117,8 +117,8 @@ QString DeviceFiles::safeFileName(const QString &typed, const QString &fallback,
     // A name that is only an extension, such as ".cod", keeps its dot until the extension is split off.
     trimEnd();
     QString suffix = extensions.first().mid(1);
-    const QString typedSuffix = QFileInfo(name).suffix();
-    if (extensions.contains("*." + typedSuffix, Qt::CaseInsensitive)) {
+    if (const QString typedSuffix = QFileInfo(name).suffix();
+        extensions.contains("*." + typedSuffix, Qt::CaseInsensitive)) {
         suffix = "." + typedSuffix;
         name.chop(suffix.size());
     }
