@@ -9,6 +9,7 @@
 #define DLG_LOAD_DECK_H
 
 #include <QFileDialog>
+#include <functional>
 #include <qtmetamacros.h>
 
 class QWidget;
@@ -25,6 +26,9 @@ class DlgLoadDeck : public QFileDialog
 
 public:
     explicit DlgLoadDeck(QWidget *parent = nullptr);
+
+    // Where device folders are out of reach, the player picks one of the decks in the decks folder instead.
+    static void choose(QWidget *parent, std::function<void(const QString &fileName)> thenChosen);
 };
 
 #endif // DLG_LOAD_DECK_H

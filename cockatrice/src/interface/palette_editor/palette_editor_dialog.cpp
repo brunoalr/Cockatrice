@@ -1,5 +1,6 @@
 #include "palette_editor_dialog.h"
 
+#include "../../client/flush_player_data.h"
 #include "../theme_config.h"
 #include "../theme_manager.h"
 #include "../widgets/utility/non_blocking_dialogs.h"
@@ -20,6 +21,7 @@
 #include <QList>
 #include <QPalette>
 #include <QPushButton>
+#include <QScopeGuard>
 #include <QSharedPointer>
 #include <QStringList>
 #include <QTimer>
@@ -333,6 +335,9 @@ void PaletteEditorDialog::onSave()
     // Snapshot the currently displayed scheme so unsaved edits are not lost.
     workingConfig[loadedScheme] = paletteGrid->currentPaletteConfig();
 
+    // A save that fails part-way has still written the files before the failure.
+    const auto flushOnEveryExit = qScopeGuard([] { flushPlayerData(); });
+
     // Persist every scheme that changed, not just the one on screen. Each scheme
     // has its own file, so edits to the non-active scheme would otherwise be
     // silently discarded when the dialog closes.
@@ -439,6 +444,7 @@ void PaletteEditorDialog::onRevertToDefault()
     // fonts.toml so the theme falls back to its shipped default, then reflect
     // the resolved fonts in the editor.
     QFile::remove(QDir(saveDir).absoluteFilePath(FontConfig::fileName()));
+    flushPlayerData();
 
     // Reload the live theme so the font revert takes effect immediately.
     themeManager->reloadCurrentTheme();
