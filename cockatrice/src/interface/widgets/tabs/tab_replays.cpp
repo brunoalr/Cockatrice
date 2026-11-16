@@ -403,14 +403,17 @@ QString TabReplays::singleSelectedLocalFile() const
 
 void TabReplays::actImportReplay()
 {
-    DeviceFiles::open(this, tr("Cockatrice replays (*.cor)"), [this](const QString &fileName, const QByteArray &bytes) {
+    const QString folder = SettingsCache::instance().paths().getReplaysPath();
+    const auto store = [this, folder](const QString &fileName, const QByteArray &bytes) {
         if (!parseReplay(bytes)) {
             return;
         }
         const QString name =
             DeviceFiles::safeFileName(QFileInfo(fileName).fileName(), tr("Replay"), REPLAY_FILE_NAME_FILTERS);
-        DeviceFiles::storeAs(this, QDir(SettingsCache::instance().paths().getReplaysPath()).filePath(name), bytes, {});
-    });
+        DeviceFiles::storeAs(this, QDir(folder).filePath(name), bytes, {});
+    };
+    DeviceFiles::open(this, QCoreApplication::translate("DeviceFiles", "Import from device"), folder,
+                      tr("Cockatrice replays (*.cor)"), store);
 }
 
 void TabReplays::actExportReplay()

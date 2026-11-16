@@ -5,6 +5,7 @@
 #include <QBuffer>
 #include <QDebug>
 #include <QDialogButtonBox>
+#include <QDir>
 #include <QGridLayout>
 #include <QIODevice>
 #include <QImageReader>
@@ -62,7 +63,7 @@ void DlgEditAvatar::actOk()
 
 void DlgEditAvatar::actBrowse()
 {
-    DeviceFiles::open(this, tr("Image Files (*.png *.jpg *.bmp)"),
+    DeviceFiles::open(this, tr("Open Image"), QDir::homePath(), tr("Image Files (*.png *.jpg *.bmp)"),
                       [this](const QString &fileName, const QByteArray &bytes) { loadImage(fileName, bytes); });
 }
 
