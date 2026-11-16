@@ -95,25 +95,26 @@ QWidget *openerOf(const QWidget *popup)
 
 // Qt closes a popup as a dialog shows, and a browser keeps a dialog above the window it belongs to only:
 // one of the closed popup sinks under the window raised next. It still goes with the widget that asked.
-void moveOutOfPopup(QDialog *dialog)
+bool moveOutOfPopup(QDialog *dialog)
 {
     QWidget *asker = dialog->parentWidget();
     QWidget *owner = asker ? asker->window() : nullptr;
     if (!owner || owner->windowType() != Qt::Popup) {
-        return;
+        return false;
     }
     while (owner && owner->windowType() == Qt::Popup) {
         owner = openerOf(owner);
     }
     dialog->setParent(owner, dialog->windowFlags());
     QObject::connect(asker, &QObject::destroyed, dialog, [dialog] { delete dialog; });
+    return true;
 }
 
 // finished() is emitted from inside the dialog's own close handling: a callback that destroys the parent
 // there frees the dialog under Qt, and a QMessageBox has not recorded its escape button yet.
 void show(QDialog *dialog, std::function<void(int result)> thenFinished)
 {
-    moveOutOfPopup(dialog);
+    const bool movedOutOfPopup = moveOutOfPopup(dialog);
     // Qt would delete the dialog before the queued callback; exec() holds this attribute back the same way.
     dialog->setAttribute(Qt::WA_DeleteOnClose, false);
     auto *hidden = new FinishWhenHidden(dialog);
@@ -151,6 +152,16 @@ void show(QDialog *dialog, std::function<void(int result)> thenFinished)
     dialog->show();
     if (focus.chosen) {
         focus.chosen->setFocus();
+    }
+    if (movedOutOfPopup) {
+        // The browser activates the window it raises as the popup closes: until a click, keys reach no dialog.
+        QMetaObject::invokeMethod(
+            dialog,
+            [dialog] {
+                dialog->activateWindow();
+                dialog->raise();
+            },
+            Qt::QueuedConnection);
     }
 }
 
