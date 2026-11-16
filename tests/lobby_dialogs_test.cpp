@@ -276,7 +276,9 @@ TEST_F(LobbyDialogs, AnAvatarFileThatCannotBeReadIsNoImage)
     ASSERT_TRUE(file.open(QIODevice::WriteOnly));
     file.write(png());
     file.close();
-    ASSERT_TRUE(file.setPermissions(QFileDevice::Permissions()));
+    if (!file.setPermissions(QFileDevice::Permissions()) || QFile(path).open(QIODevice::ReadOnly)) {
+        GTEST_SKIP() << "this platform or user can still read a file that has no permissions";
+    }
     auto *dialog = new DlgEditAvatar(window.get());
     dialog->show();
 
@@ -288,16 +290,24 @@ TEST_F(LobbyDialogs, AnAvatarFileThatCannotBeReadIsNoImage)
     EXPECT_TRUE(dialog->getImage().isEmpty());
 }
 
-TEST_F(LobbyDialogs, CancellingTheAvatarFileDialogLoadsNothing)
+TEST_F(LobbyDialogs, CancellingTheAvatarFileDialogSaysNoImageIsChosen)
 {
+    const QTemporaryDir dir;
+    const QString path = dir.filePath("not-an-image.png");
+    QFile file(path);
+    ASSERT_TRUE(file.open(QIODevice::WriteOnly));
+    file.write("not an image");
+    file.close();
     auto *dialog = new DlgEditAvatar(window.get());
     dialog->show();
+    DialogTest::answerFileDialog(browseForAvatarFile(dialog), path);
+    ASSERT_NE(labelSaying(dialog, "Invalid image chosen."), nullptr);
 
     QFileDialog *files = browseForAvatarFile(dialog);
     ASSERT_NE(files, nullptr);
     DialogTest::answerFileDialog(files, QString());
 
-    EXPECT_EQ(labelSaying(dialog, "Invalid image chosen."), nullptr);
+    EXPECT_NE(labelSaying(dialog, "No image chosen."), nullptr);
     EXPECT_TRUE(openDialogs<QFileDialog>().isEmpty());
 }
 
@@ -331,6 +341,7 @@ TEST_F(AvatarFromTheDevice, CancellingThePickerKeepsTheChosenImage)
 
     browseForAvatar(dialog, QString(), QByteArray());
 
+    EXPECT_NE(labelSaying(dialog, "No image chosen."), nullptr);
     EXPECT_FALSE(dialog->getImage().isEmpty());
 }
 
