@@ -870,6 +870,30 @@ if(WITH_CLIENT)
   )
   cockatrice_add_test(
     NAME
+    deck_loader_bytes_test
+    SOURCES
+    ${CLIENT_SRC}/client/flush_player_data.cpp
+    ${CLIENT_SRC}/interface/deck_loader/deck_loader.cpp
+    ${CLIENT_SRC}/interface/pixel_map_generator.cpp
+    ${CLIENT_SRC}/interface/theme_config.cpp
+    ${CLIENT_SRC}/interface/theme_icon.cpp
+    ${CLIENT_SRC}/interface/theme_icon_badge.cpp
+    ${CLIENT_SRC}/interface/theme_icon_fill.cpp
+    ${CLIENT_SRC}/interface/theme_icon_ink.cpp
+    ${CLIENT_SRC}/interface/theme_icon_sticker.cpp
+    ${CLIENT_SRC}/interface/theme_manager.cpp
+    ${SETTINGS_SOURCES}
+    deck_loader_bytes_test.cpp
+    LIBS
+    libcockatrice_card
+    libcockatrice_deck_list
+    libcockatrice_utility
+    ${SETTINGS_LIBS}
+    INCLUDE_DIRS
+    ${SETTINGS_INCLUDE_DIRS}
+  )
+  cockatrice_add_test(
+    NAME
     settings_dialogs_test
     SOURCES
     ${CLIENT_SRC}/client/network/update/card_spoiler/spoiler_background_updater.cpp

@@ -92,6 +92,17 @@ public:
     loadFromFile(const QString &fileName, DeckFileFormat::Format fmt, bool userRequest = false);
 
     /**
+     * @brief Loads a deck from a file's bytes, in the format its name gives, as loadFromFile() reads a file.
+     * @return An optional containing the LoadedDeck, with no file name, or empty if the bytes hold no deck.
+     */
+    static std::optional<LoadedDeck> loadFromBytes(const QString &fileName, const QByteArray &bytes);
+
+    /**
+     * @brief The bytes saveToFile() writes for the deck in the given format.
+     */
+    static QByteArray toBytes(const DeckList &deck, DeckFileFormat::Format fmt);
+
+    /**
      * @brief Loads a deck from the response of a remote deck request
      * @param nativeString The deck string, in cod format
      * @param remoteDeckId The remote deck id
@@ -163,6 +174,8 @@ public:
     }
 
 private:
+    static std::optional<LoadedDeck>
+    loadFromDevice(QIODevice &device, const QString &fileName, DeckFileFormat::Format fmt);
     static bool updateLastLoadedTimestamp(LoadedDeck &deck);
     static void printDeckListNode(QTextCursor *cursor, const InnerDecklistNode *node);
     static void saveToStream_DeckHeader(QTextStream &out, const DeckList &deckList);
