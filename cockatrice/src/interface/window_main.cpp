@@ -1823,7 +1823,8 @@ void MainWindow::addCustomSet(const QString &fullFilePath, const QByteArray &byt
     }
 
     QSaveFile file(target);
-    const bool res = file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size() && file.commit();
+    const bool res =
+        !bytes.isEmpty() && file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size() && file.commit();
 
     if (res) {
         flushPlayerData();
