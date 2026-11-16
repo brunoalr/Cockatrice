@@ -20,9 +20,11 @@
 
 #include <QByteArray>
 #include <QString>
+#include <QStringList>
 #include <functional>
 
 class QObject;
+class QWidget;
 
 namespace DeviceFiles
 {
@@ -34,6 +36,14 @@ void open(QObject *context, const QString &nameFilter, const Opened &thenPicked)
 void save(const QByteArray &bytes, const QString &fileNameHint);
 
 void replaceForTesting(Open open, Save save);
+
+// Without one of the extensions the name gets the first.
+QString safeFileName(const QString &typed, const QString &fallback, const QStringList &extensions);
+void storeAs(QWidget *parent,
+             const QString &path,
+             const QByteArray &bytes,
+             const std::function<void(const QString &path)> &thenStored);
+void exportFile(QWidget *parent, const QString &path);
 } // namespace DeviceFiles
 
 #endif

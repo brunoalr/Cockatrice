@@ -21,11 +21,11 @@ public:
 
     AbstractTabDeckEditor *deckEditor;
 
-    QAction *aNewDeck, *aLoadDeck, *aClearRecents, *aSaveDeck, *aSaveDeckAs, *aLoadDeckFromClipboard,
-        *aEditDeckInClipboard, *aEditDeckInClipboardRaw, *aSaveDeckToClipboard, *aSaveDeckToClipboardNoSetInfo,
-        *aSaveDeckToClipboardRaw, *aSaveDeckToClipboardRawNoSetInfo, *aPrintDeck, *aLoadDeckFromWebsite,
-        *aExportDeckDecklist, *aExportDeckDecklistXyz, *aAnalyzeDeckDeckstats, *aAnalyzeDeckTappedout, *aShareDeck,
-        *aClose;
+    QAction *aNewDeck, *aLoadDeck, *aClearRecents, *aSaveDeck, *aSaveDeckAs, *aImportDeck, *aExportDeck,
+        *aLoadDeckFromClipboard, *aEditDeckInClipboard, *aEditDeckInClipboardRaw, *aSaveDeckToClipboard,
+        *aSaveDeckToClipboardNoSetInfo, *aSaveDeckToClipboardRaw, *aSaveDeckToClipboardRawNoSetInfo, *aPrintDeck,
+        *aLoadDeckFromWebsite, *aExportDeckDecklist, *aExportDeckDecklistXyz, *aAnalyzeDeckDeckstats,
+        *aAnalyzeDeckTappedout, *aShareDeck, *aClose;
     QMenu *loadRecentDeckMenu, *analyzeDeckMenu, *editDeckInClipboardMenu, *saveDeckToClipboardMenu;
 
     void setSaveStatus(bool newStatus);
