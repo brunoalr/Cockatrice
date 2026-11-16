@@ -42,7 +42,7 @@ if(TEST)
   # When adding a new test that needs additional Qt modules, add them here rather than in the test's CMakeLists.txt.
   # Test is QtTest: it brings QAbstractItemModelTester and QSignalSpy, which are how the Qt model
   # and signal contracts get verified without standing up a GUI.
-  set(_TEST_NEEDED Concurrent Network Svg Widgets Test)
+  set(_TEST_NEEDED Concurrent Network PrintSupport Svg Widgets Test)
 endif()
 
 set(REQUIRED_QT_COMPONENTS ${REQUIRED_QT_COMPONENTS} ${_SERVATRICE_NEEDED} ${_COCKATRICE_NEEDED} ${_ORACLE_NEEDED}
@@ -61,12 +61,13 @@ if(NOT Qt6_FOUND)
   if(Qt6_NOT_FOUND_MESSAGE)
     set(_QT_DIAGNOSTIC "\nQt package diagnostic: ${Qt6_NOT_FOUND_MESSAGE}")
   endif()
-  message(FATAL_ERROR
-          "No suitable version of Qt was found. Qt 6.4.2 or newer with these components is required: "
-          "${REQUIRED_QT_COMPONENTS};Linguist.\n"
-          "Set QTDIR or CMAKE_PREFIX_PATH to the Qt installation prefix, or Qt6_DIR to the directory "
-          "containing Qt6Config.cmake."
-          "${_QT_DIAGNOSTIC}"
+  message(
+    FATAL_ERROR
+      "No suitable version of Qt was found. Qt 6.4.2 or newer with these components is required: "
+      "${REQUIRED_QT_COMPONENTS};Linguist.\n"
+      "Set QTDIR or CMAKE_PREFIX_PATH to the Qt installation prefix, or Qt6_DIR to the directory "
+      "containing Qt6Config.cmake."
+      "${_QT_DIAGNOSTIC}"
   )
 endif()
 set(COCKATRICE_QT_VERSION_NAME Qt6)
