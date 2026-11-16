@@ -18,6 +18,7 @@
 #include "non_blocking_dialogs.h"
 
 #include <QAbstractButton>
+#include <QApplication>
 #include <QEvent>
 #include <QFileDialog>
 #include <QInputDialog>
@@ -26,6 +27,8 @@
 #include <QPointer>
 #include <QScreen>
 #include <QToolButton>
+#include <QWindow>
+#include <algorithm>
 
 namespace Dialogs
 {
@@ -82,10 +85,39 @@ protected:
     }
 };
 
+QWidget *openerOf(const QWidget *popup)
+{
+    if (popup->parentWidget()) {
+        return popup->parentWidget()->window();
+    }
+    const QWindow *opener = popup->windowHandle() ? popup->windowHandle()->transientParent() : nullptr;
+    const QWidgetList windows = QApplication::topLevelWidgets();
+    const auto it = std::ranges::find_if(
+        windows, [opener](const QWidget *window) { return opener && window->windowHandle() == opener; });
+    return it == windows.end() ? nullptr : *it;
+}
+
+// Qt closes a popup as a dialog shows, and a browser keeps a dialog above the window it belongs to only:
+// one of the closed popup sinks under the window raised next. It still goes with the widget that asked.
+void moveOutOfPopup(QDialog *dialog)
+{
+    QWidget *asker = dialog->parentWidget();
+    QWidget *owner = asker ? asker->window() : nullptr;
+    if (!owner || owner->windowType() != Qt::Popup) {
+        return;
+    }
+    while (owner && owner->windowType() == Qt::Popup) {
+        owner = openerOf(owner);
+    }
+    dialog->setParent(owner, dialog->windowFlags());
+    QObject::connect(asker, &QObject::destroyed, dialog, [dialog] { delete dialog; });
+}
+
 // finished() is emitted from inside the dialog's own close handling: a callback that destroys the parent
 // there frees the dialog under Qt, and a QMessageBox has not recorded its escape button yet.
 void show(QDialog *dialog, std::function<void(int result)> thenFinished)
 {
+    moveOutOfPopup(dialog);
     // Qt would delete the dialog before the queued callback; exec() holds this attribute back the same way.
     dialog->setAttribute(Qt::WA_DeleteOnClose, false);
     auto *hidden = new FinishWhenHidden(dialog);
