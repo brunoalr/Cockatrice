@@ -50,13 +50,17 @@ void DeviceFiles::open(QWidget *parent,
                        const QString &caption,
                        const QString &startFolder,
                        const QString &nameFilter,
-                       const Opened &thenPicked)
+                       const Opened &thenPicked,
+                       const std::function<void()> &thenCancelled)
 {
     if (SettingsCache::instance().canReachDeviceFolders()) {
         auto *dialog = new QFileDialog(parent, caption, startFolder, nameFilter);
         dialog->setFileMode(QFileDialog::ExistingFile);
-        Dialogs::open(dialog, [dialog, thenPicked](int result) {
+        Dialogs::open(dialog, [dialog, thenPicked, thenCancelled](int result) {
             if (result != QDialog::Accepted) {
+                if (thenCancelled) {
+                    thenCancelled();
+                }
                 return;
             }
             const QString fileName = dialog->selectedFiles().at(0);
@@ -66,10 +70,15 @@ void DeviceFiles::open(QWidget *parent,
         return;
     }
     // A browser reports a cancel as an empty name; the picker cannot be closed when its asker goes.
-    const Opened picked = [guard = QPointer<QObject>(parent), thenPicked](const QString &fileName,
-                                                                          const QByteArray &bytes) {
-        if (guard && !fileName.isEmpty()) {
+    const Opened picked = [guard = QPointer<QObject>(parent), thenPicked,
+                           thenCancelled](const QString &fileName, const QByteArray &bytes) {
+        if (!guard) {
+            return;
+        }
+        if (!fileName.isEmpty()) {
             thenPicked(fileName, bytes);
+        } else if (thenCancelled) {
+            thenCancelled();
         }
     };
     if (replacements().open) {

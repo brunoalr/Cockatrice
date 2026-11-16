@@ -63,8 +63,10 @@ void DlgEditAvatar::actOk()
 
 void DlgEditAvatar::actBrowse()
 {
-    DeviceFiles::open(this, tr("Open Image"), QDir::homePath(), tr("Image Files (*.png *.jpg *.bmp)"),
-                      [this](const QString &fileName, const QByteArray &bytes) { loadImage(fileName, bytes); });
+    DeviceFiles::open(
+        this, tr("Open Image"), QDir::homePath(), tr("Image Files (*.png *.jpg *.bmp)"),
+        [this](const QString &fileName, const QByteArray &bytes) { loadImage(fileName, bytes); },
+        [this] { imageLabel->setText(tr("No image chosen.")); });
 }
 
 void DlgEditAvatar::loadImage(const QString &fileName, const QByteArray &bytes)

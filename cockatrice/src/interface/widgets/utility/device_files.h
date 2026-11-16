@@ -39,7 +39,8 @@ void open(QWidget *parent,
           const QString &caption,
           const QString &startFolder,
           const QString &nameFilter,
-          const Opened &thenPicked);
+          const Opened &thenPicked,
+          const std::function<void()> &thenCancelled = {});
 void save(const QByteArray &bytes, const QString &fileNameHint);
 
 void replaceForTesting(Open open, Save save);
