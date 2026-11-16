@@ -1230,7 +1230,8 @@ TEST_F(DecksInStorage, AnEmptyFolderSaysHowToGetADeckIn)
 
     const auto *box = onlyOpen<QMessageBox>();
     ASSERT_NE(box, nullptr);
-    EXPECT_TRUE(box->text().startsWith("No deck is saved in this browser yet."));
+    EXPECT_EQ(box->text(), "No deck is saved in this browser yet. Build one in the deck editor and save it, import one "
+                           "from the device, or load one from the clipboard or from an online service.");
     clickInOnlyBox(QMessageBox::Ok);
     EXPECT_EQ(answers, 0);
 }
