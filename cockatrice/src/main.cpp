@@ -252,6 +252,10 @@ int main(int argc, char *argv[])
 
     app.installEventFilter(&cockatriceFilter);
 #endif
+#ifdef Q_OS_WASM
+    // Qt 6.11 runs the menu of a menu bar's or a tool bar's overflow button in a nested event loop.
+    Dialogs::popUpToolButtonMenus(&app);
+#endif
 
     QObject::connect(&app, &QApplication::lastWindowClosed, &app, &QApplication::quit);
 
