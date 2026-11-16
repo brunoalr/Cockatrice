@@ -105,6 +105,7 @@ void renameLocalInTurn(TabReplays *tab, QList<QFileInfo> files)
                               [tab, files] { renameLocalInTurn(tab, files); });
             return;
         }
+        flushPlayerData();
         renameLocalInTurn(tab, files);
     });
 }
@@ -393,6 +394,7 @@ void TabReplays::actNewLocalFolder()
                      [this, dirIndex = QPersistentModelIndex(dirIndex)](const QString &folderName) {
                          if (!folderName.isEmpty()) {
                              localDirModel->mkdir(dirIndex, folderName);
+                             flushPlayerData();
                          }
                      });
 }
@@ -418,6 +420,7 @@ void TabReplays::actDeleteLocalReplay()
                              localDirModel->remove(curLeft);
                          }
                      }
+                     flushPlayerData();
                  });
 }
 

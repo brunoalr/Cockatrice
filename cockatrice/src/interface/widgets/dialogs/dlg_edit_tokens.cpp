@@ -1,5 +1,6 @@
 #include "dlg_edit_tokens.h"
 
+#include "../../../client/flush_player_data.h"
 #include "../../theme_icon.h"
 #include "../interface/widgets/utility/get_text_with_max.h"
 #include "../interface/widgets/utility/non_blocking_dialogs.h"
@@ -44,6 +45,7 @@ class QWidget;
 DlgEditTokens::~DlgEditTokens()
 {
     CardDatabaseManager::getInstance()->saveCustomTokensToFile();
+    flushPlayerData();
 }
 
 DlgEditTokens::DlgEditTokens(QWidget *parent) : QDialog(parent), currentCard(nullptr)

@@ -40,6 +40,8 @@ public:
     void setReplayPlayAreaGeometry(const QByteArray &value);
     void setReplayPlayAreaState(const QByteArray &value);
 
+    void setDeckAnalyticsLayout(const QString &value);
+
     QByteArray getMainWindowGeometry() const;
 
     QByteArray getDeckEditorLayoutState() const;
@@ -58,6 +60,8 @@ public:
 
     QByteArray getReplayPlayAreaLayoutState() const;
     QByteArray getReplayPlayAreaGeometry() const;
+
+    QString getDeckAnalyticsLayout() const;
 signals:
 
 public slots:

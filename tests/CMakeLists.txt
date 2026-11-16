@@ -830,9 +830,11 @@ if(WITH_CLIENT)
     NAME
     deck_dialogs_test
     SOURCES
+    ${CLIENT_SRC}/client/flush_player_data.cpp
     ${CLIENT_SRC}/client/network/parsers/deck_link_to_api_transformer.cpp
     ${CLIENT_SRC}/client/network/web_relay.cpp
     ${CLIENT_SRC}/interface/deck_loader/card_node_function.cpp
+    ${CLIENT_SRC}/interface/deck_loader/deck_loader.cpp
     ${CLIENT_SRC}/interface/key_signals.cpp
     ${CLIENT_SRC}/interface/pixel_map_generator.cpp
     ${CLIENT_SRC}/interface/theme_config.cpp
@@ -848,6 +850,7 @@ if(WITH_CLIENT)
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_convert_deck_to_cod_format.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_default_tags_editor.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_tokens.cpp
+    ${CLIENT_SRC}/interface/widgets/dialogs/dlg_load_deck.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_load_deck_from_website.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/override_printing_warning.cpp
     ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/api_response/card_in_deck_request.cpp
@@ -859,6 +862,7 @@ if(WITH_CLIENT)
     ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_bracket_widget.cpp
     ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_spellbook_api_accessor.cpp
     ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_spellbook_bracket_explainer.cpp
+    ${CLIENT_SRC}/interface/widgets/tabs/deck_save_prompt.cpp
     ${CLIENT_SRC}/interface/widgets/utility/get_text_with_max.cpp
     ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_dialog.cpp
     ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_item_widget.cpp
