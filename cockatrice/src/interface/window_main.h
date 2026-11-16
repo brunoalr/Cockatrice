@@ -198,6 +198,7 @@ private:
 
     void startLocalGame(const LocalGameOptions &options);
     void watchReplayFile(const QString &fileName);
+    void watchReplay(const QByteArray &buf);
     void addCustomSet(const QString &fullFilePath, const QByteArray &bytes);
 
     QList<QMenu *> tabMenus;
