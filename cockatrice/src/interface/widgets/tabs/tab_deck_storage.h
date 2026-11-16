@@ -57,7 +57,6 @@ private:
     QTimer *visibilityRefreshTimer;
     QStringList visibilityFailures;
     QString getTargetPath() const;
-    QString singleSelectedLocalFile() const;
 
     void setRemoteEnabled(bool enabled);
 

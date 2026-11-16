@@ -41,7 +41,9 @@
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
+#include <QFileSystemModel>
 #include <QInputDialog>
+#include <QItemSelectionModel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
@@ -1401,6 +1403,28 @@ TEST_F(DecksOnTheDevice, ExportingAStoredFileSendsItsBytesAsTheyAre)
     ASSERT_EQ(picker.saved.size(), 1);
     EXPECT_EQ(picker.saved.at(0).first, "Burn.cod");
     EXPECT_EQ(picker.saved.at(0).second, stored("red/Burn.cod"));
+}
+
+TEST_F(DecksOnTheDevice, OnlyASingleSelectedFileIsOneToExport)
+{
+    addDeck("Burn.cod", "Burn");
+    addDeck("red/Zoo.cod", "Zoo");
+    QFileSystemModel files;
+    files.setRootPath(decks.path());
+    QItemSelectionModel selection(&files);
+    const auto select = [&files, &selection, this](const QString &relativePath) {
+        selection.select(files.index(decks.filePath(relativePath)),
+                         QItemSelectionModel::Select | QItemSelectionModel::Rows);
+    };
+
+    EXPECT_EQ(DeviceFiles::singleSelectedFile(&selection, &files), QString());
+    select("Burn.cod");
+    EXPECT_EQ(DeviceFiles::singleSelectedFile(&selection, &files), decks.filePath("Burn.cod"));
+    select("red/Zoo.cod");
+    EXPECT_EQ(DeviceFiles::singleSelectedFile(&selection, &files), QString());
+    selection.clearSelection();
+    select("red");
+    EXPECT_EQ(DeviceFiles::singleSelectedFile(&selection, &files), QString());
 }
 
 class AnalyticsLayout : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass

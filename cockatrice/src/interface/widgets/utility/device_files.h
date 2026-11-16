@@ -23,6 +23,8 @@
 #include <QStringList>
 #include <functional>
 
+class QFileSystemModel;
+class QItemSelectionModel;
 class QWidget;
 
 namespace DeviceFiles
@@ -49,6 +51,8 @@ void storeAs(QWidget *parent,
              const QByteArray &bytes,
              const std::function<void(const QString &path)> &thenStored);
 void exportFile(QWidget *parent, const QString &path);
+// Empty unless exactly one row is selected and it is a file: a browser opens one save picker per click.
+QString singleSelectedFile(const QItemSelectionModel *selection, const QFileSystemModel *files);
 } // namespace DeviceFiles
 
 #endif
