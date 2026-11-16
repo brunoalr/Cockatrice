@@ -399,6 +399,8 @@ void TabReplays::actImportReplay()
     const QString folder = SettingsCache::instance().paths().getReplaysPath();
     const auto store = [this, folder](const QString &fileName, const QByteArray &bytes) {
         if (!parseReplay(bytes)) {
+            Dialogs::warning(this, QCoreApplication::translate("DeviceFiles", "Import from device"),
+                             tr("\"%1\" is not a replay file.").arg(QFileInfo(fileName).fileName()));
             return;
         }
         const QString name =
