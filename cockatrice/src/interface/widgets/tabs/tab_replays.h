@@ -17,6 +17,7 @@
 // GameReplay is a protobuf message passed through the openReplay signal,
 // so the moc-generated code needs the complete type.
 #include <libcockatrice/protocol/pb/game_replay.pb.h>
+#include <memory>
 #include <qtmetamacros.h>
 
 class ServerInfo_User;
@@ -93,6 +94,8 @@ signals:
 
 public:
     TabReplays(TabSupervisor *_tabSupervisor, AbstractClient *_client, const ServerInfo_User *currentUserInfo);
+    // Null also for no bytes, which protobuf would read as a replay without a single event.
+    static std::unique_ptr<GameReplay> parseReplay(const QByteArray &bytes);
     void retranslateUi() override;
     [[nodiscard]] QString getTabText() const override
     {

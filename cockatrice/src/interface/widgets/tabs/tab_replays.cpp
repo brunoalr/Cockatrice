@@ -78,16 +78,6 @@ namespace
 // File name filters for the local replay files Cockatrice can load.
 const QStringList REPLAY_FILE_NAME_FILTERS = {"*.cor"};
 
-std::unique_ptr<GameReplay> parseReplay(const QByteArray &data)
-{
-    auto replay = std::make_unique<GameReplay>();
-    if (!replay->ParseFromArray(data.data(), data.size())) {
-        qCWarning(TabReplaysLog) << "could not parse replay!";
-        return nullptr;
-    }
-    return replay;
-}
-
 void renameLocalInTurn(TabReplays *tab, QList<QFileInfo> files)
 {
     if (files.isEmpty()) {
@@ -390,6 +380,16 @@ void TabReplays::actOpenLocalReplay()
             emit openReplay(replay.release());
         }
     }
+}
+
+std::unique_ptr<GameReplay> TabReplays::parseReplay(const QByteArray &bytes)
+{
+    auto replay = std::make_unique<GameReplay>();
+    if (bytes.isEmpty() || !replay->ParseFromArray(bytes.data(), bytes.size())) {
+        qCWarning(TabReplaysLog) << "could not parse replay!";
+        return nullptr;
+    }
+    return replay;
 }
 
 QString TabReplays::singleSelectedLocalFile() const

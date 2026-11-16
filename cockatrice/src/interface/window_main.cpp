@@ -36,6 +36,7 @@
 #include "../interface/widgets/dialogs/dlg_view_log.h"
 #include "../interface/widgets/onboarding/first_run_wizard.h"
 #include "../interface/widgets/settings_page/general_settings_page.h"
+#include "../interface/widgets/tabs/tab_replays.h"
 #include "../interface/widgets/tabs/tab_server.h"
 #include "../interface/widgets/tabs/tab_supervisor.h"
 #include "../main.h"
@@ -155,7 +156,6 @@ class LocalServerInterface;
 const QString MainWindow::appName = "Cockatrice";
 const QStringList MainWindow::fileNameFilters = QStringList() << QObject::tr("Cockatrice card database (*.xml)")
                                                               << QObject::tr("All files (*.*)");
-inline Q_LOGGING_CATEGORY(MainWindowLog, "main_window");
 
 /**
  * Replaces the tab-specific menus that are shown in the menuBar.
@@ -276,11 +276,8 @@ void MainWindow::watchReplayFile(const QString &fileName)
 
 void MainWindow::watchReplay(const QByteArray &buf)
 {
-    replay = new GameReplay;
-    if (replay->ParseFromArray(buf.data(), buf.size())) {
-        tabSupervisor->openReplay(replay);
-    } else {
-        qCWarning(MainWindowLog) << "failed to parse replay!";
+    if (std::unique_ptr<GameReplay> replay = TabReplays::parseReplay(buf)) {
+        tabSupervisor->openReplay(replay.release());
     }
 }
 
