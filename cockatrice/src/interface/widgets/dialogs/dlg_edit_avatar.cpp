@@ -1,12 +1,10 @@
 #include "dlg_edit_avatar.h"
 
-#include "../utility/non_blocking_dialogs.h"
+#include "../utility/device_files.h"
 
 #include <QBuffer>
 #include <QDebug>
 #include <QDialogButtonBox>
-#include <QDir>
-#include <QFileDialog>
 #include <QGridLayout>
 #include <QIODevice>
 #include <QImageReader>
@@ -64,24 +62,19 @@ void DlgEditAvatar::actOk()
 
 void DlgEditAvatar::actBrowse()
 {
-    auto *dialog = new QFileDialog(this, tr("Open Image"), QDir::homePath(), tr("Image Files (*.png *.jpg *.bmp)"));
-    dialog->setFileMode(QFileDialog::ExistingFile);
-    connect(dialog, &QFileDialog::fileSelected, this, &DlgEditAvatar::loadImage);
-    Dialogs::open(dialog, [this](int result) {
-        if (result != QDialog::Accepted) {
-            imageLabel->setText(tr("No image chosen."));
-        }
-    });
+    DeviceFiles::open(this, tr("Image Files (*.png *.jpg *.bmp)"),
+                      [this](const QString &fileName, const QByteArray &bytes) { loadImage(fileName, bytes); });
 }
 
-void DlgEditAvatar::loadImage(const QString &fileName)
+void DlgEditAvatar::loadImage(const QString &fileName, const QByteArray &bytes)
 {
-    QImageReader imgReader;
+    QBuffer buffer;
+    buffer.setData(bytes);
+    QImageReader imgReader(&buffer);
     imgReader.setDecideFormatFromContent(true);
     // Honour the EXIF orientation phone cameras write; otherwise portrait
     // photos are shown and stored sideways.
     imgReader.setAutoTransform(true);
-    imgReader.setFileName(fileName);
 
     // Decode straight to the maximum avatar size. Scaling afterwards decodes
     // the full-resolution image first, which can be tens of megabytes for a

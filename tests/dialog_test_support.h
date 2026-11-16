@@ -18,6 +18,7 @@
 #ifndef DIALOG_TEST_SUPPORT_H
 #define DIALOG_TEST_SUPPORT_H
 
+#include "interface/widgets/utility/device_files.h"
 #include "support/test_home.h"
 
 #include <QApplication>
@@ -33,6 +34,7 @@
 #include <QWidget>
 #include <gtest/gtest.h>
 #include <memory>
+#include <utility>
 
 namespace DialogTest
 {
@@ -57,6 +59,45 @@ inline void answerFileDialog(QFileDialog *files, const QString &path)
     }
     settle();
 }
+
+class DevicePicker
+{
+public:
+    QString filter;
+    QList<std::pair<QString, QByteArray>> saved;
+
+    DevicePicker()
+    {
+        DeviceFiles::replaceForTesting(
+            [this](const QString &nameFilter, const DeviceFiles::Opened &then) {
+                filter = nameFilter;
+                pending = then;
+            },
+            [this](const QByteArray &bytes, const QString &fileNameHint) { saved.append({fileNameHint, bytes}); });
+    }
+    ~DevicePicker()
+    {
+        DeviceFiles::replaceForTesting({}, {});
+    }
+    DevicePicker(const DevicePicker &) = delete;
+    DevicePicker &operator=(const DevicePicker &) = delete;
+
+    bool isOpen() const
+    {
+        return static_cast<bool>(pending);
+    }
+
+    // An empty name is how a browser reports a cancel.
+    void pick(const QString &fileName, const QByteArray &bytes)
+    {
+        ASSERT_TRUE(isOpen()) << "no file was asked for";
+        std::exchange(pending, {})(fileName, bytes);
+        settle();
+    }
+
+private:
+    DeviceFiles::Opened pending;
+};
 
 #ifdef Q_OS_MACOS
 // ~QFileDialog saves to the QtProject preferences, which macOS writes in the real Library whatever the home is:

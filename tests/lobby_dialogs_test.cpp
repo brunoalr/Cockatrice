@@ -21,15 +21,14 @@
 #include "interface/widgets/dialogs/dlg_edit_avatar.h"
 #include "interface/widgets/dialogs/dlg_report_user.h"
 
+#include <QBuffer>
 #include <QDialogButtonBox>
 #include <QDir>
-#include <QFile>
 #include <QFileDialog>
 #include <QImage>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QTemporaryDir>
 #include <QTextEdit>
 #include <gtest/gtest.h>
 #include <libcockatrice/network/client/abstract/abstract_client.h>
@@ -118,17 +117,39 @@ protected:
             ->click();
     }
 
-    void browseForAvatar(const DlgEditAvatar *dialog, const QString &path) const
+    DialogTest::DevicePicker picker;
+
+    void browseForAvatar(const DlgEditAvatar *dialog, const QString &fileName, const QByteArray &bytes)
     {
         for (QPushButton *button : dialog->findChildren<QPushButton *>()) {
             if (button->text() == "Browse...") {
                 button->click();
             }
         }
-        QFileDialog *files = onlyOpen<QFileDialog>();
-        ASSERT_NE(files, nullptr);
-        EXPECT_EQ(files->windowModality(), Qt::WindowModal);
-        DialogTest::answerFileDialog(files, path);
+        EXPECT_EQ(picker.filter, "Image Files (*.png *.jpg *.bmp)");
+        EXPECT_TRUE(openDialogs<QFileDialog>().isEmpty());
+        picker.pick(fileName, bytes);
+    }
+
+    static QByteArray png()
+    {
+        QImage image(4, 4, QImage::Format_RGB32);
+        image.fill(Qt::red);
+        QByteArray bytes;
+        QBuffer buffer(&bytes);
+        buffer.open(QIODevice::WriteOnly);
+        image.save(&buffer, "PNG");
+        return bytes;
+    }
+
+    static const QLabel *labelSaying(const DlgEditAvatar *dialog, const QString &text)
+    {
+        for (const QLabel *label : dialog->findChildren<QLabel *>()) {
+            if (label->text() == text) {
+                return label;
+            }
+        }
+        return nullptr;
     }
 };
 
@@ -194,42 +215,49 @@ TEST_F(LobbyDialogs, ARefusedReportKeepsTheDialogOpen)
 
 TEST_F(LobbyDialogs, ChoosingAnAvatarImageLoadsIt)
 {
-    const QTemporaryDir dir;
-    const QString path = dir.filePath("avatar.png");
-    QImage image(4, 4, QImage::Format_RGB32);
-    image.fill(Qt::red);
-    ASSERT_TRUE(image.save(path));
     auto *dialog = new DlgEditAvatar(window.get());
     dialog->show();
 
-    browseForAvatar(dialog, path);
+    browseForAvatar(dialog, "avatar.png", png());
 
     EXPECT_FALSE(dialog->getImage().isEmpty());
-    EXPECT_TRUE(openDialogs<QFileDialog>().isEmpty());
+    EXPECT_EQ(labelSaying(dialog, "No image chosen."), nullptr);
 }
 
-TEST_F(LobbyDialogs, CancellingTheAvatarFileDialogSaysNoImageWasChosen)
+TEST_F(LobbyDialogs, AFileThatIsNoImageSaysSo)
 {
-    const QTemporaryDir dir;
-    const QString path = dir.filePath("not-an-image.png");
-    QFile file(path);
-    ASSERT_TRUE(file.open(QIODevice::WriteOnly));
-    file.write("not an image");
-    file.close();
     auto *dialog = new DlgEditAvatar(window.get());
     dialog->show();
-    browseForAvatar(dialog, path);
-    const QLabel *imageLabel = nullptr;
-    for (const QLabel *label : dialog->findChildren<QLabel *>()) {
-        if (label->text() == "Invalid image chosen.") {
-            imageLabel = label;
+
+    browseForAvatar(dialog, "not-an-image.png", "not an image");
+
+    EXPECT_NE(labelSaying(dialog, "Invalid image chosen."), nullptr);
+    EXPECT_TRUE(dialog->getImage().isEmpty());
+}
+
+TEST_F(LobbyDialogs, CancellingThePickerKeepsTheChosenImage)
+{
+    auto *dialog = new DlgEditAvatar(window.get());
+    dialog->show();
+    browseForAvatar(dialog, "avatar.png", png());
+
+    browseForAvatar(dialog, QString(), QByteArray());
+
+    EXPECT_FALSE(dialog->getImage().isEmpty());
+}
+
+TEST_F(LobbyDialogs, AnImageArrivingAfterTheDialogClosedIsDropped)
+{
+    auto *dialog = new DlgEditAvatar(window.get());
+    dialog->show();
+    for (QPushButton *button : dialog->findChildren<QPushButton *>()) {
+        if (button->text() == "Browse...") {
+            button->click();
         }
     }
-    ASSERT_NE(imageLabel, nullptr);
 
-    browseForAvatar(dialog, QString());
-
-    EXPECT_EQ(imageLabel->text(), "No image chosen.");
+    delete dialog;
+    picker.pick("avatar.png", png());
 }
 } // namespace
 
