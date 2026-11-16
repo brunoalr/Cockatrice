@@ -854,6 +854,7 @@ if(WITH_CLIENT)
     ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_spellbook_api_accessor.cpp
     ${CLIENT_SRC}/interface/widgets/tabs/api/commander_spellbook/commander_spellbook_bracket_explainer.cpp
     ${CLIENT_SRC}/interface/widgets/tabs/deck_save_prompt.cpp
+    ${CLIENT_SRC}/interface/widgets/utility/device_files.cpp
     ${CLIENT_SRC}/interface/widgets/utility/get_text_with_max.cpp
     ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_dialog.cpp
     ${CLIENT_SRC}/interface/widgets/visual_deck_storage/deck_preview/deck_preview_tag_item_widget.cpp
@@ -936,6 +937,7 @@ if(WITH_CLIENT)
     NAME
     lobby_dialogs_test
     SOURCES
+    ${CLIENT_SRC}/client/flush_player_data.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_edit_avatar.cpp
     ${CLIENT_SRC}/interface/widgets/dialogs/dlg_report_user.cpp
     ${CLIENT_SRC}/interface/widgets/utility/device_files.cpp

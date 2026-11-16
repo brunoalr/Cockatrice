@@ -19,6 +19,7 @@
 
 #include "../../../client/settings/cache_settings.h"
 #include "../../deck_loader/deck_loader.h"
+#include "../utility/device_files.h"
 #include "../utility/non_blocking_dialogs.h"
 
 #include <QDir>
@@ -27,45 +28,6 @@
 #include <QInputDialog>
 #include <QMessageBox>
 #include <libcockatrice/settings/paths_settings.h>
-
-namespace
-{
-QString safeFileName(const QString &typed, const QString &fallback)
-{
-    QString name;
-    for (const QChar c : typed) {
-        if (c.category() != QChar::Other_Control && !QStringLiteral("/\\:*?\"<>|").contains(c)) {
-            name += c;
-        }
-    }
-    // A leading dot hides the file, and Windows refuses a trailing one.
-    const auto isEdge = [](QChar c) { return c.isSpace() || c == '.'; };
-    const auto trim = [&name, isEdge] {
-        while (!name.isEmpty() && isEdge(name.back())) {
-            name.chop(1);
-        }
-        while (!name.isEmpty() && isEdge(name.front())) {
-            name.remove(0, 1);
-        }
-    };
-    trim();
-    if (name.isEmpty()) {
-        name = fallback;
-    }
-    QString suffix = ".cod";
-    const QString typedSuffix = QFileInfo(name).suffix();
-    if (DeckLoader::ACCEPTED_FILE_EXTENSIONS.contains("*." + typedSuffix, Qt::CaseInsensitive)) {
-        suffix = "." + typedSuffix;
-        name.chop(suffix.size());
-    }
-    // File systems take at most 255 bytes, and the browser's lists skip a longer name.
-    while ((name + suffix).toUtf8().size() > 255) {
-        name.chop(name.back().isLowSurrogate() ? 2 : 1);
-        trim();
-    }
-    return name + suffix;
-}
-} // namespace
 
 void DeckSavePrompt::chooseFile(QWidget *parent,
                                 const QString &deckName,
@@ -101,7 +63,8 @@ void DeckSavePrompt::askForName(QWidget *parent,
             return;
         }
         const QString answer = prompt->textValue();
-        const QString fileName = safeFileName(answer, tr("Untitled deck"));
+        const QString fileName =
+            DeviceFiles::safeFileName(answer, tr("Untitled deck"), DeckLoader::ACCEPTED_FILE_EXTENSIONS);
         const QString path = QDir(SettingsCache::instance().paths().getDeckPath()).filePath(fileName);
         if (!QFileInfo::exists(path)) {
             then(path);
@@ -118,4 +81,28 @@ void DeckSavePrompt::askForName(QWidget *parent,
             },
             QMessageBox::No);
     });
+}
+
+void DeckSavePrompt::importFromDevice(QWidget *parent, std::function<void(const QString &path)> thenImported)
+{
+    DeviceFiles::open(
+        parent, DeckLoader::FILE_NAME_FILTERS.join(";;"),
+        [parent, thenImported](const QString &fileName, const QByteArray &bytes) {
+            if (!DeckLoader::loadFromBytes(fileName, bytes)) {
+                Dialogs::critical(parent, tr("Error"), tr("Could not open deck at %1").arg(fileName));
+                return;
+            }
+            const QString name = DeviceFiles::safeFileName(QFileInfo(fileName).fileName(), tr("Untitled deck"),
+                                                           DeckLoader::ACCEPTED_FILE_EXTENSIONS);
+            DeviceFiles::storeAs(parent, QDir(SettingsCache::instance().paths().getDeckPath()).filePath(name), bytes,
+                                 thenImported);
+        });
+}
+
+void DeckSavePrompt::exportToDevice(const DeckList &deck, const QString &fileName)
+{
+    const QString name = fileName.isEmpty() ? DeviceFiles::safeFileName(deck.getName(), tr("Untitled deck"),
+                                                                        DeckLoader::ACCEPTED_FILE_EXTENSIONS)
+                                            : QFileInfo(fileName).fileName();
+    DeviceFiles::save(DeckLoader::toBytes(deck, DeckFileFormat::getFormatFromName(name)), name);
 }

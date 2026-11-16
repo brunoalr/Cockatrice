@@ -51,12 +51,13 @@ private:
     int shareInFlightSeq = 0;
 
     QAction *aOpenLocalDeck, *aRenameLocal, *aUpload, *aNewLocalFolder, *aDeleteLocalDeck;
-    QAction *aOpenDecksFolder;
+    QAction *aOpenDecksFolder, *aImportDeck, *aExportDeck;
     QAction *aOpenRemoteDeck, *aDownload, *aShareDecks, *aPublishDeck, *aNewFolder, *aDeleteRemoteDeck;
     bool visibilityRefreshStarted = false;
     QTimer *visibilityRefreshTimer;
     QStringList visibilityFailures;
     QString getTargetPath() const;
+    QString singleSelectedLocalFile() const;
 
     void setRemoteEnabled(bool enabled);
 
@@ -90,6 +91,7 @@ private slots:
     void actDeleteLocalDeck();
 
     void actOpenDecksFolder();
+    void actExportLocalDeck();
 
     void actRemoteDoubleClick(const QModelIndex &curRight);
     void actOpenRemoteDeck();

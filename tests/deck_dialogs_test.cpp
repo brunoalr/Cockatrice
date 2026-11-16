@@ -1243,6 +1243,128 @@ TEST_F(DecksInStorage, WhereDeviceFoldersAreReachableAFileDialogChoosesTheDeckTo
     EXPECT_EQ(QFileInfo(answered).fileName(), "Zoo.cod");
 }
 
+class DecksOnTheDevice : public DecksInStorage // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    DialogTest::DevicePicker picker;
+
+    static DeckList burn()
+    {
+        DeckList deck;
+        deck.setName("Burn");
+        deck.addCards("Lightning Bolt", 4, DECK_ZONE_MAIN);
+        return deck;
+    }
+
+    void import()
+    {
+        DeckSavePrompt::importFromDevice(window.get(), [this](const QString &path) { record(path); });
+        settle();
+        EXPECT_EQ(picker.filter, DeckLoader::FILE_NAME_FILTERS.join(";;"));
+        EXPECT_TRUE(openDialogs<QFileDialog>().isEmpty());
+    }
+
+    QByteArray stored(const QString &relativePath) const
+    {
+        QFile file(decks.filePath(relativePath));
+        return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+    }
+};
+
+TEST_F(DecksOnTheDevice, ImportCopiesThePickedDeckIntoTheDecksFolder)
+{
+    const QByteArray bytes = DeckLoader::toBytes(burn(), DeckFileFormat::Cockatrice);
+    import();
+    picker.pick("Burn.cod", bytes);
+
+    EXPECT_EQ(answers, 1);
+    EXPECT_EQ(answered, decks.filePath("Burn.cod"));
+    EXPECT_EQ(stored("Burn.cod"), bytes);
+    EXPECT_TRUE(openDialogs<QDialog>().isEmpty());
+}
+
+TEST_F(DecksOnTheDevice, AnImportedFileGetsASafeNameMadeFromItsOwn)
+{
+    const QByteArray plain = DeckLoader::toBytes(burn(), DeckFileFormat::PlainText);
+    import();
+    picker.pick("/device/folder/Red: Burn?.dek", plain);
+    EXPECT_EQ(answered, decks.filePath("Red Burn.dek"));
+    EXPECT_EQ(stored("Red Burn.dek"), plain);
+
+    import();
+    picker.pick("Burn list", plain);
+    EXPECT_EQ(answered, decks.filePath("Burn list.cod"));
+    EXPECT_EQ(answers, 2);
+}
+
+TEST_F(DecksOnTheDevice, ImportReplacesAFileOnlyAfterYes)
+{
+    addFile("Burn.cod");
+    const QByteArray bytes = DeckLoader::toBytes(burn(), DeckFileFormat::Cockatrice);
+
+    import();
+    picker.pick("Burn.cod", bytes);
+    const auto *box = onlyOpen<QMessageBox>();
+    ASSERT_NE(box, nullptr);
+    EXPECT_EQ(box->defaultButton(), box->button(QMessageBox::No));
+    clickInOnlyBox(QMessageBox::No, "A file named \"Burn.cod\" already exists. Replace it?");
+    EXPECT_EQ(answers, 0);
+    EXPECT_TRUE(stored("Burn.cod").isEmpty());
+
+    import();
+    picker.pick("Burn.cod", bytes);
+    clickInOnlyBox(QMessageBox::Yes);
+    EXPECT_EQ(answers, 1);
+    EXPECT_EQ(stored("Burn.cod"), bytes);
+}
+
+TEST_F(DecksOnTheDevice, ImportingAFileThatHoldsNoDeckSaysSoAndWritesNothing)
+{
+    import();
+    picker.pick("notes.cod", "%%% ###\n");
+
+    clickInOnlyBox(QMessageBox::Ok, "Could not open deck at notes.cod");
+    EXPECT_EQ(answers, 0);
+    EXPECT_TRUE(decks.entryList(QDir::Files).isEmpty());
+}
+
+TEST_F(DecksOnTheDevice, ACancelledImportDoesNothing)
+{
+    import();
+    picker.pick({}, {});
+
+    EXPECT_EQ(answers, 0);
+    EXPECT_TRUE(openDialogs<QDialog>().isEmpty());
+    EXPECT_TRUE(decks.entryList(QDir::Files).isEmpty());
+}
+
+TEST_F(DecksOnTheDevice, ExportSendsTheDeckInTheFormatOfItsFileName)
+{
+    DeckSavePrompt::exportToDevice(burn(), decks.filePath("red/Burn list.txt"));
+    DeckList zoo = burn();
+    zoo.setName("Zoo: Naya");
+    DeckSavePrompt::exportToDevice(zoo, {});
+    DeckSavePrompt::exportToDevice(DeckList(), {});
+
+    const QList<std::pair<QString, QByteArray>> expected = {
+        {"Burn list.txt", DeckLoader::toBytes(burn(), DeckFileFormat::PlainText)},
+        {"Zoo Naya.cod", DeckLoader::toBytes(zoo, DeckFileFormat::Cockatrice)},
+        {"Untitled deck.cod", DeckLoader::toBytes(DeckList(), DeckFileFormat::Cockatrice)},
+    };
+    EXPECT_EQ(picker.saved, expected);
+}
+
+TEST_F(DecksOnTheDevice, ExportingAStoredFileSendsItsBytesAsTheyAre)
+{
+    addDeck("red/Burn.cod", "Burn");
+
+    DeviceFiles::exportFile(window.get(), decks.filePath("red/Burn.cod"));
+
+    ASSERT_EQ(picker.saved.size(), 1);
+    EXPECT_EQ(picker.saved.at(0).first, "Burn.cod");
+    EXPECT_EQ(picker.saved.at(0).second, stored("red/Burn.cod"));
+}
+
 class AnalyticsLayout : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass
 {
 protected:
