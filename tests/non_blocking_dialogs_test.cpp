@@ -429,8 +429,8 @@ TEST_F(AskedFromAPopup, TheBoxBelongsToTheWindowThePopupOpenedFrom)
 
 TEST_F(AskedFromAPopup, TheBoxBelongsToTheWindowAParentlessPopupWasOpenedFrom)
 {
-    popup->winId();
-    popup->windowHandle()->setTransientParent(parent->windowHandle());
+    auto *opener = new QPushButton(parent.get());
+    Dialogs::rememberOpener(popup.get(), opener);
 
     QMessageBox *box = confirmFromThePopup();
     ASSERT_NE(box, nullptr);

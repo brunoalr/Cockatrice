@@ -18,7 +18,6 @@
 #include "non_blocking_dialogs.h"
 
 #include <QAbstractButton>
-#include <QApplication>
 #include <QEvent>
 #include <QFileDialog>
 #include <QInputDialog>
@@ -27,8 +26,6 @@
 #include <QPointer>
 #include <QScreen>
 #include <QToolButton>
-#include <QWindow>
-#include <algorithm>
 
 namespace Dialogs
 {
@@ -85,16 +82,15 @@ protected:
     }
 };
 
+constexpr auto OPENER_PROPERTY = "nonBlockingDialogsOpener";
+
 QWidget *openerOf(const QWidget *popup)
 {
     if (popup->parentWidget()) {
         return popup->parentWidget()->window();
     }
-    const QWindow *opener = popup->windowHandle() ? popup->windowHandle()->transientParent() : nullptr;
-    const QWidgetList windows = QApplication::topLevelWidgets();
-    const auto it = std::ranges::find_if(
-        windows, [opener](const QWidget *window) { return opener && window->windowHandle() == opener; });
-    return it == windows.end() ? nullptr : *it;
+    const auto opener = popup->property(OPENER_PROPERTY).value<QPointer<QWidget>>();
+    return opener ? opener->window() : nullptr;
 }
 
 // Qt closes a popup as a dialog shows, and a browser keeps a dialog above the window it belongs to only:
@@ -355,6 +351,11 @@ void showMenuOnClick(QAbstractButton *button, QMenu *menu)
 void popUpToolButtonMenus(QObject *scope)
 {
     scope->installEventFilter(new ToolButtonMenuPopper(scope));
+}
+
+void rememberOpener(QWidget *popup, QWidget *opener)
+{
+    popup->setProperty(OPENER_PROPERTY, QVariant::fromValue(QPointer<QWidget>(opener)));
 }
 
 void detail::openThen(QDialog *dialog, std::function<void(int result)> thenFinished)
