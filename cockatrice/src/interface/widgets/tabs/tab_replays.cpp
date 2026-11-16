@@ -211,8 +211,10 @@ QGroupBox *TabReplays::createLeftLayout()
     aExportReplay->setVisible(deviceFoldersOutOfReach);
     aExportReplay->setEnabled(false);
     connect(aExportReplay, &QAction::triggered, this, &TabReplays::actExportReplay);
-    connect(localDirView->selectionModel(), &QItemSelectionModel::selectionChanged, this,
-            [this] { aExportReplay->setEnabled(!singleSelectedLocalFile().isEmpty()); });
+    connect(localDirView->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this] {
+        aExportReplay->setEnabled(
+            !DeviceFiles::singleSelectedFile(localDirView->selectionModel(), localDirModel).isEmpty());
+    });
 
     // Add actions to toolbars
     toolBar->addAction(aOpenLocalReplay);
@@ -392,15 +394,6 @@ std::unique_ptr<GameReplay> TabReplays::parseReplay(const QByteArray &bytes)
     return replay;
 }
 
-QString TabReplays::singleSelectedLocalFile() const
-{
-    const QModelIndexList selected = localDirView->selectionModel()->selectedRows();
-    if (selected.size() != 1 || localDirModel->isDir(selected.first())) {
-        return {};
-    }
-    return localDirModel->filePath(selected.first());
-}
-
 void TabReplays::actImportReplay()
 {
     const QString folder = SettingsCache::instance().paths().getReplaysPath();
@@ -418,7 +411,8 @@ void TabReplays::actImportReplay()
 
 void TabReplays::actExportReplay()
 {
-    if (const QString filePath = singleSelectedLocalFile(); !filePath.isEmpty()) {
+    if (const QString filePath = DeviceFiles::singleSelectedFile(localDirView->selectionModel(), localDirModel);
+        !filePath.isEmpty()) {
         DeviceFiles::exportFile(this, filePath);
     }
 }

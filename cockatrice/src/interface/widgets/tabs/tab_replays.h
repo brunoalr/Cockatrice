@@ -51,7 +51,6 @@ private:
     QGroupBox *createRightLayout();
 
     void setRemoteEnabled(bool enabled);
-    QString singleSelectedLocalFile() const;
 
     void downloadNodeAtIndex(const QModelIndex &curLeft, const QModelIndex &curRight);
 

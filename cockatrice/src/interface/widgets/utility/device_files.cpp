@@ -25,6 +25,8 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFileSystemModel>
+#include <QItemSelectionModel>
 #include <QPointer>
 #include <QSaveFile>
 #include <utility>
@@ -177,4 +179,13 @@ void DeviceFiles::exportFile(QWidget *parent, const QString &path)
         return;
     }
     save(file.readAll(), QFileInfo(path).fileName());
+}
+
+QString DeviceFiles::singleSelectedFile(const QItemSelectionModel *selection, const QFileSystemModel *files)
+{
+    const QModelIndexList selected = selection->selectedRows();
+    if (selected.size() != 1 || files->isDir(selected.first())) {
+        return {};
+    }
+    return files->filePath(selected.first());
 }

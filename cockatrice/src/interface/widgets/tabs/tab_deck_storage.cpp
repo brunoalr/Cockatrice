@@ -224,8 +224,10 @@ TabDeckStorage::TabDeckStorage(TabSupervisor *_tabSupervisor,
     aExportDeck->setVisible(deviceFoldersOutOfReach);
     aExportDeck->setEnabled(false);
     connect(aExportDeck, &QAction::triggered, this, &TabDeckStorage::actExportLocalDeck);
-    connect(localDirView->selectionModel(), &QItemSelectionModel::selectionChanged, this,
-            [this] { aExportDeck->setEnabled(!singleSelectedLocalFile().isEmpty()); });
+    connect(localDirView->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this] {
+        aExportDeck->setEnabled(
+            !DeviceFiles::singleSelectedFile(localDirView->selectionModel(), localDirModel).isEmpty());
+    });
 
     // Right side actions
     aOpenRemoteDeck = new QAction(this);
@@ -324,15 +326,6 @@ QString TabDeckStorage::getTargetPath() const
     } else {
         return dir->getPath();
     }
-}
-
-QString TabDeckStorage::singleSelectedLocalFile() const
-{
-    const QModelIndexList selected = localDirView->selectionModel()->selectedRows();
-    if (selected.size() != 1 || localDirModel->isDir(selected.first())) {
-        return {};
-    }
-    return localDirModel->filePath(selected.first());
 }
 
 void TabDeckStorage::handleConnected(const ServerInfo_User &userInfo)
@@ -602,7 +595,8 @@ void TabDeckStorage::actOpenDecksFolder()
 
 void TabDeckStorage::actExportLocalDeck()
 {
-    if (const QString filePath = singleSelectedLocalFile(); !filePath.isEmpty()) {
+    if (const QString filePath = DeviceFiles::singleSelectedFile(localDirView->selectionModel(), localDirModel);
+        !filePath.isEmpty()) {
         DeviceFiles::exportFile(this, filePath);
     }
 }
