@@ -70,8 +70,8 @@ void DeviceFiles::open(QWidget *parent,
         return;
     }
     // A browser reports a cancel as an empty name; the picker cannot be closed when its asker goes.
-    const Opened picked = [guard = QPointer<QObject>(parent), thenPicked,
-                           thenCancelled](const QString &fileName, const QByteArray &bytes) {
+    const Opened picked = [guard = QPointer<QObject>(parent), thenPicked, thenCancelled](const QString &fileName,
+                                                                                         const QByteArray &bytes) {
         if (!guard) {
             return;
         }
