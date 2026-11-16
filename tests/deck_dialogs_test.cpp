@@ -1283,6 +1283,28 @@ TEST_F(DecksOnTheDevice, ImportCopiesThePickedDeckIntoTheDecksFolder)
     EXPECT_TRUE(openDialogs<QDialog>().isEmpty());
 }
 
+TEST_F(DecksOnTheDevice, ImportReadsTheBytesInTheFormatOfTheNameTheyAreStoredUnder)
+{
+    const QByteArray bytes = DeckLoader::toBytes(burn(), DeckFileFormat::Cockatrice);
+    const QList<std::pair<QString, QString>> cases = {
+        {"Burn", "Burn.cod"},
+        {"Zoo.cod.", "Zoo.cod"},
+        {"Sligh.xml", "Sligh.xml.cod"},
+    };
+    for (const auto &[picked, name] : cases) {
+        answers = 0;
+        import();
+        picker.pick(picked, bytes);
+        EXPECT_TRUE(openDialogs<QMessageBox>().isEmpty()) << picked.toStdString();
+        EXPECT_EQ(answers, 1) << picked.toStdString();
+        EXPECT_EQ(stored(name), bytes) << picked.toStdString();
+        for (QMessageBox *box : openDialogs<QMessageBox>()) {
+            box->button(QMessageBox::Ok)->click();
+        }
+        settle();
+    }
+}
+
 TEST_F(DecksOnTheDevice, AnImportedFileGetsASafeNameMadeFromItsOwn)
 {
     const QByteArray plain = DeckLoader::toBytes(burn(), DeckFileFormat::PlainText);

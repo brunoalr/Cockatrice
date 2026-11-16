@@ -89,12 +89,12 @@ void DeckSavePrompt::importFromDevice(QWidget *parent, std::function<void(const 
         parent, QCoreApplication::translate("DeviceFiles", "Import from device"),
         SettingsCache::instance().paths().getDeckPath(), DeckLoader::FILE_NAME_FILTERS.join(";;"),
         [parent, thenImported](const QString &fileName, const QByteArray &bytes) {
-            if (!DeckLoader::loadFromBytes(fileName, bytes)) {
+            const QString name = DeviceFiles::safeFileName(QFileInfo(fileName).fileName(), tr("Untitled deck"),
+                                                           DeckLoader::ACCEPTED_FILE_EXTENSIONS);
+            if (!DeckLoader::loadFromBytes(name, bytes)) {
                 Dialogs::critical(parent, tr("Error"), tr("Could not open deck at %1").arg(fileName));
                 return;
             }
-            const QString name = DeviceFiles::safeFileName(QFileInfo(fileName).fileName(), tr("Untitled deck"),
-                                                           DeckLoader::ACCEPTED_FILE_EXTENSIONS);
             DeviceFiles::storeAs(parent, QDir(SettingsCache::instance().paths().getDeckPath()).filePath(name), bytes,
                                  thenImported);
         });
