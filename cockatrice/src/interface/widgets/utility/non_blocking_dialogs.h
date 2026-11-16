@@ -97,6 +97,10 @@ void open(QMessageBox *box, std::function<void(QAbstractButton *clicked)> thenCl
 // Instead of a QToolButton's own menu, which some Qt versions show with QMenu::exec(): a nested event loop.
 void showMenuOnClick(QAbstractButton *button, QMenu *menu);
 
+// Pops up the menu of a tool button that Qt would show with QMenu::exec() on a press, such as the overflow button
+// of a menu bar or a tool bar. Watches the events \a scope receives: one button's, or all of the application's.
+void popUpToolButtonMenus(QObject *scope);
+
 template <typename Fn> auto whileAlive(QObject *context, Fn fn)
 {
     return [guard = QPointer<QObject>(context), fn = std::move(fn)]<typename... Arguments>(Arguments &&...arguments)

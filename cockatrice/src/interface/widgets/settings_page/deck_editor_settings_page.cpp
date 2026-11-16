@@ -60,6 +60,9 @@ DeckEditorSettingsPage::DeckEditorSettingsPage()
     mpSpoilerSavePathLineEdit = new QLineEdit(SettingsCache::instance().getSpoilerCardDatabasePath());
     mpSpoilerSavePathLineEdit->setReadOnly(true);
     mpSpoilerPathButton = new QPushButton("...");
+    if (!SettingsCache::instance().canReachDeviceFolders()) {
+        mpSpoilerPathButton->setVisible(false);
+    }
     connect(mpSpoilerPathButton, &QPushButton::clicked, this, &DeckEditorSettingsPage::spoilerPathButtonClicked);
 
     updateNowButton = new QPushButton;
