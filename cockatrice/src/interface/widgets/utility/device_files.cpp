@@ -101,23 +101,28 @@ QString DeviceFiles::safeFileName(const QString &typed, const QString &fallback,
     }
     // A leading dot hides the file, and Windows refuses a trailing one.
     const auto isEdge = [](QChar c) { return c.isSpace() || c == '.'; };
-    const auto trim = [&name, isEdge] {
+    const auto trimEnd = [&name, isEdge] {
         while (!name.isEmpty() && isEdge(name.back())) {
             name.chop(1);
         }
+    };
+    const auto trim = [&name, isEdge, trimEnd] {
+        trimEnd();
         while (!name.isEmpty() && isEdge(name.front())) {
             name.remove(0, 1);
         }
     };
-    trim();
-    if (name.isEmpty()) {
-        name = fallback;
-    }
+    // A name that is only an extension, such as ".cod", keeps its dot until the extension is split off.
+    trimEnd();
     QString suffix = extensions.first().mid(1);
     const QString typedSuffix = QFileInfo(name).suffix();
     if (extensions.contains("*." + typedSuffix, Qt::CaseInsensitive)) {
         suffix = "." + typedSuffix;
         name.chop(suffix.size());
+    }
+    trim();
+    if (name.isEmpty()) {
+        name = fallback;
     }
     // File systems take at most 255 bytes, and the browser's lists skip a longer name.
     while ((name + suffix).toUtf8().size() > 255) {
