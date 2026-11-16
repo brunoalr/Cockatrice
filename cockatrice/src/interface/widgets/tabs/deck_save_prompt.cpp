@@ -26,7 +26,6 @@
 #include <QFileInfo>
 #include <QInputDialog>
 #include <QMessageBox>
-#include <QRegularExpression>
 #include <libcockatrice/settings/paths_settings.h>
 
 namespace
@@ -40,15 +39,31 @@ QString safeFileName(const QString &typed, const QString &fallback)
         }
     }
     // A leading dot hides the file, and Windows refuses a trailing one.
-    static const QRegularExpression edges(QStringLiteral(R"(^[\s.]+|[\s.]+$)"));
-    name.remove(edges);
+    const auto isEdge = [](QChar c) { return c.isSpace() || c == '.'; };
+    const auto trim = [&name, isEdge] {
+        while (!name.isEmpty() && isEdge(name.back())) {
+            name.chop(1);
+        }
+        while (!name.isEmpty() && isEdge(name.front())) {
+            name.remove(0, 1);
+        }
+    };
+    trim();
     if (name.isEmpty()) {
         name = fallback;
     }
-    if (!DeckLoader::ACCEPTED_FILE_EXTENSIONS.contains("*." + QFileInfo(name).suffix(), Qt::CaseInsensitive)) {
-        name += ".cod";
+    QString suffix = ".cod";
+    const QString typedSuffix = QFileInfo(name).suffix();
+    if (DeckLoader::ACCEPTED_FILE_EXTENSIONS.contains("*." + typedSuffix, Qt::CaseInsensitive)) {
+        suffix = "." + typedSuffix;
+        name.chop(suffix.size());
     }
-    return name;
+    // File systems take at most 255 bytes, and the browser's lists skip a longer name.
+    while ((name + suffix).toUtf8().size() > 255) {
+        name.chop(name.back().isLowSurrogate() ? 2 : 1);
+        trim();
+    }
+    return name + suffix;
 }
 } // namespace
 

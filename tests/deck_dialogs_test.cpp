@@ -1006,6 +1006,9 @@ TEST_F(DecksInStorage, UnsafeNamesBecomeSafeFileNames)
         {"Burn.DEK", "Burn.DEK"},
         {"", "Untitled deck.cod"},
         {" / ", "Untitled deck.cod"},
+        {QStringLiteral("\u00A0\u00A0"), "Untitled deck.cod"},
+        {QStringLiteral("\u3000Burn\u3000"), "Burn.cod"},
+        {QStringLiteral("\u2028"), "Untitled deck.cod"},
     };
     for (const auto &[typed, expected] : cases) {
         answers = 0;
@@ -1013,6 +1016,25 @@ TEST_F(DecksInStorage, UnsafeNamesBecomeSafeFileNames)
         answerName(typed);
         EXPECT_EQ(answers, 1) << typed.toStdString();
         EXPECT_EQ(answered, decks.filePath(expected)) << typed.toStdString();
+    }
+}
+
+TEST_F(DecksInStorage, ALongNameIsCutToTheLengthAFileSystemTakes)
+{
+    const QString face = QString::fromUtf8("\xF0\x9F\x98\x80");
+    const QList<std::pair<QString, QString>> cases = {
+        {QString(300, 'B'), QString(251, 'B') + ".cod"},
+        {QString(300, 'B') + ".txt", QString(251, 'B') + ".txt"},
+        {face.repeated(100), face.repeated(62) + ".cod"},
+        {QString(250, 'B') + " B", QString(250, 'B') + ".cod"},
+    };
+    for (const auto &[typed, expected] : cases) {
+        answers = 0;
+        askToSave("Burn");
+        answerName(typed);
+        EXPECT_EQ(answers, 1) << typed.toStdString();
+        EXPECT_EQ(answered, decks.filePath(expected)) << typed.toStdString();
+        EXPECT_LE(QFileInfo(answered).fileName().toUtf8().size(), 255) << typed.toStdString();
     }
 }
 
@@ -1085,6 +1107,11 @@ TEST_F(DecksInStorage, WhereDeviceFoldersAreReachableAFileDialogChoosesWhereToSa
     ASSERT_NE(save, nullptr);
     EXPECT_EQ(save->acceptMode(), QFileDialog::AcceptSave);
     EXPECT_EQ(QFileInfo(save->directory().path()).canonicalFilePath(), QFileInfo(decks.path()).canonicalFilePath());
+    EXPECT_EQ(save->defaultSuffix(), "cod");
+    EXPECT_EQ(save->nameFilters(), DeckLoader::FILE_NAME_FILTERS);
+    const auto *nameField = save->findChild<QLineEdit *>("fileNameEdit");
+    ASSERT_NE(nameField, nullptr);
+    EXPECT_EQ(nameField->text(), "Burn");
     DialogTest::answerFileDialog(save, decks.filePath("Burn.cod"));
     EXPECT_EQ(answers, 1);
     EXPECT_EQ(QFileInfo(answered).fileName(), "Burn.cod");
