@@ -62,7 +62,6 @@ inline Q_LOGGING_CATEGORY(WindowMainStartupAutoconnectLog, "window_main.startup.
 inline Q_LOGGING_CATEGORY(CardDatabaseUpdateLog, "card_database.update");
 
 class DlgViewLog;
-class GameReplay;
 class LocalServer;
 class LatencyStatusWidget;
 class CardDatabaseUpdateStatusBar;
@@ -242,7 +241,6 @@ private:
     CardDatabaseFetcher *cardDatabaseFetcher = nullptr;
 #endif
     DlgViewLog *logviewDialog;
-    GameReplay *replay;
     DlgTipOfTheDay *tip;
     QUrl connectTo;
 #ifdef WITH_GUI_TEST
