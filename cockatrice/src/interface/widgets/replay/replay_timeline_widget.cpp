@@ -43,7 +43,7 @@ void ReplayTimelineWidget::setTimeline(const QList<int> &replayTimeline)
     }
     histogram.append(binValue);
     if (!replayTimeline.isEmpty()) {
-        // The bar and a click divide by it, and a replay whose only event falls in second 0 ends at 0.
+        // The bar divides by it, and a replay whose only event falls in second 0 ends at 0.
         maxTime = qMax(1, replayTimeline.last());
     }
 
