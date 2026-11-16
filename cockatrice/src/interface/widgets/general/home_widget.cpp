@@ -356,12 +356,15 @@ QGroupBox *HomeWidget::createButtons()
     replayButton->setObjectName("homeViewReplaysButton");
     connect(replayButton, &QPushButton::clicked, tabSupervisor, [this] { tabSupervisor->actTabReplays(true); });
     boxLayout->addWidget(replayButton);
+#ifndef Q_OS_WASM
+    // Quitting leaves a browser tab on a blank page.
     if (qobject_cast<MainWindow *>(tabSupervisor->parentWidget())) {
         exitButton = new HomeStyledButton(QString(), gradientColors);
         connect(exitButton, &QPushButton::clicked, qobject_cast<MainWindow *>(tabSupervisor->parentWidget()),
                 &MainWindow::actExit);
         boxLayout->addWidget(exitButton);
     }
+#endif
 
     box->setLayout(boxLayout);
     return box;

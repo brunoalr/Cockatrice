@@ -304,8 +304,8 @@ void PrintingSelectorCardOverlayWidget::leaveEvent(QEvent *event)
  * @brief Creates and shows the card-overlay context menu.
  *
  * The menu includes the card art preference (Pin/Unpin Printing), the Image Overrides
- * submenu (Load Custom Image, Clear Custom Image, and one entry per alternate printing with a
- * live preview), and the Show Related cards submenu.
+ * submenu (Load Custom Image except in the web build, Clear Custom Image, and one entry per
+ * alternate printing with a live preview), and the Show Related cards submenu.
  *
  * @param point The local position the menu should pop at.
  */
@@ -344,7 +344,11 @@ void PrintingSelectorCardOverlayWidget::customMenu(QPoint point)
 
     auto *overrideMenu = new QMenu(tr("Image Overrides"), menu.get());
 
+#ifndef Q_OS_WASM
+    // Its static file dialog runs a nested event loop, which ends a page.
     auto *loadCustomAction = overrideMenu->addAction(tr("Load Custom Image..."));
+    connect(loadCustomAction, &QAction::triggered, this, &PrintingSelectorCardOverlayWidget::loadCustomImage);
+#endif
     auto *clearOverrideAction = overrideMenu->addAction(tr("Clear Custom Image"));
 
     // Nothing to clear on a card that has no local override yet.
@@ -387,8 +391,6 @@ void PrintingSelectorCardOverlayWidget::customMenu(QPoint point)
         QPixmapCache::clear();
         rootCard.emitPixmapUpdated(); // force UI refresh
     });
-
-    connect(loadCustomAction, &QAction::triggered, this, &PrintingSelectorCardOverlayWidget::loadCustomImage);
 
     connect(overrideMenu, &QMenu::hovered, this, &PrintingSelectorCardOverlayWidget::showPreviewForAction);
     connect(overrideMenu, &QMenu::aboutToHide, this, &PrintingSelectorCardOverlayWidget::hidePreview);

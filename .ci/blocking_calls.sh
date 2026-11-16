@@ -20,7 +20,7 @@ export LC_ALL=C
 
 baseline_file="$(dirname "$0")/blocking_calls.baseline"
 
-blocking_call='QMessageBox::(information|warning|critical|about|aboutQt|question)\(|QtUtils::confirm\(|QInputDialog::get[A-Za-z]+\(|QFileDialog::get(OpenFile|SaveFile|ExistingDirectory)(Names?|Urls?)?\(|Q(Color|Font)Dialog::get[A-Za-z]+\(|setPopupMode\(|(^|[^A-Za-z0-9_])exec\('
+blocking_call='QMessageBox::(information|warning|critical|about|aboutQt|question)\(|QtUtils::confirm\(|QInputDialog::get[A-Za-z]+\(|QFileDialog::get(OpenFile|SaveFile|ExistingDirectory)(Names?|Urls?)?\(|Q(Color|Font)Dialog::get[A-Za-z]+\(|setPopupMode\(|ActionsContextMenu|(^|[^A-Za-z0-9_])exec\('
 
 count_blocking_calls() {
   local repo=$1
@@ -91,6 +91,7 @@ split->setPopupMode(QToolButton::MenuButtonPopup);
 delayed->setPopupMode(QToolButton::DelayedPopup);
 setPopupMode(InstantPopup);
 tool->setPopupMode( mode );
+view->setContextMenuPolicy(Qt::ActionsContextMenu);
 if (exec() == QDialog::Accepted) {
 return QDialog::exec();
     *ok = dialog->exec() == QDialog::Accepted;
@@ -109,8 +110,8 @@ EOF
 
   local count
   count=$(count_blocking_calls "$repo")
-  if [[ $count != 27 ]]; then
-    echo "self-test FAILED: counted $count blocking calls in the fixture, expected 27"
+  if [[ $count != 28 ]]; then
+    echo "self-test FAILED: counted $count blocking calls in the fixture, expected 28"
     return 1
   fi
   if check_against_baseline 7 6 >/dev/null; then
