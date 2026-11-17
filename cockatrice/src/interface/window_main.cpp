@@ -276,7 +276,7 @@ void MainWindow::watchReplayFile(const QString &fileName)
 
 void MainWindow::watchReplay(const QByteArray &buf)
 {
-    if (std::unique_ptr<GameReplay> replay = TabReplays::parseReplay(buf)) {
+    if (std::unique_ptr<GameReplay> replay = parseReplay(buf)) {
         tabSupervisor->openReplay(replay.release());
     }
 }

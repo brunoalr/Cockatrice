@@ -148,9 +148,9 @@ void DeviceFiles::storeAs(QWidget *parent,
                           const QByteArray &bytes,
                           const std::function<void(const QString &path)> &thenStored)
 {
-    const auto store = [parent, path, bytes, thenStored] {
-        QSaveFile file(path);
-        if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
+    const auto store = [parent, path, bytes, thenStored] { // NOSONAR: the replace question keeps a copy
+        if (QSaveFile file(path);
+            !file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
             Dialogs::critical(
                 parent, QCoreApplication::translate("DeviceFiles", "Error"),
                 QCoreApplication::translate("DeviceFiles",

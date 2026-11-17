@@ -51,7 +51,9 @@ private:
     int shareInFlightSeq = 0;
 
     QAction *aOpenLocalDeck, *aRenameLocal, *aUpload, *aNewLocalFolder, *aDeleteLocalDeck;
-    QAction *aOpenDecksFolder, *aImportDeck, *aExportDeck;
+    QAction *aOpenDecksFolder;
+    QAction *aImportDeck;
+    QAction *aExportDeck;
     QAction *aOpenRemoteDeck, *aDownload, *aShareDecks, *aPublishDeck, *aNewFolder, *aDeleteRemoteDeck;
     bool visibilityRefreshStarted = false;
     QTimer *visibilityRefreshTimer;

@@ -97,7 +97,7 @@ QWidget *openerOf(const QWidget *popup)
 // one of the closed popup sinks under the window raised next. It still goes with the widget that asked.
 bool moveOutOfPopup(QDialog *dialog)
 {
-    QWidget *asker = dialog->parentWidget();
+    const QWidget *asker = dialog->parentWidget();
     QWidget *owner = asker ? asker->window() : nullptr;
     if (!owner || owner->windowType() != Qt::Popup) {
         return false;
@@ -106,7 +106,8 @@ bool moveOutOfPopup(QDialog *dialog)
         owner = openerOf(owner);
     }
     dialog->setParent(owner, dialog->windowFlags());
-    QObject::connect(asker, &QObject::destroyed, dialog, [dialog] { delete dialog; });
+    // At once, not later: an answer already queued must not reach the widget that is gone.
+    QObject::connect(asker, &QObject::destroyed, dialog, [dialog] { delete dialog; }); // NOSONAR
     return true;
 }
 

@@ -72,7 +72,7 @@ void ReplayTimelineWidget::paintEvent(QPaintEvent * /* event */)
 
 void ReplayTimelineWidget::mousePressEvent(QMouseEvent *event)
 {
-    int newTime = static_cast<int>((qint64)maxTime * (qint64)event->position().x() / qMax(1, width()));
+    const auto newTime = static_cast<int>((qint64)maxTime * (qint64)event->position().x() / qMax(1, width()));
     emit timeClicked(newTime);
 }
 

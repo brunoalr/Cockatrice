@@ -110,6 +110,29 @@ void renameLocalInTurn(TabReplays *tab, QList<QFileInfo> files)
         renameLocalInTurn(tab, files);
     });
 }
+void importReplay(QWidget *parent)
+{
+    const QString folder = SettingsCache::instance().paths().getReplaysPath();
+    const auto store = [parent, folder](const QString &fileName, const QByteArray &bytes) {
+        if (!parseReplay(bytes)) {
+            Dialogs::warning(parent, QCoreApplication::translate("DeviceFiles", "Import from device"),
+                             TabReplays::tr("\"%1\" is not a replay file.").arg(QFileInfo(fileName).fileName()));
+            return;
+        }
+        const QString name = DeviceFiles::safeFileName(QFileInfo(fileName).fileName(), TabReplays::tr("Replay"),
+                                                       REPLAY_FILE_NAME_FILTERS);
+        DeviceFiles::storeAs(parent, QDir(folder).filePath(name), bytes, {});
+    };
+    DeviceFiles::open(parent, QCoreApplication::translate("DeviceFiles", "Import from device"), folder,
+                      TabReplays::tr("Cockatrice replays (*.cor)"), store);
+}
+
+void exportReplay(QWidget *parent, const QItemSelectionModel *selection, const QFileSystemModel *model)
+{
+    if (const QString filePath = DeviceFiles::singleSelectedFile(selection, model); !filePath.isEmpty()) {
+        DeviceFiles::exportFile(parent, filePath);
+    }
+}
 } // namespace
 
 TabReplays::TabReplays(TabSupervisor *_tabSupervisor, AbstractClient *_client, const ServerInfo_User *currentUserInfo)
@@ -205,12 +228,13 @@ QGroupBox *TabReplays::createLeftLayout()
     aImportReplay = new QAction(this);
     aImportReplay->setIcon(loadThemedIcon(QStringLiteral("icons/arrow_to_bottom")));
     aImportReplay->setVisible(deviceFoldersOutOfReach);
-    connect(aImportReplay, &QAction::triggered, this, &TabReplays::actImportReplay);
+    connect(aImportReplay, &QAction::triggered, this, [this] { importReplay(this); });
     aExportReplay = new QAction(this);
     aExportReplay->setIcon(loadThemedIcon(QStringLiteral("icons/arrow_to_top")));
     aExportReplay->setVisible(deviceFoldersOutOfReach);
     aExportReplay->setEnabled(false);
-    connect(aExportReplay, &QAction::triggered, this, &TabReplays::actExportReplay);
+    connect(aExportReplay, &QAction::triggered, this,
+            [this] { exportReplay(this, localDirView->selectionModel(), localDirModel); });
     connect(localDirView->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this] {
         aExportReplay->setEnabled(
             !DeviceFiles::singleSelectedFile(localDirView->selectionModel(), localDirModel).isEmpty());
@@ -384,7 +408,7 @@ void TabReplays::actOpenLocalReplay()
     }
 }
 
-std::unique_ptr<GameReplay> TabReplays::parseReplay(const QByteArray &bytes)
+std::unique_ptr<GameReplay> parseReplay(const QByteArray &bytes)
 {
     auto replay = std::make_unique<GameReplay>();
     if (bytes.isEmpty() || !replay->ParseFromArray(bytes.data(), bytes.size())) {
@@ -392,31 +416,6 @@ std::unique_ptr<GameReplay> TabReplays::parseReplay(const QByteArray &bytes)
         return nullptr;
     }
     return replay;
-}
-
-void TabReplays::actImportReplay()
-{
-    const QString folder = SettingsCache::instance().paths().getReplaysPath();
-    const auto store = [this, folder](const QString &fileName, const QByteArray &bytes) {
-        if (!parseReplay(bytes)) {
-            Dialogs::warning(this, QCoreApplication::translate("DeviceFiles", "Import from device"),
-                             tr("\"%1\" is not a replay file.").arg(QFileInfo(fileName).fileName()));
-            return;
-        }
-        const QString name =
-            DeviceFiles::safeFileName(QFileInfo(fileName).fileName(), tr("Replay"), REPLAY_FILE_NAME_FILTERS);
-        DeviceFiles::storeAs(this, QDir(folder).filePath(name), bytes, {});
-    };
-    DeviceFiles::open(this, QCoreApplication::translate("DeviceFiles", "Import from device"), folder,
-                      tr("Cockatrice replays (*.cor)"), store);
-}
-
-void TabReplays::actExportReplay()
-{
-    if (const QString filePath = DeviceFiles::singleSelectedFile(localDirView->selectionModel(), localDirModel);
-        !filePath.isEmpty()) {
-        DeviceFiles::exportFile(this, filePath);
-    }
 }
 
 void TabReplays::actRenameLocal()

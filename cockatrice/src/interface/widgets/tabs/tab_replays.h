@@ -43,7 +43,9 @@ private:
     QGroupBox *leftGroupBox, *rightGroupBox;
 
     QAction *aOpenLocalReplay, *aRenameLocal, *aNewLocalFolder, *aDeleteLocalReplay;
-    QAction *aOpenReplaysFolder, *aImportReplay, *aExportReplay;
+    QAction *aOpenReplaysFolder;
+    QAction *aImportReplay;
+    QAction *aExportReplay;
     QAction *aOpenRemoteReplay, *aDownload, *aKeep, *aDeleteRemoteReplay, *aGetReplayCode;
     QAction *aSubmitReplayCode;
 
@@ -65,8 +67,6 @@ private slots:
     void actDeleteLocalReplay();
 
     void actOpenReplaysFolder();
-    void actImportReplay();
-    void actExportReplay();
 
     void actRemoteDoubleClick(const QModelIndex &curLeft);
     void actOpenRemoteReplay();
@@ -93,13 +93,14 @@ signals:
 
 public:
     TabReplays(TabSupervisor *_tabSupervisor, AbstractClient *_client, const ServerInfo_User *currentUserInfo);
-    // Null also for no bytes, which protobuf would read as a replay without a single event.
-    static std::unique_ptr<GameReplay> parseReplay(const QByteArray &bytes);
     void retranslateUi() override;
     [[nodiscard]] QString getTabText() const override
     {
         return tr("Game Replays");
     }
 };
+
+// Null also for no bytes, which protobuf would read as a replay without a single event.
+std::unique_ptr<GameReplay> parseReplay(const QByteArray &bytes);
 
 #endif
