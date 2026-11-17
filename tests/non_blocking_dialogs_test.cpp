@@ -429,8 +429,8 @@ TEST_F(AskedFromAPopup, TheBoxBelongsToTheWindowThePopupOpenedFrom)
 
 TEST_F(AskedFromAPopup, TheBoxBelongsToTheWindowAParentlessPopupWasOpenedFrom)
 {
-    auto *opener = new QPushButton(parent.get());
-    Dialogs::rememberOpener(popup.get(), opener);
+    QPushButton opener(parent.get());
+    Dialogs::rememberOpener(popup.get(), &opener);
 
     QMessageBox *box = confirmFromThePopup();
     ASSERT_NE(box, nullptr);
@@ -442,7 +442,8 @@ TEST_F(AskedFromAPopup, TheBoxGoesWithTheWidgetThatAsked)
     QPointer<QMessageBox> box = confirmFromThePopup();
     ASSERT_NE(box, nullptr);
 
-    delete chip;
+    chip->deleteLater();
+    QCoreApplication::sendPostedEvents(chip, QEvent::DeferredDelete);
     settle();
 
     EXPECT_TRUE(box.isNull());

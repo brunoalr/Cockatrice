@@ -347,11 +347,11 @@ TEST_F(AvatarFromTheDevice, CancellingThePickerKeepsTheChosenImage)
 
 TEST_F(AvatarFromTheDevice, AnImageArrivingAfterTheDialogClosedIsDropped)
 {
-    auto *dialog = new DlgEditAvatar(window.get());
+    auto dialog = std::make_unique<DlgEditAvatar>(window.get());
     dialog->show();
-    clickBrowse(dialog);
+    clickBrowse(dialog.get());
 
-    delete dialog;
+    dialog.reset();
     picker.pick("avatar.png", png());
 }
 } // namespace

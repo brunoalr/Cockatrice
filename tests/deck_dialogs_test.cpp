@@ -1265,7 +1265,7 @@ protected:
         return deck;
     }
 
-    void import()
+    void importDeck()
     {
         DeckSavePrompt::importFromDevice(window.get(), [this](const QString &path) { record(path); });
         settle();
@@ -1283,7 +1283,7 @@ protected:
 TEST_F(DecksOnTheDevice, ImportCopiesThePickedDeckIntoTheDecksFolder)
 {
     const QByteArray bytes = DeckLoader::toBytes(burn(), DeckFileFormat::Cockatrice);
-    import();
+    importDeck();
     picker.pick("Burn.cod", bytes);
 
     EXPECT_EQ(answers, 1);
@@ -1302,7 +1302,7 @@ TEST_F(DecksOnTheDevice, ImportReadsTheBytesInTheFormatOfTheNameTheyAreStoredUnd
     };
     for (const auto &[picked, name] : cases) {
         answers = 0;
-        import();
+        importDeck();
         picker.pick(picked, bytes);
         EXPECT_TRUE(openDialogs<QMessageBox>().isEmpty()) << picked.toStdString();
         EXPECT_EQ(answers, 1) << picked.toStdString();
@@ -1317,12 +1317,12 @@ TEST_F(DecksOnTheDevice, ImportReadsTheBytesInTheFormatOfTheNameTheyAreStoredUnd
 TEST_F(DecksOnTheDevice, AnImportedFileGetsASafeNameMadeFromItsOwn)
 {
     const QByteArray plain = DeckLoader::toBytes(burn(), DeckFileFormat::PlainText);
-    import();
+    importDeck();
     picker.pick("/device/folder/Red: Burn?.dek", plain);
     EXPECT_EQ(answered, decks.filePath("Red Burn.dek"));
     EXPECT_EQ(stored("Red Burn.dek"), plain);
 
-    import();
+    importDeck();
     picker.pick("Burn list", plain);
     EXPECT_EQ(answered, decks.filePath("Burn list.cod"));
     EXPECT_EQ(answers, 2);
@@ -1333,7 +1333,7 @@ TEST_F(DecksOnTheDevice, ImportReplacesAFileOnlyAfterYes)
     addFile("Burn.cod");
     const QByteArray bytes = DeckLoader::toBytes(burn(), DeckFileFormat::Cockatrice);
 
-    import();
+    importDeck();
     picker.pick("Burn.cod", bytes);
     const auto *box = onlyOpen<QMessageBox>();
     ASSERT_NE(box, nullptr);
@@ -1342,7 +1342,7 @@ TEST_F(DecksOnTheDevice, ImportReplacesAFileOnlyAfterYes)
     EXPECT_EQ(answers, 0);
     EXPECT_TRUE(stored("Burn.cod").isEmpty());
 
-    import();
+    importDeck();
     picker.pick("Burn.cod", bytes);
     clickInOnlyBox(QMessageBox::Yes);
     EXPECT_EQ(answers, 1);
@@ -1351,7 +1351,7 @@ TEST_F(DecksOnTheDevice, ImportReplacesAFileOnlyAfterYes)
 
 TEST_F(DecksOnTheDevice, ImportingAFileThatHoldsNoDeckSaysSoAndWritesNothing)
 {
-    import();
+    importDeck();
     picker.pick("notes.cod", "%%% ###\n");
 
     clickInOnlyBox(QMessageBox::Ok, "Could not open deck at notes.cod");
@@ -1361,7 +1361,7 @@ TEST_F(DecksOnTheDevice, ImportingAFileThatHoldsNoDeckSaysSoAndWritesNothing)
 
 TEST_F(DecksOnTheDevice, ACancelledImportDoesNothing)
 {
-    import();
+    importDeck();
     picker.pick({}, {});
 
     EXPECT_EQ(answers, 0);

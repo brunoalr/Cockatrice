@@ -65,6 +65,7 @@ class DevicePicker
 public:
     QString filter;
     QList<std::pair<QString, QByteArray>> saved;
+    DeviceFiles::Opened pending;
 
     DevicePicker()
     {
@@ -94,9 +95,6 @@ public:
         std::exchange(pending, {})(fileName, bytes);
         settle();
     }
-
-private:
-    DeviceFiles::Opened pending;
 };
 
 #ifdef Q_OS_MACOS
