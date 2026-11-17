@@ -12,6 +12,7 @@ import argparse
 import json
 import re
 import subprocess
+import sys
 
 
 DEFAULT_REPO_NAME = 'cockatrice/cockatrice'
@@ -35,8 +36,7 @@ convert_to_gib = lambda x: x / (1024**3)
 # `gh cache list --json` available fields: createdAt, id, key, lastAccessedAt, ref, sizeInBytes, version. (see https://cli.github.com/manual/gh_cache_list)
 response = subprocess.run(['gh', 'cache', '-R', args.repo, 'list', '--limit', str(LIMIT), '--json', 'key,sizeInBytes'], capture_output=True)
 if response.returncode != 0:
-    print(f"Error: gh cache list failed (check gh auth or repo access): {response.stderr.decode('utf-8')}")
-    exit(1)
+    sys.exit(f"Error: gh cache list failed (check gh auth or repo access): {response.stderr.decode('utf-8')}")
 json_data = json.loads(response.stdout)
 # find prefixes
 prefixes = set()
@@ -65,7 +65,7 @@ summary.sort(key=lambda x: x['sizeInGib'], reverse=True)
     
 if markdown:
     print('| PREFIX | COUNT | SIZE (GiB) |')
-    print(f'|{'-'*PREFIX_LEN}|{'-'*COUNT_LEN}:|{'-'*SIZE_LEN}:|')
+    print(f"|{'-'*PREFIX_LEN}|{'-'*COUNT_LEN}:|{'-'*SIZE_LEN}:|")
     for item in summary:
         print(f'| {item["prefix"]} | {item["count"]} | {item["sizeInGib"]:.2f} |')
     print(f'| **Total** | {num_entries} | {total_size_in_gb:.2f} |')
