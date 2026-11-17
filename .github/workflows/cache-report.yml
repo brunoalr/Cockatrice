@@ -1,5 +1,5 @@
 # Reports GitHub Actions cache usage grouped by key prefix (e.g. buildkit, ccache, vcpkg).
-# Run locally: .ci/gha_cache_usage.sh
+# Run locally: python3 .ci/gha_cache_usage.py
 
 name: Cache usage report
 
@@ -17,12 +17,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Report cache usage
         id: cache_report
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 .ci/gha_cache_usage.py --markdown | tee report.txt
+          python3 .ci/gha_cache_usage.py --markdown --repo "$GITHUB_REPOSITORY" | tee report.txt
           cat report.txt >> "$GITHUB_STEP_SUMMARY"
