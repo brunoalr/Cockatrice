@@ -38,6 +38,8 @@ jobs:
         id: cache_report
         env:
           GH_TOKEN: ${{ github.token }}
+        # Named, bash runs with pipefail: without it tee would hide a failed report.
+        shell: bash
         run: |
           python3 .ci/gha_cache_usage.py --markdown --repo "$GITHUB_REPOSITORY" | tee report.txt
           cat report.txt >> "$GITHUB_STEP_SUMMARY"
