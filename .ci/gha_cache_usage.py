@@ -90,3 +90,6 @@ else:
     for item in summary:
         print(f"{item['prefix']:{PREFIX_LEN}} {item['count']:{COUNT_LEN}} {item['sizeInGib']:{SIZE_LEN}.2f}")
     print(f"{'Total':{PREFIX_LEN}} {num_entries:{COUNT_LEN}} {total_size_in_gb:{SIZE_LEN}.2f}")
+
+if num_entries >= LIMIT:
+    print(f"\nOnly the first {LIMIT} caches are counted: the totals are incomplete.")
