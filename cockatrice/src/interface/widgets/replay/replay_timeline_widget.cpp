@@ -43,7 +43,8 @@ void ReplayTimelineWidget::setTimeline(const QList<int> &replayTimeline)
     }
     histogram.append(binValue);
     if (!replayTimeline.isEmpty()) {
-        maxTime = replayTimeline.last();
+        // The bar divides by it, and a replay whose only event falls in second 0 ends at 0.
+        maxTime = qMax(1, replayTimeline.last());
     }
 
     update();
@@ -71,7 +72,7 @@ void ReplayTimelineWidget::paintEvent(QPaintEvent * /* event */)
 
 void ReplayTimelineWidget::mousePressEvent(QMouseEvent *event)
 {
-    int newTime = static_cast<int>((qint64)maxTime * (qint64)event->position().x() / width());
+    const auto newTime = static_cast<int>((qint64)maxTime * (qint64)event->position().x() / qMax(1, width()));
     emit timeClicked(newTime);
 }
 

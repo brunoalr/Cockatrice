@@ -21,6 +21,7 @@
 #include "interface/widgets/dialogs/dlg_edit_avatar.h"
 #include "interface/widgets/dialogs/dlg_report_user.h"
 
+#include <QBuffer>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
@@ -118,17 +119,67 @@ protected:
             ->click();
     }
 
-    void browseForAvatar(const DlgEditAvatar *dialog, const QString &path) const
+    DialogTest::DevicePicker picker;
+
+    static void clickBrowse(const DlgEditAvatar *dialog)
     {
         for (QPushButton *button : dialog->findChildren<QPushButton *>()) {
             if (button->text() == "Browse...") {
                 button->click();
             }
         }
-        QFileDialog *files = onlyOpen<QFileDialog>();
-        ASSERT_NE(files, nullptr);
-        EXPECT_EQ(files->windowModality(), Qt::WindowModal);
-        DialogTest::answerFileDialog(files, path);
+    }
+
+    void browseForAvatar(const DlgEditAvatar *dialog, const QString &fileName, const QByteArray &bytes)
+    {
+        clickBrowse(dialog);
+        EXPECT_EQ(picker.filter, "Image Files (*.png *.jpg *.bmp)");
+        EXPECT_TRUE(openDialogs<QFileDialog>().isEmpty());
+        picker.pick(fileName, bytes);
+    }
+
+    static QByteArray png()
+    {
+        QImage image(4, 4, QImage::Format_RGB32);
+        image.fill(Qt::red);
+        QByteArray bytes;
+        QBuffer buffer(&bytes);
+        buffer.open(QIODevice::WriteOnly);
+        image.save(&buffer, "PNG");
+        return bytes;
+    }
+
+    static const QLabel *labelSaying(const DlgEditAvatar *dialog, const QString &text)
+    {
+        for (const QLabel *label : dialog->findChildren<QLabel *>()) {
+            if (label->text() == text) {
+                return label;
+            }
+        }
+        return nullptr;
+    }
+
+    QFileDialog *browseForAvatarFile(const DlgEditAvatar *dialog) const
+    {
+        clickBrowse(dialog);
+        EXPECT_FALSE(picker.isOpen());
+        return onlyOpen<QFileDialog>();
+    }
+};
+
+// As in a browser tab, which reaches only its own storage.
+class AvatarFromTheDevice : public LobbyDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    void SetUp() override
+    {
+        SettingsCache::instance().setDeviceFoldersReachableForTesting(false);
+    }
+
+    void TearDown() override
+    {
+        SettingsCache::instance().setDeviceFoldersReachableForTesting(true);
+        LobbyDialogs::TearDown();
     }
 };
 
@@ -192,23 +243,54 @@ TEST_F(LobbyDialogs, ARefusedReportKeepsTheDialogOpen)
     EXPECT_TRUE(dialog->isVisible());
 }
 
-TEST_F(LobbyDialogs, ChoosingAnAvatarImageLoadsIt)
+TEST_F(LobbyDialogs, AFileDialogInTheHomeFolderChoosesTheAvatarImage)
 {
     const QTemporaryDir dir;
     const QString path = dir.filePath("avatar.png");
-    QImage image(4, 4, QImage::Format_RGB32);
-    image.fill(Qt::red);
-    ASSERT_TRUE(image.save(path));
+    QFile file(path);
+    ASSERT_TRUE(file.open(QIODevice::WriteOnly));
+    file.write(png());
+    file.close();
     auto *dialog = new DlgEditAvatar(window.get());
     dialog->show();
 
-    browseForAvatar(dialog, path);
+    QFileDialog *files = browseForAvatarFile(dialog);
+    ASSERT_NE(files, nullptr);
+    EXPECT_EQ(files->parentWidget(), dialog);
+    EXPECT_EQ(files->windowTitle(), "Open Image");
+    EXPECT_EQ(files->directory().absolutePath(), QDir::homePath());
+    EXPECT_EQ(files->nameFilters(), QStringList{"Image Files (*.png *.jpg *.bmp)"});
+    EXPECT_EQ(files->fileMode(), QFileDialog::ExistingFile);
+    EXPECT_EQ(files->windowModality(), Qt::WindowModal);
+    DialogTest::answerFileDialog(files, path);
 
     EXPECT_FALSE(dialog->getImage().isEmpty());
     EXPECT_TRUE(openDialogs<QFileDialog>().isEmpty());
 }
 
-TEST_F(LobbyDialogs, CancellingTheAvatarFileDialogSaysNoImageWasChosen)
+TEST_F(LobbyDialogs, AnAvatarFileThatCannotBeReadIsNoImage)
+{
+    const QTemporaryDir dir;
+    const QString path = dir.filePath("avatar.png");
+    QFile file(path);
+    ASSERT_TRUE(file.open(QIODevice::WriteOnly));
+    file.write(png());
+    file.close();
+    if (!file.setPermissions(QFileDevice::Permissions()) || QFile(path).open(QIODevice::ReadOnly)) {
+        GTEST_SKIP() << "this platform or user can still read a file that has no permissions";
+    }
+    auto *dialog = new DlgEditAvatar(window.get());
+    dialog->show();
+
+    QFileDialog *files = browseForAvatarFile(dialog);
+    ASSERT_NE(files, nullptr);
+    DialogTest::answerFileDialog(files, path);
+
+    EXPECT_NE(labelSaying(dialog, "Invalid image chosen."), nullptr);
+    EXPECT_TRUE(dialog->getImage().isEmpty());
+}
+
+TEST_F(LobbyDialogs, CancellingTheAvatarFileDialogSaysNoImageIsChosen)
 {
     const QTemporaryDir dir;
     const QString path = dir.filePath("not-an-image.png");
@@ -218,18 +300,59 @@ TEST_F(LobbyDialogs, CancellingTheAvatarFileDialogSaysNoImageWasChosen)
     file.close();
     auto *dialog = new DlgEditAvatar(window.get());
     dialog->show();
-    browseForAvatar(dialog, path);
-    const QLabel *imageLabel = nullptr;
-    for (const QLabel *label : dialog->findChildren<QLabel *>()) {
-        if (label->text() == "Invalid image chosen.") {
-            imageLabel = label;
-        }
-    }
-    ASSERT_NE(imageLabel, nullptr);
+    DialogTest::answerFileDialog(browseForAvatarFile(dialog), path);
+    ASSERT_NE(labelSaying(dialog, "Invalid image chosen."), nullptr);
 
-    browseForAvatar(dialog, QString());
+    QFileDialog *files = browseForAvatarFile(dialog);
+    ASSERT_NE(files, nullptr);
+    DialogTest::answerFileDialog(files, QString());
 
-    EXPECT_EQ(imageLabel->text(), "No image chosen.");
+    EXPECT_NE(labelSaying(dialog, "No image chosen."), nullptr);
+    EXPECT_TRUE(openDialogs<QFileDialog>().isEmpty());
+}
+
+TEST_F(AvatarFromTheDevice, ChoosingAnAvatarImageLoadsIt)
+{
+    auto *dialog = new DlgEditAvatar(window.get());
+    dialog->show();
+
+    browseForAvatar(dialog, "avatar.png", png());
+
+    EXPECT_FALSE(dialog->getImage().isEmpty());
+    EXPECT_EQ(labelSaying(dialog, "No image chosen."), nullptr);
+}
+
+TEST_F(AvatarFromTheDevice, AFileThatIsNoImageSaysSo)
+{
+    auto *dialog = new DlgEditAvatar(window.get());
+    dialog->show();
+
+    browseForAvatar(dialog, "not-an-image.png", "not an image");
+
+    EXPECT_NE(labelSaying(dialog, "Invalid image chosen."), nullptr);
+    EXPECT_TRUE(dialog->getImage().isEmpty());
+}
+
+TEST_F(AvatarFromTheDevice, CancellingThePickerKeepsTheChosenImage)
+{
+    auto *dialog = new DlgEditAvatar(window.get());
+    dialog->show();
+    browseForAvatar(dialog, "avatar.png", png());
+
+    browseForAvatar(dialog, QString(), QByteArray());
+
+    EXPECT_NE(labelSaying(dialog, "No image chosen."), nullptr);
+    EXPECT_FALSE(dialog->getImage().isEmpty());
+}
+
+TEST_F(AvatarFromTheDevice, AnImageArrivingAfterTheDialogClosedIsDropped)
+{
+    auto dialog = std::make_unique<DlgEditAvatar>(window.get());
+    dialog->show();
+    clickBrowse(dialog.get());
+
+    dialog.reset();
+    picker.pick("avatar.png", png());
 }
 } // namespace
 

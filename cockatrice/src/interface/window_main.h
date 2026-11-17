@@ -62,7 +62,6 @@ inline Q_LOGGING_CATEGORY(WindowMainStartupAutoconnectLog, "window_main.startup.
 inline Q_LOGGING_CATEGORY(CardDatabaseUpdateLog, "card_database.update");
 
 class DlgViewLog;
-class GameReplay;
 class LocalServer;
 class LatencyStatusWidget;
 class CardDatabaseUpdateStatusBar;
@@ -209,6 +208,8 @@ private:
 
     void startLocalGame(const LocalGameOptions &options);
     void watchReplayFile(const QString &fileName);
+    void watchReplay(const QByteArray &buf);
+    void addCustomSet(const QString &fullFilePath, const QByteArray &bytes);
 
     QList<QMenu *> tabMenus;
     QMenu *cockatriceMenu, *dbMenu, *tabsMenu, *helpMenu, *trayIconMenu;
@@ -254,7 +255,6 @@ private:
     CardDatabaseFetcher *cardDatabaseFetcher = nullptr;
 #endif
     DlgViewLog *logviewDialog;
-    GameReplay *replay;
     DlgTipOfTheDay *tip;
     QUrl connectTo;
 #ifdef WITH_GUI_TEST

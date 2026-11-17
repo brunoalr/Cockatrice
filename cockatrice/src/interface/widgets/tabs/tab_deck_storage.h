@@ -52,6 +52,8 @@ private:
 
     QAction *aOpenLocalDeck, *aRenameLocal, *aUpload, *aNewLocalFolder, *aDeleteLocalDeck;
     QAction *aOpenDecksFolder;
+    QAction *aImportDeck;
+    QAction *aExportDeck;
     QAction *aOpenRemoteDeck, *aDownload, *aShareDecks, *aPublishDeck, *aNewFolder, *aDeleteRemoteDeck;
     bool visibilityRefreshStarted = false;
     QTimer *visibilityRefreshTimer;
@@ -90,6 +92,7 @@ private slots:
     void actDeleteLocalDeck();
 
     void actOpenDecksFolder();
+    void actExportLocalDeck();
 
     void actRemoteDoubleClick(const QModelIndex &curRight);
     void actOpenRemoteDeck();

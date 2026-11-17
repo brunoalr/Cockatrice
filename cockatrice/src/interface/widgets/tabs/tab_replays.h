@@ -17,6 +17,7 @@
 // GameReplay is a protobuf message passed through the openReplay signal,
 // so the moc-generated code needs the complete type.
 #include <libcockatrice/protocol/pb/game_replay.pb.h>
+#include <memory>
 #include <qtmetamacros.h>
 
 class ServerInfo_User;
@@ -43,6 +44,8 @@ private:
 
     QAction *aOpenLocalReplay, *aRenameLocal, *aNewLocalFolder, *aDeleteLocalReplay;
     QAction *aOpenReplaysFolder;
+    QAction *aImportReplay;
+    QAction *aExportReplay;
     QAction *aOpenRemoteReplay, *aDownload, *aKeep, *aDeleteRemoteReplay, *aGetReplayCode;
     QAction *aSubmitReplayCode;
 
@@ -96,5 +99,8 @@ public:
         return tr("Game Replays");
     }
 };
+
+// Null also for no bytes, which protobuf would read as a replay without a single event.
+std::unique_ptr<GameReplay> parseReplay(const QByteArray &bytes);
 
 #endif

@@ -8,9 +8,11 @@
 #include "../deck_share/deck_share_utils.h"
 #include "../deck_share/share_bar_widget.h"
 #include "../interface/widgets/server/remote/remote_decklist_tree_widget.h"
+#include "../interface/widgets/utility/device_files.h"
 #include "../interface/widgets/utility/get_text_with_max.h"
 #include "../interface/widgets/utility/non_blocking_dialogs.h"
 #include "abstract_client.h"
+#include "deck_save_prompt.h"
 #include "libcockatrice/protocol/pb/commands.pb.h"
 #include "libcockatrice/protocol/pb/serverinfo_user.pb.h"
 #include "libcockatrice/protocol/pb/session_commands.pb.h"
@@ -212,6 +214,21 @@ TabDeckStorage::TabDeckStorage(TabSupervisor *_tabSupervisor,
     aOpenDecksFolder->setIcon(qApp->style()->standardIcon(QStyle::SP_DirOpenIcon));
     connect(aOpenDecksFolder, &QAction::triggered, this, &TabDeckStorage::actOpenDecksFolder);
 
+    const bool deviceFoldersOutOfReach = !SettingsCache::instance().canReachDeviceFolders();
+    aImportDeck = new QAction(this);
+    aImportDeck->setIcon(loadThemedIcon(QStringLiteral("icons/arrow_to_bottom")));
+    aImportDeck->setVisible(deviceFoldersOutOfReach);
+    connect(aImportDeck, &QAction::triggered, this, [this] { DeckSavePrompt::importFromDevice(this, {}); });
+    aExportDeck = new QAction(this);
+    aExportDeck->setIcon(loadThemedIcon(QStringLiteral("icons/arrow_to_top")));
+    aExportDeck->setVisible(deviceFoldersOutOfReach);
+    aExportDeck->setEnabled(false);
+    connect(aExportDeck, &QAction::triggered, this, &TabDeckStorage::actExportLocalDeck);
+    connect(localDirView->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this] {
+        aExportDeck->setEnabled(
+            !DeviceFiles::singleSelectedFile(localDirView->selectionModel(), localDirModel).isEmpty());
+    });
+
     // Right side actions
     aOpenRemoteDeck = new QAction(this);
     aOpenRemoteDeck->setIcon(loadThemedIcon(QStringLiteral("icons/pencil")));
@@ -246,6 +263,8 @@ TabDeckStorage::TabDeckStorage(TabSupervisor *_tabSupervisor,
     // A tab has no file manager to show a folder in.
     leftRightmostToolBar->addAction(aOpenDecksFolder);
 #endif
+    leftRightmostToolBar->addAction(aImportDeck);
+    leftRightmostToolBar->addAction(aExportDeck);
 
     rightToolBar->addAction(aOpenRemoteDeck);
     rightToolBar->addAction(aDownload);
@@ -282,6 +301,8 @@ void TabDeckStorage::retranslateUi()
     aShareDecks->setText(tr("Share decks"));
     aPublishDeck->setText(tr("Publish/unpublish deck"));
     aOpenDecksFolder->setText(tr("Open decks folder"));
+    aImportDeck->setText(tr("Import from device..."));
+    aExportDeck->setText(tr("Export to device..."));
     shareBar->retranslateUi();
     if (shareBar->isVisible()) {
         onServerSelectionChanged();
@@ -570,6 +591,14 @@ void TabDeckStorage::actOpenDecksFolder()
 {
     QString dir = localDirModel->rootPath();
     QtUtils::openPathInFileManager(dir);
+}
+
+void TabDeckStorage::actExportLocalDeck()
+{
+    if (const QString filePath = DeviceFiles::singleSelectedFile(localDirView->selectionModel(), localDirModel);
+        !filePath.isEmpty()) {
+        DeviceFiles::exportFile(this, filePath);
+    }
 }
 
 void TabDeckStorage::actRemoteDoubleClick(const QModelIndex &curRight)
