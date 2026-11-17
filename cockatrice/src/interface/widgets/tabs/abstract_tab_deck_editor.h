@@ -202,6 +202,9 @@ protected slots:
     /** @brief Opens the deck share dialog for the current deck. */
     void actShareDeck();
 
+    void actImportDeckFromDevice();
+    void actExportDeckToDevice();
+
     /** @brief Loads a deck from the clipboard. */
     virtual void actLoadDeckFromClipboard();
 

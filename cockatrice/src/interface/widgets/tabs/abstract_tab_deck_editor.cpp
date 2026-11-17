@@ -253,6 +253,24 @@ void AbstractTabDeckEditor::actLoadDeck()
     });
 }
 
+void AbstractTabDeckEditor::actImportDeckFromDevice()
+{
+    confirmOpen(true, [this](DeckOpenLocation deckOpenLocation) {
+        if (deckOpenLocation == CANCELLED) {
+            return;
+        }
+
+        DeckSavePrompt::importFromDevice(
+            this, [this, deckOpenLocation](const QString &path) { openDeckFromFile(path, deckOpenLocation); });
+    });
+}
+
+void AbstractTabDeckEditor::actExportDeckToDevice()
+{
+    const LoadedDeck deck = deckStateManager->toLoadedDeck();
+    DeckSavePrompt::exportToDevice(deck.deckList, deck.lastLoadInfo.fileName);
+}
+
 /**
  * @brief Opens a recently used deck file.
  * @param fileName Path to the deck file.

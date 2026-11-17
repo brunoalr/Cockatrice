@@ -4,6 +4,7 @@
 #include "../../../client/settings/cache_settings.h"
 #include "../../theme_icon.h"
 #include "../interface/widgets/server/remote/remote_replay_list_tree_widget.h"
+#include "../interface/widgets/utility/device_files.h"
 #include "../interface/widgets/utility/non_blocking_dialogs.h"
 #include "libcockatrice/protocol/pb/commands.pb.h"
 #include "libcockatrice/protocol/pb/serverinfo_replay.pb.h"
@@ -109,6 +110,29 @@ void renameLocalInTurn(TabReplays *tab, QList<QFileInfo> files)
         renameLocalInTurn(tab, files);
     });
 }
+void importReplay(QWidget *parent)
+{
+    const QString folder = SettingsCache::instance().paths().getReplaysPath();
+    const auto store = [parent, folder](const QString &fileName, const QByteArray &bytes) {
+        if (!parseReplay(bytes)) {
+            Dialogs::warning(parent, QCoreApplication::translate("DeviceFiles", "Import from device"),
+                             TabReplays::tr("\"%1\" is not a replay file.").arg(QFileInfo(fileName).fileName()));
+            return;
+        }
+        const QString name = DeviceFiles::safeFileName(QFileInfo(fileName).fileName(), TabReplays::tr("Replay"),
+                                                       REPLAY_FILE_NAME_FILTERS);
+        DeviceFiles::storeAs(parent, QDir(folder).filePath(name), bytes, {});
+    };
+    DeviceFiles::open(parent, QCoreApplication::translate("DeviceFiles", "Import from device"), folder,
+                      TabReplays::tr("Cockatrice replays (*.cor)"), store);
+}
+
+void exportReplay(QWidget *parent, const QItemSelectionModel *selection, const QFileSystemModel *model)
+{
+    if (const QString filePath = DeviceFiles::singleSelectedFile(selection, model); !filePath.isEmpty()) {
+        DeviceFiles::exportFile(parent, filePath);
+    }
+}
 } // namespace
 
 TabReplays::TabReplays(TabSupervisor *_tabSupervisor, AbstractClient *_client, const ServerInfo_User *currentUserInfo)
@@ -200,6 +224,22 @@ QGroupBox *TabReplays::createLeftLayout()
     aOpenReplaysFolder->setIcon(qApp->style()->standardIcon(QStyle::SP_DirOpenIcon));
     connect(aOpenReplaysFolder, &QAction::triggered, this, &TabReplays::actOpenReplaysFolder);
 
+    const bool deviceFoldersOutOfReach = !SettingsCache::instance().canReachDeviceFolders();
+    aImportReplay = new QAction(this);
+    aImportReplay->setIcon(loadThemedIcon(QStringLiteral("icons/arrow_to_bottom")));
+    aImportReplay->setVisible(deviceFoldersOutOfReach);
+    connect(aImportReplay, &QAction::triggered, this, [this] { importReplay(this); });
+    aExportReplay = new QAction(this);
+    aExportReplay->setIcon(loadThemedIcon(QStringLiteral("icons/arrow_to_top")));
+    aExportReplay->setVisible(deviceFoldersOutOfReach);
+    aExportReplay->setEnabled(false);
+    connect(aExportReplay, &QAction::triggered, this,
+            [this] { exportReplay(this, localDirView->selectionModel(), localDirModel); });
+    connect(localDirView->selectionModel(), &QItemSelectionModel::selectionChanged, this, [this] {
+        aExportReplay->setEnabled(
+            !DeviceFiles::singleSelectedFile(localDirView->selectionModel(), localDirModel).isEmpty());
+    });
+
     // Add actions to toolbars
     toolBar->addAction(aOpenLocalReplay);
     toolBar->addAction(aRenameLocal);
@@ -210,6 +250,8 @@ QGroupBox *TabReplays::createLeftLayout()
     // A tab has no file manager to show a folder in.
     rightmostToolBar->addAction(aOpenReplaysFolder);
 #endif
+    rightmostToolBar->addAction(aImportReplay);
+    rightmostToolBar->addAction(aExportReplay);
 
     return groupBox;
 }
@@ -291,6 +333,8 @@ void TabReplays::retranslateUi()
     aNewLocalFolder->setText(tr("New folder"));
     aDeleteLocalReplay->setText(tr("Delete"));
     aOpenReplaysFolder->setText(tr("Open replays folder"));
+    aImportReplay->setText(tr("Import from device..."));
+    aExportReplay->setText(tr("Export to device..."));
     aOpenRemoteReplay->setText(tr("Watch replay"));
     aDownload->setText(tr("Download replay"));
     aKeep->setText(tr("Toggle expiration lock"));
@@ -358,13 +402,20 @@ void TabReplays::actOpenLocalReplay()
         QByteArray _data = f.readAll();
         f.close();
 
-        GameReplay *replay = new GameReplay;
-        if (replay->ParseFromArray(_data.data(), _data.size())) {
-            emit openReplay(replay);
-        } else {
-            qCWarning(TabReplaysLog) << "could not parse replay!";
+        if (std::unique_ptr<GameReplay> replay = parseReplay(_data)) {
+            emit openReplay(replay.release());
         }
     }
+}
+
+std::unique_ptr<GameReplay> parseReplay(const QByteArray &bytes)
+{
+    auto replay = std::make_unique<GameReplay>();
+    if (bytes.isEmpty() || !replay->ParseFromArray(bytes.data(), bytes.size())) {
+        qCWarning(TabReplaysLog) << "could not parse replay!";
+        return nullptr;
+    }
+    return replay;
 }
 
 void TabReplays::actRenameLocal()

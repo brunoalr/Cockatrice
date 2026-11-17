@@ -5,6 +5,7 @@
 #include "../../theme_icon.h"
 #include "../../theme_manager.h"
 #include "../cards/card_info_picture_widget.h"
+#include "../utility/device_files.h"
 #include "../utility/non_blocking_dialogs.h"
 #include "all_zones_card_amount_widget.h"
 #include "libcockatrice/card/card_info.h"
@@ -15,7 +16,6 @@
 #include <QAction>
 #include <QApplication>
 #include <QColor>
-#include <QFileDialog>
 #include <QGuiApplication>
 #include <QImage>
 #include <QLabel>
@@ -344,11 +344,11 @@ void PrintingSelectorCardOverlayWidget::customMenu(QPoint point)
 
     auto *overrideMenu = new QMenu(tr("Image Overrides"), menu.get());
 
-#ifndef Q_OS_WASM
-    // Its static file dialog runs a nested event loop, which ends a page.
-    auto *loadCustomAction = overrideMenu->addAction(tr("Load Custom Image..."));
-    connect(loadCustomAction, &QAction::triggered, this, &PrintingSelectorCardOverlayWidget::loadCustomImage);
-#endif
+    // Where device folders are out of reach, pictures live in memory only: the image would not outlive the page.
+    if (SettingsCache::instance().canReachDeviceFolders()) {
+        auto *loadCustomAction = overrideMenu->addAction(tr("Load Custom Image..."));
+        connect(loadCustomAction, &QAction::triggered, this, &PrintingSelectorCardOverlayWidget::loadCustomImage);
+    }
     auto *clearOverrideAction = overrideMenu->addAction(tr("Clear Custom Image"));
 
     // Nothing to clear on a card that has no local override yet.
@@ -518,24 +518,20 @@ void PrintingSelectorCardOverlayWidget::initializePinBadge()
  */
 void PrintingSelectorCardOverlayWidget::loadCustomImage()
 {
-    QString filePath = QFileDialog::getOpenFileName(this, tr("Select Card Image"), QString(),
-                                                    tr("Images (*.png *.jpg *.jpeg *.webp)"));
+    const auto install = [this](const QString &, const QByteArray &bytes) {
+        QPixmap pixmap;
+        if (!pixmap.loadFromData(bytes)) {
+            // No silent paths: a file that cannot be read answers visibly instead of a no-op.
+            Dialogs::warning(this, tr("Load Custom Image"), tr("The selected file could not be read as an image."));
+            return;
+        }
 
-    if (filePath.isEmpty()) {
-        return;
-    }
+        CardPictureLoader::getInstance().saveCardImageToLocalStorage(rootCard, pixmap, true);
 
-    QPixmap pixmap(filePath);
-    if (pixmap.isNull()) {
-        // No silent paths: a file that cannot be read answers visibly instead of a no-op.
-        Dialogs::warning(this, tr("Load Custom Image"), tr("The selected file could not be read as an image."));
-        return;
-    }
-
-    CardPictureLoader::getInstance().saveCardImageToLocalStorage(rootCard, pixmap, true);
-
-    QPixmapCache::clear();
-    rootCard.emitPixmapUpdated();
+        QPixmapCache::clear();
+        rootCard.emitPixmapUpdated();
+    };
+    DeviceFiles::open(this, tr("Select Card Image"), QString(), tr("Images (*.png *.jpg *.jpeg *.webp)"), install);
 }
 
 /**
