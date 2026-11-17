@@ -94,6 +94,10 @@ template <typename Dialog> void open(Dialog *dialog, std::function<void(int resu
 // Reports what QMessageBox::clickedButton() holds after exec(): the escape button for a window close.
 void open(QMessageBox *box, std::function<void(QAbstractButton *clicked)> thenClicked);
 
+// A dialog asked from inside a popup goes to the window the popup was opened from: its parent widget's, or for a
+// popup without one, the window of the opener remembered here.
+void rememberOpener(QWidget *popup, QWidget *opener);
+
 // Instead of a QToolButton's own menu, which some Qt versions show with QMenu::exec(): a nested event loop.
 void showMenuOnClick(QAbstractButton *button, QMenu *menu);
 

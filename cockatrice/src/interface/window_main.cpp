@@ -36,6 +36,7 @@
 #include "../interface/widgets/dialogs/dlg_view_log.h"
 #include "../interface/widgets/onboarding/first_run_wizard.h"
 #include "../interface/widgets/settings_page/general_settings_page.h"
+#include "../interface/widgets/tabs/tab_replays.h"
 #include "../interface/widgets/tabs/tab_server.h"
 #include "../interface/widgets/tabs/tab_supervisor.h"
 #include "../main.h"
@@ -59,6 +60,7 @@
 #include "widgets/server/handle_public_servers.h"
 #include "widgets/settings_page/abstract_settings_page.h"
 #include "widgets/tabs/api/commander_spellbook/handle_commander_brackets.h"
+#include "widgets/utility/device_files.h"
 #include "widgets/utility/non_blocking_dialogs.h"
 #ifdef WITH_GUI_TEST
 #include "../game_graphics/pq_cockatrice_event_player.h"
@@ -94,6 +96,7 @@
 #include <QPixmap>
 #include <QPixmapCache>
 #include <QPushButton>
+#include <QSaveFile>
 #include <QSharedPointer>
 #include <QSize>
 #include <QStatusBar>
@@ -153,7 +156,6 @@ class LocalServerInterface;
 const QString MainWindow::appName = "Cockatrice";
 const QStringList MainWindow::fileNameFilters = QStringList() << QObject::tr("Cockatrice card database (*.xml)")
                                                               << QObject::tr("All files (*.*)");
-inline Q_LOGGING_CATEGORY(MainWindowLog, "main_window");
 
 /**
  * Replaces the tab-specific menus that are shown in the menuBar.
@@ -250,6 +252,12 @@ void MainWindow::startLocalGame(const LocalGameOptions &options)
 
 void MainWindow::actWatchReplay()
 {
+    if (!SettingsCache::instance().canReachDeviceFolders()) {
+        DeviceFiles::open(this, tr("Load replay"), SettingsCache::instance().paths().getReplaysPath(),
+                          QObject::tr("Cockatrice replays (*.cor)"),
+                          [this](const QString &, const QByteArray &bytes) { watchReplay(bytes); });
+        return;
+    }
     auto *dlg = new QFileDialog(this, tr("Load replay"));
     dlg->setDirectory(SettingsCache::instance().paths().getReplaysPath());
     dlg->setNameFilters(QStringList() << QObject::tr("Cockatrice replays (*.cor)"));
@@ -263,14 +271,13 @@ void MainWindow::watchReplayFile(const QString &fileName)
     if (!file.open(QIODevice::ReadOnly)) {
         return;
     }
-    QByteArray buf = file.readAll();
-    file.close();
+    watchReplay(file.readAll());
+}
 
-    replay = new GameReplay;
-    if (replay->ParseFromArray(buf.data(), buf.size())) {
-        tabSupervisor->openReplay(replay);
-    } else {
-        qCWarning(MainWindowLog) << "failed to parse replay!";
+void MainWindow::watchReplay(const QByteArray &buf)
+{
+    if (std::unique_ptr<GameReplay> replay = parseReplay(buf)) {
+        tabSupervisor->openReplay(replay.release());
     }
 }
 
@@ -585,11 +592,14 @@ void MainWindow::createMenus()
     dbMenu->addAction(aEditTokens);
     dbMenu->addSeparator();
 #ifndef Q_OS_WASM
-    // A tab has no file manager to show a folder in, and the file picker of the last entry hangs a page.
+    // A tab has no file manager to show a folder in.
     dbMenu->addAction(aOpenCustomFolder);
     dbMenu->addAction(aOpenCustomsetsFolder);
-    dbMenu->addAction(aAddCustomSet);
 #endif
+    // In a browser nothing removes a stored set, and every import adds a copy that loads at each start.
+    if (SettingsCache::instance().canReachDeviceFolders()) {
+        dbMenu->addAction(aAddCustomSet);
+    }
     dbMenu->addSeparator();
     dbMenu->addAction(aReloadCardDatabase);
 
@@ -1786,19 +1796,12 @@ void MainWindow::actOpenCustomsetsFolder()
 
 void MainWindow::actAddCustomSet()
 {
-    QFileDialog dialog(this, tr("Load sets/cards"), QDir::homePath());
-    dialog.setNameFilters(MainWindow::fileNameFilters);
-    if (!dialog.exec()) {
-        return;
-    }
+    DeviceFiles::open(this, tr("Load sets/cards"), QDir::homePath(), MainWindow::fileNameFilters.join(";;"),
+                      [this](const QString &fileName, const QByteArray &bytes) { addCustomSet(fileName, bytes); });
+}
 
-    QString fullFilePath = dialog.selectedFiles().at(0);
-
-    if (!QFile::exists(fullFilePath)) {
-        Dialogs::warning(this, tr("Load sets/cards"), tr("Selected file cannot be found."));
-        return;
-    }
-
+void MainWindow::addCustomSet(const QString &fullFilePath, const QByteArray &bytes)
+{
     if (QFileInfo(fullFilePath).suffix() != "xml") // fileName = *.xml
     {
         Dialogs::warning(this, tr("Load sets/cards"), tr("You can only import XML databases at this time."));
@@ -1808,7 +1811,7 @@ void MainWindow::actAddCustomSet()
     QDir dir = SettingsCache::instance().getCustomCardDatabasePath();
     int nextPrefix = getNextCustomSetPrefix(dir);
 
-    bool res;
+    QString target;
 
     QString fileName = QFileInfo(fullFilePath).fileName();
     if (fileName.compare("spoiler.xml", Qt::CaseInsensitive) == 0) {
@@ -1817,15 +1820,14 @@ void MainWindow::actAddCustomSet()
          * then we'll want to overwrite the old version
          * and replace it with the new one
          */
-        if (QFile::exists(dir.absolutePath() + "/spoiler.xml")) {
-            QFile::remove(dir.absolutePath() + "/spoiler.xml");
-        }
-
-        res = QFile::copy(fullFilePath, dir.absolutePath() + "/spoiler.xml");
+        target = dir.absolutePath() + "/spoiler.xml";
     } else {
-        res = QFile::copy(fullFilePath, dir.absolutePath() + "/" + (nextPrefix > 9 ? "" : "0") +
-                                            QString::number(nextPrefix) + "." + fileName);
+        target = dir.absolutePath() + "/" + (nextPrefix > 9 ? "" : "0") + QString::number(nextPrefix) + "." + fileName;
     }
+
+    QSaveFile file(target);
+    const bool res =
+        !bytes.isEmpty() && file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size() && file.commit();
 
     if (res) {
         flushPlayerData();

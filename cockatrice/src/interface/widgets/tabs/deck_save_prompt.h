@@ -22,6 +22,7 @@
 #include <QString>
 #include <functional>
 
+class DeckList;
 class QWidget;
 
 class DeckSavePrompt
@@ -34,8 +35,14 @@ public:
     // Reports an empty name when the player cancelled.
     static void chooseFile(QWidget *parent, const QString &deckName, std::function<void(const QString &fileName)> then);
 
+    static void importFromDevice(QWidget *parent, std::function<void(const QString &path)> thenImported);
+    static void exportToDevice(const DeckList &deck, const QString &fileName);
+
 private:
     static void askForName(QWidget *parent, const QString &typed, std::function<void(const QString &fileName)> then);
+    // Asks before replacing a file, and asks for another name on No.
+    static void
+    useName(QWidget *parent, const QString &answer, const std::function<void(const QString &fileName)> &then);
 };
 
 #endif // DECK_SAVE_PROMPT_H

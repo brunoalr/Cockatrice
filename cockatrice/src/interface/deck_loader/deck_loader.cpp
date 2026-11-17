@@ -9,6 +9,7 @@
 #include "libcockatrice/deck_list/tree/inner_deck_list_node.h"
 
 #include <QApplication>
+#include <QBuffer>
 #include <QClipboard>
 #include <QDateTime>
 #include <QDebug>
@@ -68,19 +69,45 @@ DeckLoader::loadFromFile(const QString &fileName, DeckFileFormat::Format fmt, bo
         return std::nullopt;
     }
 
+    std::optional<LoadedDeck> loadedDeck = loadFromDevice(file, fileName, fmt);
+    if (!loadedDeck) {
+        return std::nullopt;
+    }
+    loadedDeck->lastLoadInfo.fileName = fileName;
+
+    if (userRequest) {
+        updateLastLoadedTimestamp(*loadedDeck);
+    }
+
+    qCDebug(DeckLoaderLog) << "Loaded deck" << fileName << "with userRequest:" << userRequest;
+
+    return loadedDeck;
+}
+
+std::optional<LoadedDeck> DeckLoader::loadFromBytes(const QString &fileName, const QByteArray &bytes)
+{
+    QBuffer buffer;
+    buffer.setData(bytes);
+    buffer.open(QIODevice::ReadOnly | QIODevice::Text);
+    return loadFromDevice(buffer, fileName, DeckFileFormat::getFormatFromName(fileName));
+}
+
+std::optional<LoadedDeck>
+DeckLoader::loadFromDevice(QIODevice &device, const QString &fileName, DeckFileFormat::Format fmt)
+{
     bool result = false;
     DeckList deckList;
     switch (fmt) {
         case DeckFileFormat::PlainText:
-            result = deckList.loadFromFile_Plain(&file, CardNameNormalizer());
+            result = deckList.loadFromFile_Plain(&device, CardNameNormalizer());
             break;
         case DeckFileFormat::Cockatrice: {
-            result = deckList.loadFromFile_Native(&file);
+            result = deckList.loadFromFile_Native(&device);
             if (!result) {
                 qCInfo(DeckLoaderLog) << "Failed to load " << fileName
                                       << "as Cockatrice format; retrying as plain format";
-                file.seek(0);
-                result = deckList.loadFromFile_Plain(&file, CardNameNormalizer());
+                device.seek(0);
+                result = deckList.loadFromFile_Plain(&device, CardNameNormalizer());
                 fmt = DeckFileFormat::PlainText;
             }
             break;
@@ -95,19 +122,24 @@ DeckLoader::loadFromFile(const QString &fileName, DeckFileFormat::Format fmt, bo
         return std::nullopt;
     }
 
-    LoadedDeck::LoadInfo lastLoadInfo = {
-        .fileName = fileName,
-        .fileFormat = fmt,
-    };
-    LoadedDeck loadedDeck = {deckList, lastLoadInfo};
+    LoadedDeck::LoadInfo lastLoadInfo = {.fileFormat = fmt};
+    return LoadedDeck{deckList, lastLoadInfo};
+}
 
-    if (userRequest) {
-        updateLastLoadedTimestamp(loadedDeck);
+QByteArray DeckLoader::toBytes(const DeckList &deck, DeckFileFormat::Format fmt)
+{
+    QByteArray bytes;
+    QBuffer buffer(&bytes);
+    buffer.open(QIODevice::WriteOnly | QIODevice::Text);
+    switch (fmt) {
+        case DeckFileFormat::PlainText:
+            deck.saveToFile_Plain(&buffer);
+            break;
+        case DeckFileFormat::Cockatrice:
+            deck.saveToFile_Native(&buffer);
+            break;
     }
-
-    qCDebug(DeckLoaderLog) << "Loaded deck" << fileName << "with userRequest:" << userRequest;
-
-    return loadedDeck;
+    return bytes;
 }
 
 void DeckLoader::loadFromFileAsync(const QString &fileName, DeckFileFormat::Format fmt, bool userRequest)

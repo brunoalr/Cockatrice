@@ -374,6 +374,82 @@ TEST_F(NonBlockingDialogs, DestroyingTheParentWhileConfirmIsOpenRunsNoCallback)
     EXPECT_FALSE(called);
 }
 
+class AskedFromAPopup : public NonBlockingDialogs // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    std::unique_ptr<QWidget> popup = std::make_unique<QWidget>(nullptr, Qt::Popup);
+    QPushButton *chip = new QPushButton(popup.get());
+    std::optional<bool> answer;
+
+    void SetUp() override
+    {
+        parent->show();
+        parent->activateWindow();
+        ASSERT_TRUE(QTest::qWaitForWindowActive(parent.get()));
+    }
+
+    QMessageBox *confirmFromThePopup()
+    {
+        popup->show();
+        settle();
+        EXPECT_TRUE(popup->isVisible());
+        Dialogs::confirm(chip, "Title", "Text", [this](bool confirmed) { answer = confirmed; });
+        settle();
+        EXPECT_FALSE(popup->isVisible());
+        for (QWidget *widget : QApplication::topLevelWidgets()) {
+            if (auto *box = qobject_cast<QMessageBox *>(widget); box && box->isVisible()) {
+                return box;
+            }
+        }
+        return nullptr;
+    }
+};
+
+TEST_F(AskedFromAPopup, AParentlessPopupLeavesTheBoxWithoutParent)
+{
+    QMessageBox *box = confirmFromThePopup();
+    ASSERT_NE(box, nullptr);
+    EXPECT_TRUE(box->isVisible());
+    EXPECT_EQ(box->parentWidget(), nullptr);
+
+    box->button(QMessageBox::Yes)->click();
+    settle();
+    EXPECT_EQ(answer, true);
+}
+
+TEST_F(AskedFromAPopup, TheBoxBelongsToTheWindowThePopupOpenedFrom)
+{
+    popup = std::make_unique<QWidget>(parent.get(), Qt::Popup);
+    chip = new QPushButton(popup.get());
+
+    QMessageBox *box = confirmFromThePopup();
+    ASSERT_NE(box, nullptr);
+    EXPECT_EQ(box->parentWidget(), parent.get());
+}
+
+TEST_F(AskedFromAPopup, TheBoxBelongsToTheWindowAParentlessPopupWasOpenedFrom)
+{
+    QPushButton opener(parent.get());
+    Dialogs::rememberOpener(popup.get(), &opener);
+
+    QMessageBox *box = confirmFromThePopup();
+    ASSERT_NE(box, nullptr);
+    EXPECT_EQ(box->parentWidget(), parent.get());
+}
+
+TEST_F(AskedFromAPopup, TheBoxGoesWithTheWidgetThatAsked)
+{
+    QPointer<QMessageBox> box = confirmFromThePopup();
+    ASSERT_NE(box, nullptr);
+
+    chip->deleteLater();
+    QCoreApplication::sendPostedEvents(chip, QEvent::DeferredDelete);
+    settle();
+
+    EXPECT_TRUE(box.isNull());
+    EXPECT_FALSE(answer.has_value());
+}
+
 TEST_F(NonBlockingDialogs, GetTextDeliversTheTypedTextOnAccept)
 {
     std::optional<QString> text;

@@ -41,7 +41,9 @@
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
+#include <QFileSystemModel>
 #include <QInputDialog>
+#include <QItemSelectionModel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
@@ -997,7 +999,7 @@ TEST_F(DecksInStorage, UnsafeNamesBecomeSafeFileNames)
     const QList<std::pair<QString, QString>> cases = {
         {"  Burn  ", "Burn.cod"},
         {"../Burn", "Burn.cod"},
-        {"a/b\\c:d*e?f\"g<h>i|j", "abcdefghij.cod"},
+        {R"(a/b\c:d*e?f"g<h>i|j)", "abcdefghij.cod"},
         {".hidden", "hidden.cod"},
         {QStringLiteral("Bu\u0001rn"), "Burn.cod"},
         {"Burn.", "Burn.cod"},
@@ -1009,6 +1011,11 @@ TEST_F(DecksInStorage, UnsafeNamesBecomeSafeFileNames)
         {QStringLiteral("\u00A0\u00A0"), "Untitled deck.cod"},
         {QStringLiteral("\u3000Burn\u3000"), "Burn.cod"},
         {QStringLiteral("\u2028"), "Untitled deck.cod"},
+        {"      .cod", "Untitled deck.cod"},
+        {".cod", "Untitled deck.cod"},
+        {" .txt", "Untitled deck.txt"},
+        {". .DEK", "Untitled deck.DEK"},
+        {"Burn. .cod", "Burn.cod"},
     };
     for (const auto &[typed, expected] : cases) {
         answers = 0;
@@ -1021,7 +1028,8 @@ TEST_F(DecksInStorage, UnsafeNamesBecomeSafeFileNames)
 
 TEST_F(DecksInStorage, ALongNameIsCutToTheLengthAFileSystemTakes)
 {
-    const QString face = QString::fromUtf8("\xF0\x9F\x98\x80");
+    constexpr char32_t grinningFace = 0x1F600;
+    const QString face = QString::fromUcs4(&grinningFace, 1);
     const QList<std::pair<QString, QString>> cases = {
         {QString(300, 'B'), QString(251, 'B') + ".cod"},
         {QString(300, 'B') + ".txt", QString(251, 'B') + ".txt"},
@@ -1225,7 +1233,8 @@ TEST_F(DecksInStorage, AnEmptyFolderSaysHowToGetADeckIn)
 
     const auto *box = onlyOpen<QMessageBox>();
     ASSERT_NE(box, nullptr);
-    EXPECT_TRUE(box->text().startsWith("No deck is saved in this browser yet."));
+    EXPECT_EQ(box->text(), "No deck is saved in this browser yet. Build one in the deck editor and save it, import one "
+                           "from the device, or load one from the clipboard or from an online service.");
     clickInOnlyBox(QMessageBox::Ok);
     EXPECT_EQ(answers, 0);
 }
@@ -1241,6 +1250,182 @@ TEST_F(DecksInStorage, WhereDeviceFoldersAreReachableAFileDialogChoosesTheDeckTo
     DialogTest::answerFileDialog(load, decks.filePath("Zoo.cod"));
     EXPECT_EQ(answers, 1);
     EXPECT_EQ(QFileInfo(answered).fileName(), "Zoo.cod");
+}
+
+class DecksOnTheDevice : public DecksInStorage // NOSONAR: TEST_F reads fixture members from a subclass
+{
+protected:
+    DialogTest::DevicePicker picker;
+
+    static DeckList burn()
+    {
+        DeckList deck;
+        deck.setName("Burn");
+        deck.addCards("Lightning Bolt", 4, DECK_ZONE_MAIN);
+        return deck;
+    }
+
+    void importDeck()
+    {
+        DeckSavePrompt::importFromDevice(window.get(), [this](const QString &path) { record(path); });
+        settle();
+        EXPECT_EQ(picker.filter, DeckLoader::FILE_NAME_FILTERS.join(";;"));
+        EXPECT_TRUE(openDialogs<QFileDialog>().isEmpty());
+    }
+
+    QByteArray stored(const QString &relativePath) const
+    {
+        QFile file(decks.filePath(relativePath));
+        return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+    }
+};
+
+TEST_F(DecksOnTheDevice, ImportCopiesThePickedDeckIntoTheDecksFolder)
+{
+    const QByteArray bytes = DeckLoader::toBytes(burn(), DeckFileFormat::Cockatrice);
+    importDeck();
+    picker.pick("Burn.cod", bytes);
+
+    EXPECT_EQ(answers, 1);
+    EXPECT_EQ(answered, decks.filePath("Burn.cod"));
+    EXPECT_EQ(stored("Burn.cod"), bytes);
+    EXPECT_TRUE(openDialogs<QDialog>().isEmpty());
+}
+
+TEST_F(DecksOnTheDevice, ImportReadsTheBytesInTheFormatOfTheNameTheyAreStoredUnder)
+{
+    const QByteArray bytes = DeckLoader::toBytes(burn(), DeckFileFormat::Cockatrice);
+    const QList<std::pair<QString, QString>> cases = {
+        {"Burn", "Burn.cod"},
+        {"Zoo.cod.", "Zoo.cod"},
+        {"Sligh.xml", "Sligh.xml.cod"},
+    };
+    for (const auto &[picked, name] : cases) {
+        answers = 0;
+        importDeck();
+        picker.pick(picked, bytes);
+        EXPECT_TRUE(openDialogs<QMessageBox>().isEmpty()) << picked.toStdString();
+        EXPECT_EQ(answers, 1) << picked.toStdString();
+        EXPECT_EQ(stored(name), bytes) << picked.toStdString();
+        for (QMessageBox *box : openDialogs<QMessageBox>()) {
+            box->button(QMessageBox::Ok)->click();
+        }
+        settle();
+    }
+}
+
+TEST_F(DecksOnTheDevice, AnImportedFileGetsASafeNameMadeFromItsOwn)
+{
+    const QByteArray plain = DeckLoader::toBytes(burn(), DeckFileFormat::PlainText);
+    importDeck();
+    picker.pick("/device/folder/Red: Burn?.dek", plain);
+    EXPECT_EQ(answered, decks.filePath("Red Burn.dek"));
+    EXPECT_EQ(stored("Red Burn.dek"), plain);
+
+    importDeck();
+    picker.pick("Burn list", plain);
+    EXPECT_EQ(answered, decks.filePath("Burn list.cod"));
+    EXPECT_EQ(answers, 2);
+}
+
+TEST_F(DecksOnTheDevice, ImportReplacesAFileOnlyAfterYes)
+{
+    addFile("Burn.cod");
+    const QByteArray bytes = DeckLoader::toBytes(burn(), DeckFileFormat::Cockatrice);
+
+    importDeck();
+    picker.pick("Burn.cod", bytes);
+    const auto *box = onlyOpen<QMessageBox>();
+    ASSERT_NE(box, nullptr);
+    EXPECT_EQ(box->defaultButton(), box->button(QMessageBox::No));
+    clickInOnlyBox(QMessageBox::No, "A file named \"Burn.cod\" already exists. Replace it?");
+    EXPECT_EQ(answers, 0);
+    EXPECT_TRUE(stored("Burn.cod").isEmpty());
+
+    importDeck();
+    picker.pick("Burn.cod", bytes);
+    clickInOnlyBox(QMessageBox::Yes);
+    EXPECT_EQ(answers, 1);
+    EXPECT_EQ(stored("Burn.cod"), bytes);
+}
+
+TEST_F(DecksOnTheDevice, ImportingAFileThatHoldsNoDeckSaysSoAndWritesNothing)
+{
+    importDeck();
+    picker.pick("notes.cod", "%%% ###\n");
+
+    clickInOnlyBox(QMessageBox::Ok, "Could not open deck at notes.cod");
+    EXPECT_EQ(answers, 0);
+    EXPECT_TRUE(decks.entryList(QDir::Files).isEmpty());
+}
+
+TEST_F(DecksOnTheDevice, ACancelledImportDoesNothing)
+{
+    importDeck();
+    picker.pick({}, {});
+
+    EXPECT_EQ(answers, 0);
+    EXPECT_TRUE(openDialogs<QDialog>().isEmpty());
+    EXPECT_TRUE(decks.entryList(QDir::Files).isEmpty());
+}
+
+TEST_F(DecksOnTheDevice, ExportSendsTheDeckInTheFormatOfItsFileName)
+{
+    DeckSavePrompt::exportToDevice(burn(), decks.filePath("red/Burn list.txt"));
+    DeckList zoo = burn();
+    zoo.setName("Zoo: Naya");
+    DeckSavePrompt::exportToDevice(zoo, {});
+    DeckSavePrompt::exportToDevice(DeckList(), {});
+
+    const QList<std::pair<QString, QByteArray>> expected = {
+        {"Burn list.txt", DeckLoader::toBytes(burn(), DeckFileFormat::PlainText)},
+        {"Zoo Naya.cod", DeckLoader::toBytes(zoo, DeckFileFormat::Cockatrice)},
+        {"Untitled deck.cod", DeckLoader::toBytes(DeckList(), DeckFileFormat::Cockatrice)},
+    };
+    EXPECT_EQ(picker.saved, expected);
+}
+
+TEST_F(DecksOnTheDevice, ASafeNameEndsInTheFirstExtensionUnlessItHasOneOfThem)
+{
+    const QStringList replays = {"*.cor"};
+    EXPECT_EQ(DeviceFiles::safeFileName("Game 12.cor", "Replay", replays), "Game 12.cor");
+    EXPECT_EQ(DeviceFiles::safeFileName("Game: 12", "Replay", replays), "Game 12.cor");
+    EXPECT_EQ(DeviceFiles::safeFileName("Burn.cod", "Replay", replays), "Burn.cod.cor");
+    EXPECT_EQ(DeviceFiles::safeFileName("..", "Replay", replays), "Replay.cor");
+    EXPECT_EQ(DeviceFiles::safeFileName(" .cor", "Replay", replays), "Replay.cor");
+}
+
+TEST_F(DecksOnTheDevice, ExportingAStoredFileSendsItsBytesAsTheyAre)
+{
+    addDeck("red/Burn.cod", "Burn");
+
+    DeviceFiles::exportFile(window.get(), decks.filePath("red/Burn.cod"));
+
+    ASSERT_EQ(picker.saved.size(), 1);
+    EXPECT_EQ(picker.saved.at(0).first, "Burn.cod");
+    EXPECT_EQ(picker.saved.at(0).second, stored("red/Burn.cod"));
+}
+
+TEST_F(DecksOnTheDevice, OnlyASingleSelectedFileIsOneToExport)
+{
+    addDeck("Burn.cod", "Burn");
+    addDeck("red/Zoo.cod", "Zoo");
+    QFileSystemModel files;
+    files.setRootPath(decks.path());
+    QItemSelectionModel selection(&files);
+    const auto select = [&files, &selection, this](const QString &relativePath) {
+        selection.select(files.index(decks.filePath(relativePath)),
+                         QItemSelectionModel::Select | QItemSelectionModel::Rows);
+    };
+
+    EXPECT_EQ(DeviceFiles::singleSelectedFile(&selection, &files), QString());
+    select("Burn.cod");
+    EXPECT_EQ(DeviceFiles::singleSelectedFile(&selection, &files), decks.filePath("Burn.cod"));
+    select("red/Zoo.cod");
+    EXPECT_EQ(DeviceFiles::singleSelectedFile(&selection, &files), QString());
+    selection.clearSelection();
+    select("red");
+    EXPECT_EQ(DeviceFiles::singleSelectedFile(&selection, &files), QString());
 }
 
 class AnalyticsLayout : public ::testing::Test // NOSONAR: TEST_F reads fixture members from a subclass

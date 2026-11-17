@@ -37,6 +37,15 @@ DeckEditorMenu::DeckEditorMenu(AbstractTabDeckEditor *parent) : QMenu(parent), d
     aShareDeck = new QAction(QString(), this);
     connect(aShareDeck, &QAction::triggered, deckEditor, &AbstractTabDeckEditor::actShareDeck);
 
+    const bool deviceFoldersOutOfReach = !SettingsCache::instance().canReachDeviceFolders();
+    aImportDeck = new QAction(QString(), this);
+    aImportDeck->setVisible(deviceFoldersOutOfReach);
+    connect(aImportDeck, &QAction::triggered, deckEditor, &AbstractTabDeckEditor::actImportDeckFromDevice);
+
+    aExportDeck = new QAction(QString(), this);
+    aExportDeck->setVisible(deviceFoldersOutOfReach);
+    connect(aExportDeck, &QAction::triggered, deckEditor, &AbstractTabDeckEditor::actExportDeckToDevice);
+
     aLoadDeckFromClipboard = new QAction(QString(), this);
     connect(aLoadDeckFromClipboard, &QAction::triggered, deckEditor, &AbstractTabDeckEditor::actLoadDeckFromClipboard);
 
@@ -109,6 +118,8 @@ DeckEditorMenu::DeckEditorMenu(AbstractTabDeckEditor *parent) : QMenu(parent), d
     addAction(aSaveDeck);
     addAction(aSaveDeckAs);
     addAction(aShareDeck);
+    addAction(aImportDeck);
+    addAction(aExportDeck);
     addSeparator();
     addAction(aLoadDeckFromClipboard);
     addMenu(editDeckInClipboardMenu);
@@ -138,6 +149,7 @@ void DeckEditorMenu::setSaveStatus(bool newStatus)
 {
     aSaveDeck->setEnabled(newStatus);
     aSaveDeckAs->setEnabled(newStatus);
+    aExportDeck->setEnabled(newStatus);
     aShareDeck->setEnabled(newStatus);
     aSaveDeckToClipboard->setEnabled(newStatus);
     aSaveDeckToClipboardNoSetInfo->setEnabled(newStatus);
@@ -177,6 +189,8 @@ void DeckEditorMenu::retranslateUi()
     aSaveDeck->setText(tr("&Save deck"));
     aSaveDeckAs->setText(tr("Save deck &as..."));
     aShareDeck->setText(tr("Share deck..."));
+    aImportDeck->setText(tr("Import from device..."));
+    aExportDeck->setText(tr("Export to device..."));
 
     aLoadDeckFromClipboard->setText(tr("Load deck from cl&ipboard..."));
 

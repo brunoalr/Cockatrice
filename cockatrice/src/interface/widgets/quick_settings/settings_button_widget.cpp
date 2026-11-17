@@ -1,6 +1,7 @@
 #include "settings_button_widget.h"
 
 #include "../../theme_icon.h"
+#include "../utility/non_blocking_dialogs.h"
 #include "settings_popup_widget.h"
 
 #include <QApplication>
@@ -109,6 +110,7 @@ void SettingsButtonWidget::togglePopup()
         }
 
         popup->move(x, y);
+        Dialogs::rememberOpener(popup, this);
         popup->show();
         popup->setFocus();
         button->setChecked(true);

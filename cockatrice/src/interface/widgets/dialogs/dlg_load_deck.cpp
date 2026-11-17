@@ -50,8 +50,9 @@ void DlgLoadDeck::choose(QWidget *parent, std::function<void(const QString &file
     }
     if (decks.isEmpty()) {
         Dialogs::information(parent, tr("Load Deck"),
-                             tr("No deck is saved in this browser yet. Build one in the deck editor and save it, or "
-                                "load one from the clipboard or from an online service."));
+                             tr("No deck is saved in this browser yet. Build one in the deck editor and save it, "
+                                "import one from the device, or load one from the clipboard or from an online "
+                                "service."));
         return;
     }
     decks.sort(Qt::CaseInsensitive);
