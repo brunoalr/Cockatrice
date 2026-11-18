@@ -1,0 +1,45 @@
+# Copyright (C) 2026 by Bruno Alexandre Rosa
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, see <https://www.gnu.org/licenses/>.
+
+# Reports GitHub Actions cache usage grouped by key prefix (e.g. buildkit, ccache, vcpkg).
+# Run locally: python3 .ci/gha_cache_usage.py
+
+name: Cache usage report
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  report:
+    name: GHA cache usage
+    runs-on: ubuntu-slim
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Report cache usage
+        id: cache_report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Named, bash runs with pipefail: without it tee would hide a failed report.
+        shell: bash
+        run: |
+          python3 .ci/gha_cache_usage.py --markdown --repo "$GITHUB_REPOSITORY" | tee report.txt
+          cat report.txt >> "$GITHUB_STEP_SUMMARY"
