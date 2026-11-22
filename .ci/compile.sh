@@ -253,6 +253,12 @@ fi
 if [[ ${USE_VCPKG:-} == "1" ]]; then
   flags+=("-DUSE_VCPKG=1")
   flags+=("-DVCPKG_INSTALL_OPTIONS=--x-abi-tools-use-exact-versions")
+  # vcpkg otherwise builds every port twice. A Debug client needs the debug runtime's
+  # libraries on Windows, so only a Release build asks for the release-only triplet there.
+  if [[ $RUNNER_OS == Windows && $BUILDTYPE == Release ]]; then
+    flags+=("-DVCPKG_HOST_TRIPLET=x64-windows-release")
+    flags+=("-DVCPKG_TARGET_TRIPLET=x64-windows-release")
+  fi
 fi
 if [[ ${WITH_CRASH_REPORTING:-} == "ON" ]]; then
   # Release CI opts into the sentry-native SDK (default is OFF so from-source, distro and
@@ -345,6 +351,10 @@ if [[ $RUNNER_OS == macOS ]]; then
     # vcpkg triplet file variables that will be appended later to the generated custom triplet file
     # https://learn.microsoft.com/en-us/vcpkg/users/triplets
     declare -a extra_triplet_vars
+
+    # Release only, for a Debug client too: vcpkg cannot build the debug half alone (headers and
+    # tools come from the release half), and static libraries here need no matching debug runtime.
+    extra_triplet_vars+=("set(VCPKG_BUILD_TYPE release)")
 
     if [[ -n $TARGET_MACOS_ARCH ]]; then
       # for example, by using x64-osx.cmake, even on arm64 macOS, vcpkg will (cross-) compile for x86_64

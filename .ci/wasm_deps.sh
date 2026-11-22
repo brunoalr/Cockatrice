@@ -37,6 +37,7 @@ emscripten=$(emcc -dumpversion)
   echo 'set(VCPKG_C_FLAGS "-pthread")'
   echo 'set(VCPKG_CXX_FLAGS "-pthread")'
   echo 'set(VCPKG_LINKER_FLAGS "-pthread")'
+  echo 'set(VCPKG_BUILD_TYPE release)'
 } >"$triplets/$triplet.cmake"
 
 {
