@@ -253,6 +253,12 @@ fi
 if [[ ${USE_VCPKG:-} == "1" ]]; then
   flags+=("-DUSE_VCPKG=1")
   flags+=("-DVCPKG_INSTALL_OPTIONS=--x-abi-tools-use-exact-versions")
+  # vcpkg otherwise builds every port twice. A Debug client needs the debug runtime's
+  # libraries on Windows, so only a Release build asks for the release-only triplet there.
+  if [[ $RUNNER_OS == Windows && $BUILDTYPE == Release ]]; then
+    flags+=("-DVCPKG_HOST_TRIPLET=x64-windows-release")
+    flags+=("-DVCPKG_TARGET_TRIPLET=x64-windows-release")
+  fi
 fi
 if [[ ${WITH_CRASH_REPORTING:-} == "ON" ]]; then
   # Release CI opts into the sentry-native SDK (default is OFF so from-source, distro and
@@ -328,8 +334,8 @@ if [[ $RUNNER_OS == macOS ]]; then
     flags+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=$TARGET_MACOS_VERSION")
   fi
 
-  if [[ ${USE_VCPKG:-} == "1" && ( -n $TARGET_MACOS_VERSION || -n $TARGET_MACOS_ARCH ) ]]; then
-    # if we are using either a custom version or architecture, we need to use a custom triplet file to compile *vcpkg dependencies*
+  if [[ ${USE_VCPKG:-} == "1" ]]; then
+    # a custom version, a custom architecture and the release-only build type each need a custom triplet file to compile *vcpkg dependencies*
     # https://learn.microsoft.com/en-us/vcpkg/concepts/triplets
     # an easy way to get a custom triplet file is to copy a triplet file from the vcpkg repo and then modify it
     triplets_dir="/tmp/cmake/triplets"
@@ -346,6 +352,10 @@ if [[ $RUNNER_OS == macOS ]]; then
     # https://learn.microsoft.com/en-us/vcpkg/users/triplets
     declare -a extra_triplet_vars
 
+    # Release only, for a Debug client too: vcpkg cannot build the debug half alone (headers and
+    # tools come from the release half), and static libraries here need no matching debug runtime.
+    extra_triplet_vars+=("set(VCPKG_BUILD_TYPE release)")
+
     if [[ -n $TARGET_MACOS_ARCH ]]; then
       # for example, by using x64-osx.cmake, even on arm64 macOS, vcpkg will (cross-) compile for x86_64
       triplet_arch=$TARGET_MACOS_ARCH
@@ -353,13 +363,14 @@ if [[ $RUNNER_OS == macOS ]]; then
       triplet_arch=$(uname -m)
     fi
 
-    if [[ -n $TARGET_MACOS_VERSION ]]; then
+    # A leg with no target of its own (the Debug leg) can still name the one its dependencies share.
+    vcpkg_target="${VCPKG_TARGET_MACOS_VERSION:-$TARGET_MACOS_VERSION}"
+    if [[ -n $vcpkg_target ]]; then
       # The triplet is what vcpkg hashes into the ABI hash of every port, so two legs that
       # agree here reuse each other's binary cache. Targets 14 and 15 on the same Xcode
       # produce identical binaries when they share the lowest deployment target, so both
       # build against 14 to keep one set of vcpkg binaries instead of two.
       # Keep in sync with "vcpkg_deployment_target" in desktop-build.yml.
-      vcpkg_target="${VCPKG_TARGET_MACOS_VERSION:-$TARGET_MACOS_VERSION}"
       extra_triplet_vars+=("set(VCPKG_CMAKE_SYSTEM_VERSION $vcpkg_target)")
       extra_triplet_vars+=("set(VCPKG_OSX_DEPLOYMENT_TARGET $vcpkg_target)")
     fi
