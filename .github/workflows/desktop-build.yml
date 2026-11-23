@@ -803,7 +803,18 @@ jobs:
       - name: "[Windows] Install NSIS"
         if: matrix.os == 'Windows'
         shell: bash
-        run: choco install nsis --no-progress
+        run: |
+          # choco exits 0 when its feed is down and it installed nothing, so look for the compiler itself
+          for attempt in 1 2 3; do
+            choco install nsis --no-progress || echo "choco exited with $?"
+            if [[ -f "/c/Program Files (x86)/NSIS/makensis.exe" ]]; then
+              exit 0
+            fi
+            echo "attempt $attempt failed"
+            sleep 20
+          done
+          echo "::error::NSIS is not installed: makensis.exe is missing after three attempts"
+          exit 1
 
       # Ninja invokes cl.exe directly and needs the MSVC environment on PATH.
       - name: "[Windows] Set up MSVC environment"
