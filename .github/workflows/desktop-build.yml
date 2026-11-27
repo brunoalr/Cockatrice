@@ -284,13 +284,15 @@ jobs:
     runs-on: ubuntu-latest    # https://github.com/actions/runner-images
     continue-on-error: ${{ matrix.allow-failure == 'yes' }}
     timeout-minutes: 70
-    env:
+    # Shared with build-linux-nightly: the shared steps gate on these, and an undefined gate
+    # skips its step without an error.
+    env: &linux-env
       CACHE: ${{ github.workspace }}/.cache/${{ matrix.distro }}${{ matrix.version }}${{ matrix.variant }}    # directory for caching docker image and ccache
-      # Every key listed in LIVE_CCACHE_KEYS in prune-caches below must match this matrix.
+      # Every key listed in LIVE_CCACHE_KEYS in prune-caches below must match this matrix and the nightly one.
       CCACHE_SIZE: 1200M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       # CI lowers the DWARF level to 1 (file and line, which is what a failing test or a
       # sanitizer backtrace reports), which halves what one configuration writes to the cache.
-      # Empty on tags and on the nightly legs, which ship binaries and keep full DWARF for the
+      # Empty on tags, which ship binaries and keep full DWARF for the
       # Sentry symbols; a tag restores a cache it cannot use and is slower, which is accepted
       # because a tag is rare and only pull requests gate.
       COCKATRICE_DEBUG_INFO_LEVEL: ${{ github.ref_type != 'tag' && '1' || '' }}
@@ -306,10 +308,8 @@ jobs:
       #               package leg sets test: skip, and the suite runs only in Debug test legs.
       DEBUG_TEST: ${{ matrix.sanitize == 'yes' || matrix.coverage == 'yes' || matrix.debug_test == 'yes' }}
       RUN_TESTS: ${{ matrix.test != 'skip' && !(matrix.sanitize == 'yes' || matrix.coverage == 'yes' || matrix.debug_test == 'yes') }}
-      # Whether this leg restores and saves its compiler cache. Every leg a pull request
-      # runs keeps one; the nightly-only legs do not, so that the quota is spent on the
-      # builds that review a change. A tag build runs both sets, and the nightly legs are
-      # cold there - accepted, because a tag is rare and only the pull-request legs gate.
+      # Every leg keeps a compiler cache, the nightly ones too: a pull request that runs them
+      # restores master's. The switch stays because the shared steps gate on it.
       PERSIST_CCACHE: 'true'
 
     # Shared with build-linux-nightly so the two leg sets run the same steps.
@@ -459,8 +459,8 @@ jobs:
       # different configuration would evict the warm set for everyone. Tags build with full
       # DWARF (COCKATRICE_DEBUG_INFO_LEVEL is empty), so a tag's cache would poison the -g1
       # set if it shared the master scope; it does not, because the save is master-only. The
-      # nightly legs persist nothing at all (PERSIST_CCACHE is false) for the same reason:
-      # a schedule shares refs/heads/master with the push.
+      # nightly legs save as well: a schedule runs on refs/heads/master at the same -g1, and
+      # no nightly leg shares a key with a pull-request leg.
       #
       # Delete used cache to emulate a ccache update. See https://github.com/actions/cache/issues/342
       - name: "Delete remote compiler cache (ccache)"
@@ -570,23 +570,7 @@ jobs:
     runs-on: ubuntu-latest    # https://github.com/actions/runner-images
     continue-on-error: ${{ matrix.allow-failure == 'yes' }}
     timeout-minutes: 70
-    env:
-      CACHE: ${{ github.workspace }}/.cache/${{ matrix.distro }}${{ matrix.version }}${{ matrix.variant }}    # directory for caching docker image and ccache
-      # These legs do not keep a compiler cache: they run once a day (and on tags) and gate
-      # nothing, so their share of the 10 GB quota goes to the pull-request legs instead.
-      # A cold nightly build costs minutes on a runner nobody waits for; a cold pull request
-      # build costs a review. CCACHE_SIZE is still passed so ccache trims its scratch dir.
-      PERSIST_CCACHE: 'false'
-      CCACHE_SIZE: ${{ matrix.ccache_size || '600M' }}
-      CMAKE_GENERATOR: 'Ninja'
-      NAME: ${{ matrix.distro }}${{ matrix.version }}
-      IMAGE_SUFFIX: ${{ matrix.variant }}
-      # The shared steps below gate on these, so they have to be derived here too. Left
-      # undefined they silently skipped the build the leg exists for: the coverage leg
-      # found build/ empty and its report collection failed on every nightly and tag run.
-      # Same derivation as the pull request job above.
-      DEBUG_TEST: ${{ matrix.sanitize == 'yes' || matrix.coverage == 'yes' || matrix.debug_test == 'yes' }}
-      RUN_TESTS: ${{ matrix.test != 'skip' && !(matrix.sanitize == 'yes' || matrix.coverage == 'yes' || matrix.debug_test == 'yes') }}
+    env: *linux-env
     steps: *linux-steps
 
   build-vcpkg:
@@ -662,7 +646,9 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 100
-    env:
+    # Shared with build-vcpkg-nightly: without it the shared steps find no cache directory and
+    # no debug level, and build cold with full debug information.
+    env: &vcpkg-env
       CCACHE_DIR: ${{ github.workspace }}/.cache/
       CCACHE_SIZE: 1200M    # space of all repo is 10Gi: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#usage-limits-and-eviction-policy
       PERSIST_CCACHE: 'true'
@@ -1213,6 +1199,7 @@ jobs:
     if: github.event_name == 'schedule' || github.ref_type == 'tag'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 100
+    env: *vcpkg-env
     steps: *vcpkg-steps
 
   build-wasm:
@@ -1445,11 +1432,9 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          # Must list the ccache key of every leg that keeps a compiler cache
-          # (PERSIST_CCACHE in build-linux and build-vcpkg, and build-wasm), or a live entry is deleted.
-          # The nightly legs keep none, so their leftover entries are reclaimed here
-          # instead of waiting out the age rule.
-          LIVE_CCACHE_KEYS: 'ccache-Arch ccache-Servatrice_Debian12 ccache-Debian13 ccache-Debian13test ccache-Fedora45debug ccache-Fedora45release ccache-Ubuntu26.04 ccache-Ubuntu26.04sanitize ccache-macOS14 ccache-macOS15 ccache-macOS27Debug ccache-Windows10 ccache-Wasm'
+          # Must list the ccache key of every leg of build-linux, build-vcpkg, their nightly
+          # jobs and build-wasm, or a live entry is deleted.
+          LIVE_CCACHE_KEYS: 'ccache-Arch ccache-Servatrice_Debian12 ccache-Debian12 ccache-Debian13 ccache-Debian13test ccache-Fedora44 ccache-Fedora45debug ccache-Fedora45release ccache-Ubuntu24.04 ccache-Ubuntu26.04 ccache-Ubuntu26.04cover ccache-Ubuntu26.04sanitize ccache-macOS13Intel ccache-macOS14 ccache-macOS15 ccache-macOS27Debug ccache-Windows10 ccache-Wasm'
         run: |
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/caches?per_page=100" \
             --jq '.actions_caches[] | [.id, .ref, .key, .last_accessed_at] | @tsv' >"$RUNNER_TEMP/caches.tsv"
@@ -1480,7 +1465,7 @@ jobs:
               # ccache-Ubuntu26.04 is a prefix of ccache-Ubuntu26.04sanitize, and both
               # keys are live.
               if [[ $live_ccache != *" $key "* ]]; then
-                reason="no pull-request leg keeps it"
+                reason="no leg keeps it"
               fi
             elif [[ $key == codeql-trap-* ]]; then
               if [[ $key != "$newest_trap" ]]; then
